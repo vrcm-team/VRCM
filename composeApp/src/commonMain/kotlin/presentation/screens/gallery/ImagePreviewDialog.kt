@@ -8,7 +8,6 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,6 +36,7 @@ import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.files.FileApi
 import io.github.vrcmteam.vrcm.presentation.animations.DefaultBoundsTransform
 import io.github.vrcmteam.vrcm.presentation.compoments.*
+import io.github.vrcmteam.vrcm.presentation.designsystem.*
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
@@ -57,6 +57,7 @@ class ImagePreviewDialog(
     private val fileName: String,
     private val fileExtension: String,
     private val directImageUrl: String? = null,
+    private val fileVersion: Int? = null,
 ) : SharedDialog {
 
     override val transitionDurationMillis: Int =
@@ -81,9 +82,13 @@ class ImagePreviewDialog(
 
         ) {
             // 如果提供了直接URL（如拍立得），直接使用；否则从fileId构造
-            val previewImageUrl = directImageUrl ?: FileApi.convertFileUrl(fileId, 2048)
+            val previewImageUrl = directImageUrl
+                ?: fileVersion?.let { FileApi.imageUrl(fileId, it, 2048) }
+                ?: FileApi.convertFileUrl(fileId, 2048)
             // 导出和分享使用原始文件端点，预览仍使用受控尺寸避免大图占用内存。
-            val imageUrl = directImageUrl ?: FileApi.convertFileUrlToOriginal(fileId)
+            val imageUrl = directImageUrl
+                ?: fileVersion?.let { FileApi.originalFileUrl(fileId, it) }
+                ?: FileApi.convertFileUrlToOriginal(fileId)
             // 为了防止ZoomableImage拦截背景点击事件，单独放在一个Box中
             Box(
                 modifier = Modifier
@@ -110,9 +115,9 @@ class ImagePreviewDialog(
                     .align(Alignment.BottomEnd),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                FloatingActionButton(
+                AppFloatingActionButton(
                     onClick = {
-                        if (isSharing) return@FloatingActionButton
+                        if (isSharing) return@AppFloatingActionButton
                         isSharing = true
                         coroutineScope.launch(Dispatchers.IO) {
                             runCatching { platform.shareImage(imageUrl, "${fileName}${fileExtension}") }
@@ -129,21 +134,20 @@ class ImagePreviewDialog(
                     },
                 ) {
                     if (isSharing) {
-                        CircularProgressIndicator(
+                        AppActivityIndicator(
                             modifier = Modifier.size(24.dp),
-                            strokeWidth = 3.dp,
-                            color = MaterialTheme.colorScheme.onPrimary,
+                            color = AppTheme.colors.onTint,
                         )
                     } else {
-                        Icon(
+                        AppIcon(
                             imageVector = AppIcons.Share,
                             contentDescription = strings.imageShare,
                         )
                     }
                 }
-                FloatingActionButton(
+                AppFloatingActionButton(
                     onClick = {
-                        if (isSaving) return@FloatingActionButton
+                        if (isSaving) return@AppFloatingActionButton
                         isSaving = true
                         coroutineScope.launch(Dispatchers.IO) {
                             authService.reTryAuthCatching {
@@ -168,13 +172,12 @@ class ImagePreviewDialog(
                     },
                 ) {
                     if (isSaving) {
-                        CircularProgressIndicator(
+                        AppActivityIndicator(
                             modifier = Modifier.size(24.dp),
-                            strokeWidth = 3.dp,
-                            color = MaterialTheme.colorScheme.onPrimary,
+                            color = AppTheme.colors.onTint,
                         )
                     } else {
-                        Icon(
+                        AppIcon(
                             painter = rememberVectorPainter(AppIcons.SaveAlt),
                             contentDescription = strings.imageSave,
                         )
@@ -184,7 +187,7 @@ class ImagePreviewDialog(
 
 
             // 添加一个关闭按钮，放在左上角
-            IconButton(
+            AppIconButton(
                 onClick = {
                     // 关闭对话框
                     setDialogContent(null)
@@ -194,7 +197,7 @@ class ImagePreviewDialog(
                     .padding(8.dp)
                     .align(Alignment.TopStart)
             ) {
-                Icon(
+                AppIcon(
                     painter = rememberVectorPainter(AppIcons.Close),
                     contentDescription = "Close",
                     tint = Color.White
@@ -470,19 +473,18 @@ internal fun PrintPhotoImage(
             AsyncImagePainter.State.Empty,
             is AsyncImagePainter.State.Loading -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(
+                    AppActivityIndicator(
                         modifier = Modifier.size(24.dp),
-                        strokeWidth = 2.dp,
                     )
                 }
             }
 
             is AsyncImagePainter.State.Error -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
+                    AppText(
                         text = strings.imageLoadFailed,
-                        color = MaterialTheme.colorScheme.errorContainer,
-                        style = MaterialTheme.typography.titleMedium,
+                        color = AppTheme.colors.destructiveSoft,
+                        style = AppTheme.type.headline,
                     )
                 }
             }
@@ -538,15 +540,15 @@ private fun PreviewImage(
         contentScale = ContentScale.Fit,
         loading = {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+                AppActivityIndicator()
             }
         },
         error = {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(
+                AppText(
                     text = strings.imageLoadFailed,
-                    color = MaterialTheme.colorScheme.errorContainer,
-                    style = MaterialTheme.typography.titleMedium,
+                    color = AppTheme.colors.destructiveSoft,
+                    style = AppTheme.type.headline,
                 )
             }
         }

@@ -18,7 +18,7 @@
 ## Bring your VRChat social life to your phone
 
 <div align="center">
-  <img src="image/MultiPlatformPreview.png" width="720" alt="VRCM cross-platform VRChat social companion preview"/>
+  <img src="image/MultiPlatformPreview.png" width="720" alt="VRCM Home on desktop, Android and iPhone; the desktop window uses the wide layout with a vertical tab bar, the Home list and a detail pane side by side"/>
 </div>
 
 VRCM is a cross-platform VRChat companion focused on social connection and convenience. It goes beyond showing who is online: explore your social circles, remember time spent together, and move smoothly from shared links to worlds, interactions, and real-world meetups.
@@ -26,7 +26,7 @@ VRCM is a cross-platform VRChat companion focused on social connection and conve
 > VRCM follows a different product direction from VRCX: VRCX puts greater emphasis on desktop logging and information management, while VRCM prioritizes mobile social connection, convenient interaction, and availability on the go.
 > Desktop builds will continue to receive basic support and essential maintenance, but deeper desktop development is not a near-term priority, nor is matching VRCX's desktop feature depth.
 
-[Download the latest release](https://github.com/vrcm-team/VRCM/releases/latest) · [What's new in 1.1.3](docs/releases/1.1.3.md)
+[Download the latest release](https://github.com/vrcm-team/VRCM/releases/latest) · [Website](https://vrcm-team.github.io/VRCM/) · [What's new in 1.1.3](docs/releases/1.1.3.md)
 
 </div>
 
@@ -40,7 +40,7 @@ VRCM is a cross-platform VRChat companion focused on social connection and conve
 - **Mutual context**: discover mutual friends and mutual groups without leaving the profile flow.
 
 <div align="center">
-  <img src="image/Feature-Friend-Network.png" width="300" alt="Privacy-redacted friend network on a phone"/>
+  <img src="image/Feature-Friend-Network.png" width="300" alt="Friend network in the Around me view on an Android phone, with every friend pixelated for privacy"/>
 </div>
 
 > Activity and time-together data cover only what VRCM observed while running. Android can continue observing in the background when background monitoring is enabled. This is not a complete VRChat account history.
@@ -48,7 +48,7 @@ VRCM is a cross-platform VRChat companion focused on social connection and conve
 ### Mobile shortcuts and in-game interaction
 
 - **Clipboard recognition**: copy a VRChat user, world, group, or avatar URL/ID, return to VRCM, confirm, and jump directly to it.
-- **Open web links in VRCM**: Android can hand supported `vrchat.com` links directly to the app.
+- **Open web links in VRCM**: Android can open supported `vrchat.com` links in VRCM. On Android 12 and later, first check `vrchat.com` and `www.vrchat.com` under VRCM's app info → **Open by default** → **Add link**; otherwise these links keep opening in the browser.
 - **Native sharing**: share public profile links through the Android/iOS share sheet; Desktop falls back to copying the URL.
 - **Act immediately**: inspect a friend's instance, invite yourself, send several kinds of Boop, and handle friend requests or invitations.
 
@@ -60,7 +60,7 @@ VRCM is a cross-platform VRChat companion focused on social connection and conve
 - **Mobile photo management**: browse, zoom, download, and batch-delete Gallery content. Non-VRC+ users can still view Prints.
 
 <div align="center">
-  <img src="image/Feature-Gallery-Mobile.png" width="360" alt="VRChat+ Gallery on an Android phone, showing photo categories and the upload action"/>
+  <img src="image/Feature-Gallery-Mobile.png" width="300" alt="VRChat+ Gallery on an Android phone, showing photo categories and the upload action"/>
 </div>
 
 ### Android real-time alerts
@@ -82,7 +82,7 @@ VRCM is a cross-platform VRChat companion focused on social connection and conve
 - Add up to four QR codes for your VRChat profile and profile social links, then save the card to the system gallery.
 
 <div align="center">
-  <img src="image/Feature-Meetup-Card.png" width="300" alt="Full-screen meetup name card on a phone"/>
+  <img src="image/Feature-Meetup-Card.png" width="300" alt="Full-screen meetup name card with the Info Bar template, showing a photo, name, language flags and a profile QR code"/>
 </div>
 
 ## More capabilities
@@ -105,7 +105,7 @@ VRCM is a cross-platform VRChat companion focused on social connection and conve
 - Kotlin Multiplatform 2.2.20 and Compose Multiplatform 1.10.3
 - Ktor, kotlinx.serialization, Room, and Coil
 - Koin, Lifecycle ViewModel, Navigation 3, and Material 3 Adaptive
-- Android minSdk 24, targetSdk 35, compileSdk 36; Java 21
+- Android minSdk 24, targetSdk 36, compileSdk 36; Java 21
 
 ## Privacy and disclaimer
 

@@ -5,16 +5,25 @@ import androidx.savedstate.serialization.SavedStateConfiguration
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthScreen
 import io.github.vrcmteam.vrcm.presentation.screens.auth.StartupAnimeScreen
+import io.github.vrcmteam.vrcm.presentation.screens.activity.FriendActivityTimelineScreen
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryPickerScreen
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreen
+import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesScreen
+import io.github.vrcmteam.vrcm.presentation.screens.favorites.MyGroupsScreen
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageEditorScreen
 import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreen
+import io.github.vrcmteam.vrcm.presentation.screens.inventory.InventoryScreen
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardDisplayRoute
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardEditorRoute
 import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationScreen
-import io.github.vrcmteam.vrcm.presentation.screens.settings.NotificationSettingsScreen
+import io.github.vrcmteam.vrcm.presentation.screens.search.GlobalSearchScreen
+import io.github.vrcmteam.vrcm.presentation.screens.settings.SettingsScreen
+import io.github.vrcmteam.vrcm.presentation.screens.settings.RewardCodeScreen
+import io.github.vrcmteam.vrcm.presentation.screens.settings.InviteMessageSlotsScreen
+import io.github.vrcmteam.vrcm.presentation.screens.settings.PlayerModerationListScreen
+import io.github.vrcmteam.vrcm.presentation.screens.settings.PlayerModerationCleanupScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.CardListDetailScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.FriendNetworkScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.MutualFriendsScreen
@@ -32,7 +41,12 @@ internal val appSavedStateConfiguration = SavedStateConfiguration {
             subclass(AuthScreen::class, AuthScreen.serializer())
             subclass(AuthAnimeScreen::class, AuthAnimeScreen.serializer())
             subclass(HomeScreen::class, HomeScreen.serializer())
+            subclass(InventoryScreen::class, InventoryScreen.serializer())
+            subclass(FriendActivityTimelineScreen::class, FriendActivityTimelineScreen.serializer())
             subclass(GalleryScreen::class, GalleryScreen.serializer())
+            subclass(FavoritesScreen::class, FavoritesScreen.serializer())
+            subclass(MyGroupsScreen::class, MyGroupsScreen.serializer())
+            subclass(GlobalSearchScreen::class, GlobalSearchScreen.serializer())
             subclass(GalleryPickerScreen::class, GalleryPickerScreen.serializer())
             subclass(PrintImageEditorScreen::class, PrintImageEditorScreen.serializer())
             subclass(FriendNetworkScreen::class, FriendNetworkScreen.serializer())
@@ -45,7 +59,11 @@ internal val appSavedStateConfiguration = SavedStateConfiguration {
             subclass(CardListDetailScreen::class, CardListDetailScreen.serializer())
             subclass(MeetupCardDisplayRoute::class, MeetupCardDisplayRoute.serializer())
             subclass(MeetupCardEditorRoute::class, MeetupCardEditorRoute.serializer())
-            subclass(NotificationSettingsScreen::class, NotificationSettingsScreen.serializer())
+            subclass(SettingsScreen::class, SettingsScreen.serializer())
+            subclass(RewardCodeScreen::class, RewardCodeScreen.serializer())
+            subclass(InviteMessageSlotsScreen::class, InviteMessageSlotsScreen.serializer())
+            subclass(PlayerModerationListScreen::class, PlayerModerationListScreen.serializer())
+            subclass(PlayerModerationCleanupScreen::class, PlayerModerationCleanupScreen.serializer())
             subclass(NotificationScreen::class, NotificationScreen.serializer())
         }
     }

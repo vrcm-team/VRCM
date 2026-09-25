@@ -116,7 +116,8 @@ class FriendNotificationFactory(private val context: Context) {
         }
         val pending = PendingIntent.getActivity(context, code, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Notification.Builder(context, channel) else Notification.Builder(context)
-        return builder.setSmallIcon(R.mipmap.logo).setContentIntent(pending).setPriority(Notification.PRIORITY_HIGH)
+        // 状态栏小图标只取透明度：用单色图形，彩色启动器图标会变成一块实心白色
+        return builder.setSmallIcon(R.drawable.logo_notification).setContentIntent(pending).setPriority(Notification.PRIORITY_HIGH)
     }
     private fun channels() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return

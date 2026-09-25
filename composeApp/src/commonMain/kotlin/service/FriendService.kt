@@ -6,6 +6,7 @@ import io.github.vrcmteam.vrcm.core.shared.AccountWebSocketEvent
 import io.github.vrcmteam.vrcm.core.shared.AuthenticatedAccount
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
+import io.github.vrcmteam.vrcm.network.api.attributes.VRChatResponse
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
@@ -22,6 +23,7 @@ import io.github.vrcmteam.vrcm.storage.FriendListCacheStore
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
 import io.github.vrcmteam.vrcm.storage.AccountCacheWriteToken
 import io.github.vrcmteam.vrcm.storage.data.FriendListCache
+import io.ktor.http.HttpStatusCode
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
@@ -30,7 +32,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.Flow
@@ -40,6 +45,8 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.retry
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -48,6 +55,13 @@ import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.Json
 import org.koin.core.logger.Logger
+
+internal const val MAX_CONCURRENT_FRIEND_REMOVALS = 3
+
+internal data class FriendRemovalBatchResponse(
+    val results: Map<String, Result<VRChatResponse>>,
+    val sessionToken: AccountSessionToken,
+)
 
 class FriendService(
     private val friendsApi: FriendsApi,
@@ -87,6 +101,15 @@ class FriendService(
 
     private val _friendState = MutableStateFlow<Map<String, FriendData>>(emptyMap())
     val friendState: StateFlow<Map<String, FriendData>> = _friendState.asStateFlow()
+    private val _friendStateSnapshot = MutableStateFlow(
+        FriendStateSnapshot(sessionToken = null, friends = emptyMap())
+    )
+    internal val friendStateSnapshot: StateFlow<FriendStateSnapshot> =
+        _friendStateSnapshot.asStateFlow()
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+    private val _hasRefreshError = MutableStateFlow(false)
+    val hasRefreshError: StateFlow<Boolean> = _hasRefreshError.asStateFlow()
     private val _currentUserLocation = MutableStateFlow<FriendPresence?>(null)
     val currentUserLocation: StateFlow<FriendPresence?> = _currentUserLocation.asStateFlow()
     private val _friendActivitySource = MutableStateFlow<FriendActivitySourceSnapshot?>(null)
@@ -140,6 +163,8 @@ class FriendService(
                         _friendActivitySource.value = null
                         _friendLastActivitySource.value = null
                         _initialRefreshCompleted.value = false
+                        _isRefreshing.value = false
+                        _hasRefreshError.value = false
                     }
                     preloadTask.cancelAndJoin()
                     offlineLastActivityRefreshTask.cancelAndJoin()
@@ -164,8 +189,17 @@ class FriendService(
                 restoreCacheBeforeRefresh = true
                 // 新账号要重新完成一次完整刷新，才能把在线状态当作可信读数。
                 _initialRefreshCompleted.value = false
+                // 缓存恢复与首次网络刷新是同一个连续的首屏加载阶段。
+                _isRefreshing.value = true
+                _hasRefreshError.value = false
             }
-            accountTracker.onAuthenticated(session.account.userId)
+            if (accountTracker.onAuthenticated(session.account.userId)) {
+                friendStore.clear()
+                publishFriendState()
+            } else if (!restoreCacheBeforeRefresh) {
+                // 同账号续期保留好友状态，但必须用新的完整 token 重新发布绑定快照。
+                publishFriendState()
+            }
             publishFriendActivitySource()
             true
         }
@@ -182,13 +216,14 @@ class FriendService(
                     }
                     if (isCurrentSession(session.token)) {
                         preloadFriendList(session.token)
+                        runCatching { refreshCurrentUserLocation(session.token) }
                     }
                 }
             } else {
                 preloadFriendList(session.token)
-            }
-            serviceScope.launch {
-                runCatching { refreshCurrentUserLocation(session.token) }
+                serviceScope.launch {
+                    runCatching { refreshCurrentUserLocation(session.token) }
+                }
             }
         }
     }
@@ -219,7 +254,12 @@ class FriendService(
             }
             FriendEvents.FriendOnline.typeName -> {
                 val content = json.decodeFromString<FriendOnlineContent>(socketEvent.content)
-                val update = updateFriendPresence(sessionToken, content.userId, content::mergeWith)
+                val update = updateFriendPresence(
+                    sessionToken = sessionToken,
+                    userId = content.userId,
+                    isActive = false,
+                    update = content::mergeWith,
+                )
                 val friend = update?.current
                     ?: run {
                         refreshAfterIncompleteEvent(sessionToken)
@@ -237,13 +277,17 @@ class FriendService(
             FriendEvents.FriendActive.typeName -> {
                 val content = json.decodeFromString<FriendActiveContent>(socketEvent.content)
                 val friend = content.toFriendData()
-                if (!putFriend(sessionToken, friend)) return
+                if (!putFriend(sessionToken, friend, isActive = true)) return
                 emitFriendUpdate(sessionToken, FriendUpdateEvent.Active(friend))
             }
 
             FriendEvents.FriendOffline.typeName -> {
                 val content = json.decodeFromString<FriendOfflineContent>(socketEvent.content)
-                val update = updateFriendPresenceOrRemove(sessionToken, content.userId) { existing ->
+                val update = updateFriendPresenceOrRemove(
+                    sessionToken = sessionToken,
+                    userId = content.userId,
+                    isActive = false,
+                ) { existing ->
                     existing?.copy(
                         location = LocationType.Offline.value,
                         travelingToLocation = "",
@@ -266,7 +310,12 @@ class FriendService(
 
             FriendEvents.FriendLocation.typeName -> {
                 val content = json.decodeFromString<FriendLocationContent>(socketEvent.content)
-                val friend = updateFriend(sessionToken, content.userId, content::mergeWith)
+                val friend = updateFriend(
+                    sessionToken = sessionToken,
+                    userId = content.userId,
+                    isActive = false,
+                    update = content::mergeWith,
+                )
                     ?: return refreshAfterIncompleteEvent(sessionToken)
                 emitFriendUpdate(sessionToken, FriendUpdateEvent.LocationChanged(friend))
             }
@@ -344,8 +393,15 @@ class FriendService(
             if (!isCurrentSessionLocked(sessionToken)) return@synchronized null
             friendStore.beginRefresh()
         } ?: return@runRefresh false
+        val publishRefreshState = offline == null
+        if (publishRefreshState) {
+            _isRefreshing.value = true
+            _hasRefreshError.value = false
+        }
         val collectedFriends = mutableListOf<FriendData>()
         var succeeded = true
+        var refreshSucceeded = false
+        var cancelled = false
         try {
             (offline?.run(friendsApi::friendsFlow) ?: friendsApi.allFriendsFlow())
                 .retry(1) {
@@ -361,28 +417,39 @@ class FriendService(
                 }
 
             if (succeeded) {
-                return@runRefresh commitRefresh(
+                refreshSucceeded = commitRefresh(
                     sessionToken = sessionToken,
                     token = refreshToken,
                     friends = collectedFriends,
                     replaceUntouched = offline == null,
                 )
+                return@runRefresh refreshSucceeded
             }
             return@runRefresh false
         } catch (e: CancellationException) {
+            cancelled = true
             throw e
         } catch (e: Exception) {
             SharedFlowCentre.toastText.emit(ToastText.Error("获取好友列表失败: ${e.message}"))
             return@runRefresh false
+        } finally {
+            if (publishRefreshState && isCurrentSession(sessionToken)) {
+                if (!cancelled) {
+                    _hasRefreshError.value = !refreshSucceeded
+                }
+                _isRefreshing.value = false
+            }
         }
     }
 
     private fun updateFriend(
         sessionToken: AccountSessionToken,
         userId: String,
+        isActive: Boolean? = null,
         update: (FriendData?) -> FriendData?,
     ): FriendData? = synchronized(friendMapLock) {
         if (!isCurrentSessionLocked(sessionToken)) return@synchronized null
+        isActive?.let { friendStore.setActiveFromEvent(userId, it) }
         val updated = friendStore.updateFromEvent(userId, update) ?: return@synchronized null
         publishFriendState()
         updated
@@ -391,10 +458,12 @@ class FriendService(
     private fun updateFriendPresence(
         sessionToken: AccountSessionToken,
         userId: String,
+        isActive: Boolean? = null,
         update: (FriendData?) -> FriendData?,
     ): FriendPresenceUpdate? = synchronized(friendMapLock) {
         if (!isCurrentSessionLocked(sessionToken)) return@synchronized null
         val previous = friendStore.friend(userId)
+        isActive?.let { friendStore.setActiveFromEvent(userId, it) }
         val current = friendStore.updateFromEvent(userId, update) ?: return@synchronized null
         publishFriendState()
         FriendPresenceUpdate(previous, current)
@@ -403,17 +472,24 @@ class FriendService(
     private fun updateFriendPresenceOrRemove(
         sessionToken: AccountSessionToken,
         userId: String,
+        isActive: Boolean? = null,
         update: (FriendData?) -> FriendData?,
     ): FriendPresenceUpdate? = synchronized(friendMapLock) {
         if (!isCurrentSessionLocked(sessionToken)) return@synchronized null
         val previous = friendStore.friend(userId)
+        isActive?.let { friendStore.setActiveFromEvent(userId, it) }
         val current = friendStore.updateOrRemoveFromEvent(userId, update)
         publishFriendState()
         FriendPresenceUpdate(previous, current)
     }
 
-    private fun putFriend(sessionToken: AccountSessionToken, friend: FriendData): Boolean =
+    private fun putFriend(
+        sessionToken: AccountSessionToken,
+        friend: FriendData,
+        isActive: Boolean? = null,
+    ): Boolean =
         mutateFriendStore(sessionToken) {
+            isActive?.let { friendStore.setActiveFromEvent(friend.id, it) }
             friendStore.putFromEvent(friend)
         }
 
@@ -421,6 +497,13 @@ class FriendService(
         mutateFriendStore(sessionToken) {
             friendStore.removeFromEvent(userId)
         }
+
+    private fun removeFriends(
+        sessionToken: AccountSessionToken,
+        userIds: Collection<String>,
+    ): Boolean = mutateFriendStore(sessionToken) {
+        userIds.forEach(friendStore::removeFromEvent)
+    }
 
     private inline fun mutateFriendStore(
         sessionToken: AccountSessionToken,
@@ -448,21 +531,29 @@ class FriendService(
         if (!isCurrentSessionLocked(sessionToken)) return@synchronized false
         val committed = friendStore.mergeRefresh(token, friends, replaceUntouched)
         if (committed) {
-            if (replaceUntouched) {
-                _initialRefreshCompleted.value = true
-            }
             publishFriendState()
             _friendLastActivitySource.value = FriendActivitySourceSnapshot(
                 token = sessionToken,
                 friends = friends.toList(),
                 selfLocation = null,
             )
+            if (replaceUntouched) {
+                _initialRefreshCompleted.value = true
+                publishFriendActivitySource()
+            }
         }
         committed
     }
 
     private fun publishFriendState() {
         val snapshot = friendStore.snapshot
+        val stateSnapshot = FriendStateSnapshot(
+            sessionToken = activeSessionToken,
+            friends = snapshot,
+        )
+        if (_friendStateSnapshot.value != stateSnapshot) {
+            _friendStateSnapshot.value = stateSnapshot
+        }
         if (_friendState.value != snapshot) {
             _friendState.value = snapshot
         }
@@ -498,9 +589,9 @@ class FriendService(
     private suspend fun refreshCurrentUserLocation(
         sessionToken: AccountSessionToken,
     ): CurrentUserData? = currentUserRefreshMutex.withLock refresh@{
-        val locationRevision = synchronized(friendMapLock) {
+        val (locationRevision, activeFriendsToken) = synchronized(friendMapLock) {
             if (!isCurrentSessionLocked(sessionToken)) return@refresh null
-            currentUserLocationRevision
+            currentUserLocationRevision to friendStore.beginRefresh()
         }
         val currentUser = authService.refreshCurrentUserPresence(sessionToken) ?: return@refresh null
         synchronized(friendMapLock) {
@@ -509,6 +600,9 @@ class FriendService(
             }
             if (currentUserLocationRevision == locationRevision) {
                 updateCurrentUserLocationLocked(currentUser.presence.toFriendPresence())
+            }
+            if (friendStore.mergeActiveFriends(activeFriendsToken, currentUser.activeFriends)) {
+                publishFriendState()
             }
             currentUser
         }
@@ -549,6 +643,15 @@ class FriendService(
     private fun isCurrentSessionLocked(sessionToken: AccountSessionToken): Boolean =
         activeSessionToken == sessionToken && SharedFlowCentre.isCurrentSession(sessionToken)
 
+    private suspend fun resolveActiveFriendSession(
+        sessionToken: AccountSessionToken,
+    ): AccountSessionToken? =
+        combine(_friendStateSnapshot, SharedFlowCentre.currentSession) { snapshot, session ->
+            snapshot.sessionToken to session?.token
+        }.first { (snapshotToken, currentToken) ->
+            currentToken != sessionToken || snapshotToken == currentToken
+        }.second?.takeIf { it == sessionToken }
+
     fun preloadFriendList() {
         val sessionToken = synchronized(friendMapLock) { activeSessionToken } ?: return
         preloadFriendList(sessionToken)
@@ -566,9 +669,107 @@ class FriendService(
     suspend fun deleteFriendRequest(userId: String) =
         authService.reTryAuthCatching { friendsApi.deleteFriendRequest(userId) }
 
-    suspend fun unfriend(userId: String) =
-        authService.reTryAuthCatching { friendsApi.unfriend(userId) }
+    suspend fun unfriend(userId: String): Result<VRChatResponse> {
+        val sessionToken = synchronized(friendMapLock) { activeSessionToken }
+            ?: return friendSessionChangedResult()
+        if (!isCurrentSession(sessionToken)) {
+            return friendSessionChangedResult()
+        }
+
+        val response = authService.runSessionBoundCatching(sessionToken) {
+            friendsApi.unfriend(userId)
+        } ?: return friendSessionChangedResult()
+        val result = response.result
+        if (result.isFailure) return result
+        val activeSessionToken = resolveActiveFriendSession(response.sessionToken)
+            ?: return friendSessionChangedResult()
+        if (!removeFriend(activeSessionToken, userId)) {
+            return friendSessionChangedResult()
+        }
+        emitFriendUpdate(activeSessionToken, FriendUpdateEvent.Delete(userId))
+        return result
+    }
+
+    /**
+     * Runs one account-bound group and returns the exact session that owns its item results.
+     *
+     * A batch may renew authentication once. Successful and non-auth failures are retained, while
+     * only requests that returned 401 are retried under the renewed session.
+     */
+    internal suspend fun unfriendBatch(
+        sessionToken: AccountSessionToken,
+        requestedUserIds: List<String>,
+    ): FriendRemovalBatchResponse? {
+        val userIds = requestedUserIds.distinct()
+        require(userIds.size <= MAX_CONCURRENT_FRIEND_REMOVALS)
+        if (!isCurrentSession(sessionToken)) {
+            return null
+        }
+        if (userIds.isEmpty()) return FriendRemovalBatchResponse(emptyMap(), sessionToken)
+
+        val completedResults = mutableMapOf<String, Result<VRChatResponse>>()
+        var pendingUserIds = userIds
+        val response = authService.runSessionBoundCatching(sessionToken) {
+            val attemptResults = requestUnfriendBatch(pendingUserIds)
+            val unauthorizedUserIds = mutableListOf<String>()
+            var unauthorizedError: Throwable? = null
+            attemptResults.forEach { (userId, result) ->
+                val error = result.exceptionOrNull()
+                if (error is VRCApiException &&
+                    error.code == HttpStatusCode.Unauthorized.value
+                ) {
+                    unauthorizedUserIds += userId
+                    if (unauthorizedError == null) unauthorizedError = error
+                } else {
+                    completedResults[userId] = result
+                }
+            }
+            pendingUserIds = unauthorizedUserIds
+            unauthorizedError?.let { throw it }
+        } ?: return null
+        response.result.exceptionOrNull()?.let { error ->
+            pendingUserIds.forEach { userId ->
+                completedResults[userId] = Result.failure(error)
+            }
+        }
+        val missingResultError = IllegalStateException("Missing friend removal result")
+        val results = userIds.associateWith { userId ->
+            completedResults[userId] ?: Result.failure(missingResultError)
+        }
+        val activeSessionToken = resolveActiveFriendSession(response.sessionToken)
+            ?: return null
+        val succeededUserIds = results.filterValues { it.isSuccess }.keys
+        if (succeededUserIds.isNotEmpty() && !removeFriends(activeSessionToken, succeededUserIds)) {
+            return null
+        }
+        succeededUserIds.forEach { userId ->
+            emitFriendUpdate(activeSessionToken, FriendUpdateEvent.Delete(userId))
+        }
+        return FriendRemovalBatchResponse(results, response.sessionToken)
+    }
+
+    private suspend fun requestUnfriendBatch(
+        userIds: List<String>,
+    ): Map<String, Result<VRChatResponse>> = coroutineScope {
+        userIds.map { userId ->
+            async {
+                userId to try {
+                    Result.success(friendsApi.unfriend(userId))
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Throwable) {
+                    Result.failure(error)
+                }
+            }
+        }.awaitAll().toMap()
+    }
 }
+
+private data object FriendSessionChangedException :
+    IllegalStateException("Account session changed during friend removal")
+
+private fun friendSessionChangedResult(): Result<VRChatResponse> =
+    Result.failure(FriendSessionChangedException)
 
 data class FriendPresence(val location: String, val travelingToLocation: String = "")
 

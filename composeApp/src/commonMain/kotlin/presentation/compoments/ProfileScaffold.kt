@@ -12,8 +12,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import coil3.PlatformContext
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import io.github.vrcmteam.vrcm.presentation.designsystem.*
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
@@ -97,29 +98,33 @@ internal class ProfileScrollToTopController(
 
 /**
  * 详情页面脚手架
+ * @param modifier 页面脚手架的外部布局约束
  * @param profileImageUrl 详情页背景图
  * @param iconUrl 详情页头像
  * @param onReturn 返回按钮点击事件
  * @param onMenu 菜单按钮点击事件
+ * @param menuContentDescription 菜单按钮的无障碍说明
  * @param outerScrollState 外层滚动状态（控制头部视差），可从外部传入以保存/恢复滚动位置
  * @param innerScrollState 内层滚动状态（控制卡片内容滚动），可从外部传入以保存/恢复滚动位置
- * @param topBarActions 顶部栏右侧操作，复用顶部栏随滚动变化的按钮配色
+ * @param topBarActions 顶部栏右侧操作，和返回 / 菜单一样是玻璃圆钮
  * @param content 详情页内容
  */
 @Composable
 fun ProfileScaffold(
+    modifier: Modifier = Modifier,
     imageModifier: Modifier = Modifier,
     profileImageUrl: String?,
     iconUrl: String?,
     sharedImageCacheKey: String? = null,
     onReturn: () -> Unit,
     onMenu:  (() -> Unit)? = null,
+    menuContentDescription: String = "MenuIcon",
     outerScrollState: ScrollState = rememberScrollState(),
     innerScrollState: ScrollState = rememberScrollState(),
-    topBarActions: @Composable RowScope.(IconButtonColors) -> Unit = {},
+    topBarActions: @Composable RowScope.() -> Unit = {},
     content: @Composable ColumnScope.(Float, Dp) -> Unit
 ) {
-    BoxWithConstraints {
+    BoxWithConstraints(modifier = modifier) {
         val scrollState = outerScrollState
 
         val imageHeight = remember { maxHeight / 2.5f }
@@ -146,6 +151,8 @@ fun ProfileScaffold(
             }
         val lastIconPadding = imageHeight - (topBarHeight * ratio)
         val scope = rememberCoroutineScope()
+        val glassBackdrop = rememberGlassBackdrop()
+        val scaffoldHeight = maxHeight
         val scrollToTopController = remember(scope) { ProfileScrollToTopController(scope) }
         val isHidden = topBarHeight + sysTopPadding < remainingDistance
         // 嵌套滑动,当父组件没有滑到maxValue时，父组件将消费滚动偏移量
@@ -153,62 +160,71 @@ fun ProfileScaffold(
             thresholdNestedScrollConnection({ scrollState.value < scrollState.maxValue }) {
                 scope.launch { scrollState.scrollTo((scrollState.value + -it).roundToInt()) }
             }
-        Surface(
-            Modifier
-                .verticalScroll(
-                    state = scrollState,
-                    enabled = innerScrollState.value == 0,
-                )
-                .height(imageHeight + maxHeight)
-                .fillMaxWidth(),
-            contentColor = MaterialTheme.colorScheme.primary
-        ) {
-            // 用户Image
-            ProfileImage(
-                imageModifier,
-                imageHeight,
-                isHidden,
-                offsetDp,
-                ratio,
-                blurDp,
-                profileImageUrl,
-                sharedImageCacheKey,
-            )
-            // 底部信息卡片
-            BottomCard(
-                imageHeight,
-                maxHeight,
-                ratio,
-                topBarHeight,
-                sysTopPadding,
-                nestedScrollConnection,
-                innerScrollState,
-                content
-            )
-            // 顶部导航栏
-            TopMenuBar(
-                topBarHeight,
-                sysTopPadding,
-                offsetDp,
-                ratio,
-                onReturn = onReturn,
-                onMenu = onMenu,
-                actions = topBarActions,
-            )
-            // 用户icon
-            ProfileIcon(
-                imageModifier,
-                isHidden,
-                lastIconPadding,
-                offsetDp,
-                imageHeight,
-                topIconRatio,
-                iconUrl,
+        // 页面里弹出的菜单画在另开的弹层上，模糊的也是这一层内容（同 AppScaffold）
+        CompositionLocalProvider(LocalPopupBackdrop provides glassBackdrop) {
+            AppSurface(
+                Modifier
+                    .verticalScroll(
+                        state = scrollState,
+                        enabled = innerScrollState.value == 0,
+                    )
+                    .height(imageHeight + maxHeight)
+                    .fillMaxWidth(),
+                color = AppTheme.colors.groupedBackground,
             ) {
-                scrollToTopController.scrollToTop(
-                    innerScrollState = innerScrollState,
-                    outerScrollState = scrollState,
-                )
+                // 头图与信息卡片是内容层：顶栏的玻璃按钮取样它做模糊
+                Box(Modifier.fillMaxSize().glassBackdropSource(glassBackdrop), propagateMinConstraints = true) {
+                    // 用户Image
+                    ProfileImage(
+                        imageModifier,
+                        imageHeight,
+                        isHidden,
+                        offsetDp,
+                        ratio,
+                        blurDp,
+                        profileImageUrl,
+                        sharedImageCacheKey,
+                    )
+                    // 底部信息卡片
+                    BottomCard(
+                        imageHeight,
+                        scaffoldHeight,
+                        ratio,
+                        topBarHeight,
+                        sysTopPadding,
+                        nestedScrollConnection,
+                        innerScrollState,
+                        content
+                    )
+                }
+                // 顶部导航栏
+                CompositionLocalProvider(LocalGlassBackdrop provides glassBackdrop) {
+                    TopMenuBar(
+                        topBarHeight,
+                        sysTopPadding,
+                        offsetDp,
+                        ratio,
+                        onReturn = onReturn,
+                        onMenu = onMenu,
+                        menuContentDescription = menuContentDescription,
+                        actions = topBarActions,
+                    )
+                }
+                // 用户icon
+                ProfileIcon(
+                    imageModifier,
+                    isHidden,
+                    lastIconPadding,
+                    offsetDp,
+                    imageHeight,
+                    topIconRatio,
+                    iconUrl,
+                ) {
+                    scrollToTopController.scrollToTop(
+                        innerScrollState = innerScrollState,
+                        outerScrollState = scrollState,
+                    )
+                }
             }
         }
     }
@@ -265,7 +281,7 @@ private fun BottomCard(
     content: @Composable ColumnScope.(Float, Dp) -> Unit
 ) {
     val inverseRatio = 1 - ratio
-    Card(
+    AppCard(
         modifier = Modifier
             .fillMaxSize()
             .padding(top = imageHeight),
@@ -273,7 +289,7 @@ private fun BottomCard(
             topStart = (ContactPointShape * ratio).dp,
             topEnd = (ContactPointShape * ratio).dp
         ),
-        colors = CardDefaults.cardColors(contentColor = MaterialTheme.colorScheme.primary)
+        color = AppTheme.colors.groupedBackground,
     ) {
         val spacerHeight = (topBarHeight + sysTopPadding) * inverseRatio
         // 简介最小高度 = 卡片内容高度 - 间距高度 - 预留空间(给世界/模型等)

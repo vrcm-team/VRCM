@@ -1,6 +1,7 @@
 package io.github.vrcmteam.vrcm.di.modules
 
 import io.github.vrcmteam.vrcm.service.*
+import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
 import io.github.vrcmteam.vrcm.network.websocket.WebSocketSessionRecovery
 import io.github.vrcmteam.vrcm.service.meetup.DecorationResolver
 import io.github.vrcmteam.vrcm.service.meetup.DecorationTemplateSource
@@ -20,21 +21,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import org.koin.core.module.Module
+import org.koin.core.module.dsl.onClose
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.bind
 import org.koin.dsl.module
 
 val serviceModule: Module = module {
     singleOf(::VersionService)
-    single<AuthService> {
-        AuthService(
-            authApi = get(),
-            accountDao = get(),
-            cookiesStorage = get(),
-            accountCacheManager = get(),
-            profileAppearanceApi = get<ProfileAppearanceApi>(),
-        )
+    singleOf(::AuthService) {
+        onClose { it?.close() }
     } bind WebSocketSessionRecovery::class
+    single { UserProfileEnrichmentService(get()) }
     singleOf(::FavoriteService)
     singleOf(::FriendService)
     singleOf(::FriendActivityService)
@@ -42,8 +39,19 @@ val serviceModule: Module = module {
     singleOf(::VrchatStatusNotificationService)
     singleOf(::NetworkBoopRequest) bind BoopRequest::class
     singleOf(::BoopService)
+    singleOf(::NetworkRewardCodeRedeemer) bind RewardCodeRedeemer::class
+    singleOf(::NetworkBoopPrivacyRequest) bind BoopPrivacyRequest::class
+    single { BoopPrivacyService(get<AuthService>(), get<BoopPrivacyRequest>()) }
+    singleOf(::ImageInviteService) bind ImageInviteRemote::class
+    single { InviteMessageActionService(get<AuthService>(), get<InviteApi>()) }
+    singleOf(::InvitePhotoResponseService)
+    singleOf(::HomeWorldService) bind HomeWorldManager::class
+    singleOf(::NetworkInstanceCreationRequest) bind InstanceCreationRequest::class
+    singleOf(::InstanceCreationService)
     singleOf(::WorldPlatformService)
     singleOf(::OfficialLinkService)
+    singleOf(::ContentReportService)
+    singleOf(::AuthenticatedPlayerModerationCleanupSource) bind PlayerModerationCleanupSource::class
     singleOf(::HttpMeetupRemoteBytesLoader) bind MeetupRemoteBytesLoader::class
     singleOf(::InventoryDecorationTemplateSource) bind DecorationTemplateSource::class
     singleOf(::DecorationResolver)

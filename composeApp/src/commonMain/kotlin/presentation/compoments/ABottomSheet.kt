@@ -1,35 +1,24 @@
 package io.github.vrcmteam.vrcm.presentation.compoments
 
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.SheetState
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSheet
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSheetState
+import io.github.vrcmteam.vrcm.presentation.designsystem.rememberAppSheetState
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ABottomSheet(
     isVisible: Boolean,
-    sheetState: SheetState = rememberModalBottomSheetState(),
+    sheetState: AppSheetState = rememberAppSheetState(),
     onDismissRequest: () -> Unit,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     if (isVisible) {
-        val bottomInsetPadding = getInsetPadding(0, WindowInsets::getBottom)
-        ModalBottomSheet(
-            modifier = Modifier.offset(y = bottomInsetPadding),
+        // 底部系统栏的内边距由 AppSheet 自己处理
+        AppSheet(
             onDismissRequest = onDismissRequest,
-            sheetState = sheetState
-        ) {
-            content()
-            Spacer(modifier = Modifier.height(bottomInsetPadding))
-        }
+            sheetState = sheetState,
+            content = content,
+        )
     }
 }

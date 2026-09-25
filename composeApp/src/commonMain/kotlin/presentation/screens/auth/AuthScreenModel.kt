@@ -10,6 +10,7 @@ import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthUIState
+import io.github.vrcmteam.vrcm.presentation.screens.auth.data.normalizeVerifyCode
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.data.AccountDto
 import kotlinx.coroutines.*
@@ -93,6 +94,20 @@ class AuthScreenModel(
         _currentVerifyJob = null
     }
 
+    /**
+     * 开启验证器 2FA 的账号既可以输验证器验证码，也可以用一次性恢复码登录（手机不在身边、或审核等无法生成验证码的场景）。
+     * 切换时放弃进行中的验证并清空已输入的内容。
+     */
+    fun switchTwoFactorMethod() {
+        val next = when (_uiState.value.cardState) {
+            AuthCardPage.TTFACode -> AuthCardPage.TFACode
+            AuthCardPage.TFACode -> AuthCardPage.TTFACode
+            else -> return
+        }
+        cancelJob()
+        _uiState.value = _uiState.value.copy(cardState = next, verifyCode = "", btnIsLoading = false)
+    }
+
     fun tryAuth() {
         viewModelScope.launch {
             val cardState = awaitAuth().toCardPage()
@@ -137,13 +152,14 @@ class AuthScreenModel(
 
 
     fun verify() {
-        val verifyCode = _uiState.value.verifyCode
+        val cardState = _uiState.value.cardState
+        val verifyCode = cardState.normalizeVerifyCode(_uiState.value.verifyCode) ?: return
         val password = _uiState.value.password.trim()
-        if (verifyCode.isEmpty() || verifyCode.length != 6 || _uiState.value.btnIsLoading) return
+        if (_uiState.value.btnIsLoading) return
         onLoadingChange(true)
         _currentVerifyJob = viewModelScope.launch(context = Dispatchers.Default) {
             async(context = Dispatchers.IO) {
-                authService.verify( password, verifyCode, _uiState.value.cardState)
+                authService.verify(password, verifyCode, cardState)
             }.await()
                 .onSuccess {
                     onCardStateChange(AuthCardPage.Authed)

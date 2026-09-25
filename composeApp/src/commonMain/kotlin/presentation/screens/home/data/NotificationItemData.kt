@@ -1,9 +1,23 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.data
 
 import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationData
+import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationDataV2
+import io.github.vrcmteam.vrcm.network.api.notification.data.resolveNotificationGroupId
+import io.github.vrcmteam.vrcm.service.OfficialLinkType
+import io.github.vrcmteam.vrcm.service.parseOfficialId
+import io.github.vrcmteam.vrcm.service.parseOfficialLink
+import io.ktor.http.URLProtocol
+import io.ktor.http.Url
+
+/** API family that owns a notification and all mutations performed on it. */
+enum class NotificationSource {
+    PIPELINE,
+    LEGACY,
+}
 
 data class NotificationItemData(
     val id: String,
+    val source: NotificationSource,
     val imageUrl: String,
     val title: String?,
     val message: String,
@@ -12,10 +26,17 @@ data class NotificationItemData(
     val link: String?,
     val type: String,
     val actions: List<ActionData>,
+    val seen: Boolean = false,
+    val canDelete: Boolean = false,
+    val groupId: String? = null,
+    val groupName: String? = null,
+    val announcementTitle: String? = null,
     /** The selected default or custom Boop emoji identifier, when VRChat supplies it. */
     val boopEmojiId: String? = null,
     /** Pipeline events can reference this inbox item through a different notification ID. */
     val relatedNotificationId: String? = null,
+    /** Label supplied for the notification's top-level link. */
+    val linkText: String? = null,
 ) {
     /** The notification sender used by sender-specific actions such as opening a profile or replying to a Boop. */
     val senderId: String?
@@ -32,11 +53,13 @@ data class NotificationItemData(
         val data: String,
         val type: String,
         val icon: String = "",
+        val label: String = "",
     )
 
     constructor(n: NotificationData) : this(
         id = n.id,
-        imageUrl = n.imageUrl.orEmpty(),
+        source = NotificationSource.PIPELINE,
+        imageUrl = (n.imageUrl ?: n.details?.imageUrl ?: n.data.imageUrl).orEmpty(),
         title = n.title,
         message = n.message,
         createdAt = n.createdAt,
@@ -48,13 +71,57 @@ data class NotificationItemData(
                 data = responses.responseData,
                 type = responses.type,
                 icon = responses.icon,
+                label = responses.text,
             )
         },
+        seen = n.seen,
+        canDelete = n.canDelete,
+        groupId = resolveNotificationGroupId(
+            n.link,
+            n.groupId,
+            n.details?.groupId,
+            n.data.groupId,
+            n.details?.ownerId,
+            n.data.ownerId,
+            n.senderUserId,
+        ),
+        groupName = n.details?.groupName ?: n.data.groupName,
+        announcementTitle = n.details?.announcementTitle ?: n.data.announcementTitle,
         relatedNotificationId = n.relatedNotificationsId,
         boopEmojiId = n.details?.emojiId ?: n.data.emojiId,
+        linkText = n.linkText,
+    )
+
+    constructor(
+        n: NotificationDataV2,
+        imageUrl: String,
+        title: String,
+        actions: List<ActionData>,
+    ) : this(
+        id = n.id,
+        source = NotificationSource.LEGACY,
+        imageUrl = imageUrl,
+        title = title,
+        message = n.message,
+        createdAt = n.createdAt,
+        senderUserId = n.senderUserId,
+        link = "user:${n.senderUserId}",
+        type = n.type.value,
+        actions = actions,
+        seen = n.seen,
+        canDelete = true,
     )
 
 }
+
+/** Photo responses are accepted only for the two invitation notification families. */
+internal val NotificationItemData.supportsInvitePhotoResponse: Boolean
+    get() = type.equals("invite", ignoreCase = true) ||
+            type.equals("requestInvite", ignoreCase = true)
+
+/** Number of notifications that still need the user's attention. */
+val List<NotificationItemData>.unreadCount: Int
+    get() = count { !it.seen }
 
 /** Resolves either the inbox ID or the related Pipeline event ID to its rendered item. */
 internal fun List<NotificationItemData>.indexOfNotificationTarget(targetId: String?): Int {
@@ -67,13 +134,247 @@ internal fun List<NotificationItemData>.indexOfNotificationTarget(targetId: Stri
 internal enum class NotificationResponseTarget {
     BOOP_USER_API,
     NOTIFICATION_API,
+    NAVIGATION_LINK,
 }
+
+internal enum class NotificationReadTarget {
+    PIPELINE_SEE,
+    LEGACY_SEE,
+}
+
+internal val NotificationItemData.readTarget: NotificationReadTarget
+    get() = when (source) {
+        NotificationSource.PIPELINE -> NotificationReadTarget.PIPELINE_SEE
+        NotificationSource.LEGACY -> NotificationReadTarget.LEGACY_SEE
+    }
+
+internal data class NotificationInboxState(
+    val pipeline: List<NotificationItemData> = emptyList(),
+    val legacy: List<NotificationItemData> = emptyList(),
+    private val consumed: Set<NotificationIdentity> = emptySet(),
+    private val seenNotifications: Set<NotificationIdentity> = emptySet(),
+) {
+    fun replace(source: NotificationSource, items: List<NotificationItemData>): NotificationInboxState {
+        // Seen is monotonic within a session, so a stale refresh cannot undo a read mutation.
+        val mergedSeen = seenNotifications + items.filter { it.seen }.map { it.identity }
+        val visible = items
+            .filterNot { it.identity in consumed }
+            .map { item ->
+                if (!item.seen && item.identity in mergedSeen) item.copy(seen = true) else item
+            }
+        return when (source) {
+            NotificationSource.PIPELINE -> copy(pipeline = visible, seenNotifications = mergedSeen)
+            NotificationSource.LEGACY -> copy(legacy = visible, seenNotifications = mergedSeen)
+        }
+    }
+
+    fun consume(item: NotificationItemData): NotificationInboxState {
+        val identity = item.identity
+        return when (item.source) {
+            NotificationSource.PIPELINE -> copy(
+                pipeline = pipeline.filterNot { it.identity == identity },
+                consumed = consumed + identity,
+            )
+            NotificationSource.LEGACY -> copy(
+                legacy = legacy.filterNot { it.identity == identity },
+                consumed = consumed + identity,
+            )
+        }
+    }
+
+    fun markSeen(item: NotificationItemData): NotificationInboxState {
+        val identity = item.identity
+        return when (item.source) {
+            NotificationSource.PIPELINE -> copy(
+                pipeline = pipeline.map { current ->
+                    if (current.identity == identity) current.copy(seen = true) else current
+                },
+                seenNotifications = seenNotifications + identity,
+            )
+            NotificationSource.LEGACY -> copy(
+                legacy = legacy.map { current ->
+                    if (current.identity == identity) current.copy(seen = true) else current
+                },
+                seenNotifications = seenNotifications + identity,
+            )
+        }
+    }
+}
+
+internal data class NotificationIdentity(
+    val source: NotificationSource,
+    val id: String,
+    val relatedNotificationId: String?,
+) {
+    val stableKey: String
+        get() = "${source.name}:$id:${relatedNotificationId.orEmpty()}"
+}
+
+/** Stable identity shared by inbox state, pending mutations, and rendered item state. */
+internal val NotificationItemData.identity: NotificationIdentity
+    get() = NotificationIdentity(
+        source = source,
+        id = id,
+        relatedNotificationId = relatedNotificationId?.takeIf(String::isNotBlank),
+    )
 
 internal fun NotificationItemData.responseTarget(
     action: NotificationItemData.ActionData,
 ): NotificationResponseTarget =
-    if (type == "boop" && action.icon.equals("reply", ignoreCase = true)) {
+    if (action.type.equals("link", ignoreCase = true)) {
+        NotificationResponseTarget.NAVIGATION_LINK
+    } else if (type.equals("boop", ignoreCase = true) && action.icon.equals("reply", ignoreCase = true)) {
         NotificationResponseTarget.BOOP_USER_API
     } else {
         NotificationResponseTarget.NOTIFICATION_API
     }
+
+/** Resolves the server reply response, with a Users API fallback when a Boop omits responses. */
+internal val NotificationItemData.boopReplyAction: NotificationItemData.ActionData?
+    get() {
+        if (!type.equals("boop", ignoreCase = true)) return null
+        return actions.firstOrNull { responseTarget(it) == NotificationResponseTarget.BOOP_USER_API }
+            ?: NotificationItemData.ActionData(data = "", type = "boop", icon = "reply")
+    }
+
+internal sealed interface NotificationActionTarget {
+    data class User(val id: String) : NotificationActionTarget
+    data class Group(val id: String) : NotificationActionTarget
+    data class World(val id: String) : NotificationActionTarget
+    data class Avatar(val id: String) : NotificationActionTarget
+    data class External(val url: String, val host: String) : NotificationActionTarget
+}
+
+/** Responses plus the current notification's independent top-level link, without duplicates. */
+internal val NotificationItemData.displayActions: List<NotificationItemData.ActionData>
+    get() {
+        if (source != NotificationSource.PIPELINE) return actions
+        val topLevelLink = link?.trim().takeUnless { it.isNullOrEmpty() } ?: return actions
+        val topLevelAction = NotificationItemData.ActionData(
+            data = topLevelLink,
+            type = "link",
+            icon = "link",
+            label = linkText.orEmpty(),
+        )
+        val topLevelTarget = actionTarget(topLevelAction)
+        val containsSameTarget = actions.any { action ->
+            action.type.equals("link", ignoreCase = true) &&
+                (action.data.trim() == topLevelLink ||
+                    topLevelTarget?.isSameDestinationAs(actionTarget(action)) == true)
+        }
+        if (containsSameTarget) return actions
+        return actions + topLevelAction
+    }
+
+internal enum class GroupInviteActionKind {
+    ACCEPT,
+    IGNORE,
+    BLOCK,
+}
+
+internal val NotificationItemData.isGroupInvite: Boolean
+    get() = type.equals("group.invite", ignoreCase = true)
+
+internal fun NotificationItemData.groupInviteActionKind(
+    action: NotificationItemData.ActionData,
+): GroupInviteActionKind? {
+    if (!isGroupInvite) return null
+    val type = action.type.trim().lowercase()
+    if (type == "block" || type == "ban" || action.icon.equals("ban", ignoreCase = true)) {
+        return GroupInviteActionKind.BLOCK
+    }
+    return when (type) {
+        "accept" -> GroupInviteActionKind.ACCEPT
+        "decline", "hide", "ignore", "reject" -> GroupInviteActionKind.IGNORE
+        else -> null
+    }
+}
+
+/** Group invitations expose only the accept and ignore decisions. */
+internal val NotificationItemData.responseActionsForDisplay: List<NotificationItemData.ActionData>
+    get() {
+        val availableActions = displayActions
+        if (!isGroupInvite) return availableActions
+        return listOf(
+            GroupInviteActionKind.ACCEPT,
+            GroupInviteActionKind.IGNORE,
+        ).mapNotNull { kind ->
+            availableActions.firstOrNull { action -> groupInviteActionKind(action) == kind }
+        }
+    }
+
+internal val NotificationItemData.showStandaloneReadAction: Boolean
+    get() = !seen && !isGroupInvite
+
+private fun NotificationActionTarget.isSameDestinationAs(other: NotificationActionTarget?): Boolean {
+    if (other == null) return false
+    if (this !is NotificationActionTarget.External || other !is NotificationActionTarget.External) {
+        return this == other
+    }
+    return externalUrlIdentity(url) == externalUrlIdentity(other.url)
+}
+
+private data class ExternalUrlIdentity(
+    val protocol: URLProtocol,
+    val host: String,
+    val port: Int,
+    val encodedPath: String,
+    val encodedQuery: String,
+    val encodedFragment: String,
+)
+
+private fun externalUrlIdentity(value: String): ExternalUrlIdentity {
+    val url = Url(value)
+    return ExternalUrlIdentity(
+        protocol = url.protocol,
+        host = url.host.lowercase(),
+        port = url.port,
+        encodedPath = url.encodedPath.ifEmpty { "/" },
+        encodedQuery = url.encodedQuery,
+        encodedFragment = url.encodedFragment,
+    )
+}
+
+internal fun NotificationItemData.actionTarget(
+    action: NotificationItemData.ActionData,
+): NotificationActionTarget? {
+    if (!action.type.equals("link", ignoreCase = true)) return null
+    val value = action.data.trim().takeIf(String::isNotEmpty) ?: return null
+    val target = prefixedNotificationTarget(value) ?: parseOfficialLink(value)
+    if (target == null) return safeExternalTarget(value)
+    return when (target.type) {
+        OfficialLinkType.User -> NotificationActionTarget.User(target.id)
+        OfficialLinkType.Group -> NotificationActionTarget.Group(target.id)
+        OfficialLinkType.World -> NotificationActionTarget.World(target.id)
+        OfficialLinkType.Avatar -> NotificationActionTarget.Avatar(target.id)
+    }
+}
+
+private fun prefixedNotificationTarget(value: String) =
+    value.substringBefore(':').lowercase().let { prefix ->
+        val payload = value.substringAfter(':', missingDelimiterValue = "")
+        val id = when (prefix) {
+            "event" -> payload.split(',', limit = 2)
+                .takeIf { parts ->
+                    parts.size == 2 && Regex("cal_[A-Za-z0-9-]+").matches(parts[1])
+                }
+                ?.first()
+            "user", "group", "world", "avatar" -> payload
+            else -> null
+        } ?: return@let null
+        val expectedType = when (prefix) {
+            "user" -> OfficialLinkType.User
+            "world" -> OfficialLinkType.World
+            "avatar" -> OfficialLinkType.Avatar
+            else -> OfficialLinkType.Group
+        }
+        parseOfficialId(id)?.takeIf { it.type == expectedType }
+    }
+
+private fun safeExternalTarget(value: String): NotificationActionTarget.External? {
+    if (value.any(Char::isISOControl)) return null
+    val url = runCatching { Url(value) }.getOrNull() ?: return null
+    if (url.protocol != URLProtocol.HTTPS || url.host.isBlank()) return null
+    if (url.user != null || url.password != null) return null
+    return NotificationActionTarget.External(url = url.toString(), host = url.host)
+}

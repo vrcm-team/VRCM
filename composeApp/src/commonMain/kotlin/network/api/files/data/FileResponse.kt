@@ -25,7 +25,7 @@ data class FileVersionResponse(
     val status: String,
     @SerialName("created_at")
     val createdAt: String,
-    val file: FileDetailsResponse
+    val file: FileDetailsResponse? = null,
 )
 
 /**
@@ -35,9 +35,9 @@ data class FileVersionResponse(
 data class FileDetailsResponse(
     val category: String,
     val fileName: String,
-    val md5: String,
+    val md5: String? = null,
     val sizeInBytes: Long,
     val status: String,
     val uploadId: String,
-    val url: String
+    val url: String,
 )

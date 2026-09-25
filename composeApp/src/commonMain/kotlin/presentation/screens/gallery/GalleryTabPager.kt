@@ -11,15 +11,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -36,6 +27,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil3.ImageLoader
 import coil3.compose.SubcomposeAsyncImage
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppFloatingActionButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
+import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
 import io.github.vinceglb.filekit.name
@@ -70,8 +68,7 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
         @Composable
         get() = tagType.toString().replaceFirstChar { it.uppercase() }
 
-    @OptIn(ExperimentalMaterial3Api::class)
-    @Composable
+        @Composable
     fun Content(galleryScreenModel: GalleryScreenModel) {
         val navigator = LocalNavigator.currentOrThrow
         val printImageProcessor: PrintImageProcessor = koinInject()
@@ -188,8 +185,9 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
         }
 
         Box(modifier = Modifier.fillMaxSize()) {
+            val isRefreshing = if (isPrint) galleryScreenModel.isRefreshingPrints else galleryScreenModel.isRefreshingByTag(tagType)
             RefreshBox(
-                isRefreshing = if (isPrint) galleryScreenModel.isRefreshingPrints else galleryScreenModel.isRefreshingByTag(tagType),
+                isRefreshing = isRefreshing,
                 doRefresh = { if (isPrint) galleryScreenModel.refreshPrints() else galleryScreenModel.refreshFiles(tagType) }
             ) {
                 if (isPrint) {
@@ -197,6 +195,11 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
                 } else {
                     FileContent(galleryScreenModel)
                 }
+                // 自动加载不再把内容顶下来露出指示器：还没有内容时在中间放一个
+                ListStateOverlay(
+                    isEmpty = if (isPrint) galleryScreenModel.prints.isEmpty() else galleryScreenModel.getFilesByTag(tagType).isEmpty(),
+                    isLoading = isRefreshing,
+                )
             }
 
             // 选中时为红色删除按钮，否则为上传按钮
@@ -204,11 +207,12 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
             Row(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(16.dp),
+                    // 网格铺到屏幕底，悬浮按钮自己让开系统导航条
+                    .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + getInsetPadding(WindowInsets::getBottom)),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                FloatingActionButton(
+                AppFloatingActionButton(
                     onClick = {
                         if (hasSelection) {
                             // 删除选中项
@@ -231,28 +235,27 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
                         }
                     },
                     containerColor = when {
-                        hasSelection -> MaterialTheme.colorScheme.error
-                        isVrcPlus -> MaterialTheme.colorScheme.primaryContainer
-                        else -> MaterialTheme.colorScheme.surfaceVariant
+                        hasSelection -> AppTheme.colors.destructive
+                        isVrcPlus -> AppTheme.colors.tintSoft
+                        else -> AppTheme.colors.fill
                     },
                     contentColor = when {
-                        hasSelection -> MaterialTheme.colorScheme.onError
-                        isVrcPlus -> MaterialTheme.colorScheme.onPrimaryContainer
-                        else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                        hasSelection -> AppTheme.colors.onDestructive
+                        isVrcPlus -> AppTheme.colors.onTintSoft
+                        else -> AppTheme.colors.secondaryLabel.copy(alpha = 0.38f)
                     },
                 ) {
                     if (isPreparing) {
-                        CircularProgressIndicator(
+                        AppActivityIndicator(
                             modifier = Modifier.size(24.dp),
-                            strokeWidth = 2.dp,
                         )
                     } else if (hasSelection) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
+                        AppIcon(
+                            imageVector = AppIcons.Delete,
                             contentDescription = locale.galleryTabDelete,
                         )
                     } else {
-                        Icon(
+                        AppIcon(
                             imageVector = AppIcons.Publish,
                             contentDescription = if (isVrcPlus) {
                                 locale.galleryTabUploadImage
@@ -296,7 +299,12 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
     ) {
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 160.dp),
-            contentPadding = PaddingValues(8.dp),
+            contentPadding = PaddingValues(
+                start = 8.dp,
+                top = 8.dp,
+                end = 8.dp,
+                bottom = 8.dp + getInsetPadding(WindowInsets::getBottom),
+            ),
             verticalArrangement = Arrangement.spacedBy(3.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier.fillMaxSize()
@@ -365,14 +373,14 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
                     modifier = Modifier
                         .fillMaxSize()
                         .background(Color.Black.copy(alpha = 0.3f))
-                        .clip(MaterialTheme.shapes.medium)
+                        .clip(AppShapes.m)
                         .clickable {
                             galleryScreenModel.toggleSelection(FileTagType.Print, print.id)
                         },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
+                    AppIcon(
+                        imageVector = AppIcons.CheckCircle,
                         contentDescription = null,
                         tint = Color.White,
                         modifier = Modifier.size(36.dp),
@@ -389,25 +397,31 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
         galleryScreenModel: GalleryScreenModel,
     ) {
         val minimumCellSize = when (tagType) {
-            FileTagType.Gallery, FileTagType.AvatarImage, FileTagType.Print -> 160.dp
+            FileTagType.Gallery, FileTagType.AvatarImage, FileTagType.WorldImage,
+            FileTagType.Print -> 160.dp
             FileTagType.Emoji, FileTagType.Sticker -> 104.dp
             FileTagType.Icon -> 80.dp
         }
         // 根据文件类型设置不同的宽高比
         val aspectRatio = when (tagType) {
             FileTagType.Icon -> 1.0f  // 圆形展示，使用1:1比例
-            FileTagType.Gallery, FileTagType.AvatarImage,
+            FileTagType.Gallery, FileTagType.AvatarImage, FileTagType.WorldImage,
             FileTagType.Print -> 16f / 9f  // 16:9比例
             FileTagType.Emoji, FileTagType.Sticker -> 1.0f  // 正方形展示，使用1:1比例
         }
         // 根据文件类型设置不同的形状
         val shape = when (tagType) {
             FileTagType.Icon -> CircleShape  // 圆形展示
-            else -> MaterialTheme.shapes.medium  // 其他类型使用默认的medium形状
+            else -> AppShapes.m  // 其他类型使用默认的medium形状
         }
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = minimumCellSize),
-            contentPadding = PaddingValues(8.dp),
+            contentPadding = PaddingValues(
+                start = 8.dp,
+                top = 8.dp,
+                end = 8.dp,
+                bottom = 8.dp + getInsetPadding(WindowInsets::getBottom),
+            ),
             verticalArrangement = Arrangement.spacedBy(3.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier.fillMaxSize()
@@ -428,7 +442,7 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
         tagType: FileTagType,
         galleryScreenModel: GalleryScreenModel,
         aspectRatio: Float = 1f,
-        shape: Shape = MaterialTheme.shapes.medium
+        shape: Shape = AppShapes.m
     ) {
         val (dialogContent, setDialogContent) = LocationDialogContent.current
         val selected = galleryScreenModel.isSelected(tagType, file.id)
@@ -473,9 +487,8 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
                         ),
                     loading = {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                strokeWidth = 2.dp
+                            AppActivityIndicator(
+                                modifier = Modifier.size(24.dp)
                             )
                         }
                     },
@@ -485,10 +498,10 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
-                            Text(
+                            AppText(
                                 text = strings.galleryTabLoadFailed,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error
+                                style = AppTheme.type.caption1,
+                                color = AppTheme.colors.destructive
                             )
                         }
                     }
@@ -504,8 +517,8 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
                         .clickable { galleryScreenModel.toggleSelection(tagType, file.id) },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
+                    AppIcon(
+                        imageVector = AppIcons.CheckCircle,
                         contentDescription = null,
                         tint = Color.White,
                         modifier = Modifier.size(36.dp),

@@ -2,24 +2,23 @@ package io.github.vrcmteam.vrcm.presentation.screens.world
 
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import coil3.ImageLoader
 import coil3.compose.AsyncImage
+import io.github.vrcmteam.vrcm.presentation.designsystem.*
 import io.github.vrcmteam.vrcm.presentation.navigation.AppDetailRoute
 import org.koin.compose.viewmodel.koinViewModel
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
@@ -27,6 +26,7 @@ import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
+import io.github.vrcmteam.vrcm.presentation.compoments.SearchResultItem
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
 import io.github.vrcmteam.vrcm.presentation.compoments.shouldLoadNextPage
@@ -161,8 +161,7 @@ internal fun <T> RecentWorldPagingState<T>.canAutoLoadNextPage(): Boolean =
 @Serializable
 object RecentWorldsScreen : AppDetailRoute {
 
-    @OptIn(ExperimentalMaterial3Api::class)
-    @Composable
+        @Composable
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
         val model: RecentWorldsScreenModel = koinViewModel()
@@ -173,18 +172,19 @@ object RecentWorldsScreen : AppDetailRoute {
             model.loadRecentWorlds()
         }
 
-        Scaffold(
+        AppScaffold(
+            containerColor = AppTheme.colors.systemBackground,
             topBar = {
-                CenterAlignedTopAppBar(
+                AppNavBar(
+                    edgeColor = AppTheme.colors.systemBackground,
                     title = {
-                        Text(
+                        AppText(
                             text = strings.recentWorldsTitle,
-                            style = MaterialTheme.typography.titleMedium,
                         )
                     },
                     navigationIcon = {
-                        IconButton(onClick = { navigator.pop() }) {
-                            Icon(AppIcons.ArrowBackIosNew, contentDescription = "Back")
+                        AppIconButton(onClick = { navigator.pop() }) {
+                            AppIcon(AppIcons.ArrowBackIosNew, contentDescription = "Back")
                         }
                     }
                 )
@@ -195,17 +195,17 @@ object RecentWorldsScreen : AppDetailRoute {
                     modifier = Modifier.fillMaxSize().padding(paddingValues),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator()
+                    AppActivityIndicator()
                 }
             } else if (model.worlds.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize().padding(paddingValues),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
+                    AppText(
                         text = strings.recentWorldsEmpty,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = AppTheme.type.body,
+                        color = AppTheme.colors.secondaryLabel,
                     )
                 }
             } else {
@@ -222,11 +222,14 @@ object RecentWorldsScreen : AppDetailRoute {
                     }
                 }
 
+                // 骨架的留白交给 contentPadding：列表从导航栏和系统导航条下面滚过去（Edge-to-Edge）
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier.fillMaxSize().padding(paddingValues),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(
+                        top = paddingValues.calculateTopPadding() + 8.dp,
+                        bottom = paddingValues.calculateBottomPadding() + 8.dp,
+                    ),
                 ) {
                     items(model.worlds, key = { it.id }) { world ->
                         RecentWorldItem(world) { sharedImageCacheKey ->
@@ -251,10 +254,10 @@ object RecentWorldsScreen : AppDetailRoute {
                                 contentAlignment = Alignment.Center,
                             ) {
                                 if (model.isLoadingMore) {
-                                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                                    AppActivityIndicator(modifier = Modifier.size(24.dp))
                                 } else {
-                                    TextButton(onClick = model::retryLoadMoreRecentWorlds) {
-                                        Text(strings.retry)
+                                    AppButton(onClick = model::retryLoadMoreRecentWorlds, style = AppButtonStyle.Plain) {
+                                        AppText(strings.retry)
                                     }
                                 }
                             }
@@ -272,32 +275,23 @@ private fun RecentWorldItem(world: WorldData, onClick: (String?) -> Unit) {
     val sharedImageCacheKey = (world.thumbnailImageUrl ?: world.imageUrl)
         .orEmpty()
         .ifBlank { null }
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick(sharedImageCacheKey) },
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
-        )
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+    SearchResultItem(
+        item = world,
+        onClick = { onClick(sharedImageCacheKey) },
+        leadingWidth = RecentWorldThumbnailSize.width,
+        leadingContent = {
             if (world.id == "???") {
                 Box(
                     modifier = Modifier
-                        .size(80.dp, 45.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                        .size(RecentWorldThumbnailSize)
+                        .clip(AppShapes.s)
+                        .background(AppTheme.colors.fill),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
+                    AppIcon(
                         imageVector = AppIcons.VisibilityOff,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = AppTheme.colors.secondaryLabel,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -309,24 +303,28 @@ private fun RecentWorldItem(world: WorldData, onClick: (String?) -> Unit) {
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .sharedBoundsBy("${world.id}WorldImage")
-                        .size(80.dp, 45.dp)
-                        .clip(RoundedCornerShape(8.dp)),
+                        .size(RecentWorldThumbnailSize)
+                        .clip(AppShapes.s),
                 )
             }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = if (world.id == "???") world.favoriteId ?: world.name else world.name,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = if (world.id == "???") strings.hiddenWorld else world.authorName,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                )
-            }
-        }
-    }
+        },
+        headlineContent = {
+            AppText(
+                text = if (world.id == "???") world.favoriteId ?: world.name else world.name,
+                style = AppTheme.type.body,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+        supportingContent = {
+            AppText(
+                text = if (world.id == "???") strings.hiddenWorld else world.authorName,
+                style = AppTheme.type.footnote,
+                color = AppTheme.colors.secondaryLabel,
+                maxLines = 1,
+            )
+        },
+    )
 }
+
+private val RecentWorldThumbnailSize = DpSize(80.dp, 45.dp)

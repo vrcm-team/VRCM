@@ -43,6 +43,11 @@ class VRCMApplication : Application() {
             }
         }
 
+        // 应用内更新下载的安装包装上之后就用不上了，每次启动顺手删掉
+        scope.launch(Dispatchers.IO) {
+            koin.get<AppPlatform>().appUpdateInstaller?.deleteObsoletePackages()
+        }
+
         // 好友通知与后台监测都只在登录之后才有意义，所以整条依赖链等出现有效会话再解析。
         // 放在 onCreate 里同步 get 会把 Room、网络客户端、通知渠道以及 AccountCacheManager
         // 的旧缓存清理全部拽到启动的主线程上：既拖慢冷启动，任何一环抛异常都会让应用一打开就崩，

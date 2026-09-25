@@ -22,6 +22,7 @@ class NotificationTargetResolutionTest {
         relatedId: String? = null,
     ) = NotificationItemData(
         id = id,
+        source = NotificationSource.PIPELINE,
         imageUrl = "",
         title = null,
         message = "",

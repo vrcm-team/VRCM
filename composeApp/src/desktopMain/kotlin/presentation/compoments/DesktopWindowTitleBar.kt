@@ -15,10 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.window.WindowDraggableArea
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -38,6 +34,10 @@ import androidx.compose.ui.window.FrameWindowScope
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowState
 import io.github.vrcmteam.vrcm.core.shared.AppConst.APP_NAME
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppDivider
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import org.jetbrains.compose.resources.painterResource
@@ -68,7 +68,7 @@ internal fun FrameWindowScope.DesktopWindowTitleBar(
         Modifier
             .fillMaxWidth()
             .height(TitleBarHeight)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .background(AppTheme.colors.groupedBackground)
     ) {
         Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
             WindowDraggableArea(
@@ -93,11 +93,11 @@ internal fun FrameWindowScope.DesktopWindowTitleBar(
                         contentDescription = null,
                         modifier = Modifier.size(22.dp),
                     )
-                    Text(
+                    AppText(
                         text = APP_NAME,
                         modifier = Modifier.padding(start = 9.dp),
-                        color = MaterialTheme.colorScheme.onSurface,
-                        style = MaterialTheme.typography.titleSmall.copy(
+                        color = AppTheme.colors.label,
+                        style = AppTheme.type.subheadlineEmphasized.copy(
                             fontWeight = FontWeight.SemiBold,
                             letterSpacing = 0.sp,
                         ),
@@ -121,9 +121,9 @@ internal fun FrameWindowScope.DesktopWindowTitleBar(
                 onClick = onCloseRequest,
             )
         }
-        HorizontalDivider(
+        AppDivider(
             modifier = Modifier.align(Alignment.BottomCenter),
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+            color = AppTheme.colors.separator.copy(alpha = 0.6f),
         )
     }
 }
@@ -139,13 +139,13 @@ private fun WindowControlButton(
     val isHovered by interactionSource.collectIsHoveredAsState()
     val containerColor = when {
         !isHovered -> Color.Transparent
-        isCloseAction -> MaterialTheme.colorScheme.errorContainer
-        else -> MaterialTheme.colorScheme.surfaceContainerHigh
+        isCloseAction -> AppTheme.colors.destructiveSoft
+        else -> AppTheme.colors.fill
     }
     val contentColor = when {
-        isHovered && isCloseAction -> MaterialTheme.colorScheme.onErrorContainer
-        isHovered -> MaterialTheme.colorScheme.onSurface
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
+        isHovered && isCloseAction -> AppTheme.colors.onDestructiveSoft
+        isHovered -> AppTheme.colors.label
+        else -> AppTheme.colors.secondaryLabel
     }
 
     Box(
@@ -156,7 +156,7 @@ private fun WindowControlButton(
             .clickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
+        AppIcon(
             imageVector = icon,
             contentDescription = label,
             modifier = Modifier.size(18.dp),

@@ -28,9 +28,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
@@ -57,6 +54,10 @@ import androidx.compose.ui.unit.sp
 import coil3.ImageLoader
 import coil3.compose.AsyncImage
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSurface
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.animation.DecorationVisual
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.animation.DecorationVisualImage
 import org.koin.compose.koinInject
@@ -192,10 +193,10 @@ private fun InfoBarTemplate(
         )
     }
     val panel: @Composable (Modifier) -> Unit = { panelModifier ->
-        Surface(
+        AppSurface(
             modifier = panelModifier.testTag(MeetupCardTestTags.InfoBarPanel),
             shape = panelShape,
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
+            color = AppTheme.colors.secondaryGroupedBackground.copy(alpha = 0.94f),
         ) {
             Box {
                 // 细主题色边线保留模板识别，不再用大面积主题色染整块资料区。
@@ -243,7 +244,7 @@ private fun InfoBarTemplate(
                     MeetupInfoAndQrRow(
                         state = state,
                         onPhoto = false,
-                        shortTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        shortTextColor = AppTheme.colors.secondaryLabel,
                     )
                 }
             }
@@ -470,7 +471,7 @@ private val MeetupQrColumnGap = 12.dp
 
 @Composable
 private fun MeetupNameColor(onPhoto: Boolean): Color =
-    if (onPhoto) Color.White else MaterialTheme.colorScheme.onSurface
+    if (onPhoto) Color.White else AppTheme.colors.label
 
 /** 头像与可选的官方头像框；关闭头像时头像框也随之不显示。 */
 @Composable
@@ -538,7 +539,7 @@ private fun MeetupNameplateBlock(
     Box(
         modifier = modifier
             .testTag(MeetupCardTestTags.Nameplate)
-            .clip(MaterialTheme.shapes.small)
+            .clip(AppShapes.s)
             .background(gradient),
     ) {
         nameplate?.let {
@@ -567,7 +568,7 @@ private fun MeetupNameplateBlock(
                         color = nameColor,
                         modifier = Modifier.rotateClockwise(),
                     )
-                    Text(
+                    AppText(
                         text = state.displayName,
                         style = displayNameStyle(state.displayName, large),
                         color = nameColor,
@@ -585,7 +586,7 @@ private fun MeetupNameplateBlock(
             ) {
                 MeetupAvatarBlock(state, decorations)
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
+                    AppText(
                         text = state.displayName,
                         style = displayNameStyle(state.displayName, large),
                         color = nameColor,
@@ -643,14 +644,14 @@ private fun MeetupNameplateMetaChip(
     text: String,
     color: Color,
 ) {
-    Surface(
+    AppSurface(
         color = color.copy(alpha = 0.12f),
         contentColor = color,
         shape = CircleShape,
     ) {
-        Text(
+        AppText(
             text = text,
-            style = MaterialTheme.typography.labelMedium,
+            style = AppTheme.type.caption1Emphasized,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
@@ -665,7 +666,7 @@ private fun MeetupNameplateStatus(
     description: String?,
     color: Color,
 ) {
-    Surface(
+    AppSurface(
         color = color.copy(alpha = 0.12f),
         contentColor = color,
         shape = CircleShape,
@@ -688,9 +689,9 @@ private fun MeetupNameplateStatus(
                 )
             }
             description?.let { value ->
-                Text(
+                AppText(
                     text = value,
-                    style = MaterialTheme.typography.labelMedium,
+                    style = AppTheme.type.caption1Emphasized,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -707,12 +708,12 @@ private val MeetupStatusDotSize = 8.dp
 private fun displayNameStyle(name: String, large: Boolean): TextStyle {
     val base = when {
         name.length <= 14 -> if (large) {
-            MaterialTheme.typography.displaySmall
+            AppTheme.type.largeTitle
         } else {
-            MaterialTheme.typography.headlineMedium
+            AppTheme.type.title1
         }
-        name.length <= 24 -> MaterialTheme.typography.headlineSmall
-        else -> MaterialTheme.typography.titleLarge
+        name.length <= 24 -> AppTheme.type.title2
+        else -> AppTheme.type.title3
     }
     return base.copy(
         fontWeight = FontWeight.Bold,
@@ -793,7 +794,7 @@ private fun MeetupGroupHeaderFallback(group: MeetupGroupSnapshot) {
         MeetupGroupIcon(group, size = MeetupGroupIconSize, onPhoto = false)
         MeetupGroupName(
             group = group,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = AppTheme.colors.label,
             modifier = Modifier.weight(1f, fill = false),
         )
     }
@@ -802,10 +803,10 @@ private fun MeetupGroupHeaderFallback(group: MeetupGroupSnapshot) {
 /** 照片与侧栏区域使用紧凑身份行。 */
 @Composable
 private fun MeetupGroupChip(group: MeetupGroupSnapshot, prominent: Boolean) {
-    Surface(
+    AppSurface(
         modifier = Modifier.testTag(MeetupCardTestTags.GroupBanner),
         color = Color.Black.copy(alpha = 0.24f),
-        shape = MaterialTheme.shapes.small,
+        shape = AppShapes.s,
     ) {
         Row(
             modifier = Modifier.padding(
@@ -828,12 +829,12 @@ private fun MeetupGroupChip(group: MeetupGroupSnapshot, prominent: Boolean) {
 @Composable
 private fun MeetupGroupIcon(group: MeetupGroupSnapshot, size: Dp, onPhoto: Boolean) {
     val iconUrl = group.iconUrl.takeIf(String::isNotBlank) ?: return
-    Surface(
+    AppSurface(
         modifier = Modifier.size(size).testTag(MeetupCardTestTags.GroupIcon),
         color = if (onPhoto) {
             Color.White.copy(alpha = 0.14f)
         } else {
-            MaterialTheme.colorScheme.surfaceContainerHighest
+            AppTheme.colors.tertiaryGroupedBackground
         },
         shape = CircleShape,
     ) {
@@ -854,9 +855,9 @@ private fun MeetupGroupName(
     modifier: Modifier = Modifier,
 ) {
     if (group.name.isBlank()) return
-    Text(
+    AppText(
         text = group.name,
-        style = MaterialTheme.typography.labelLarge,
+        style = AppTheme.type.subheadlineEmphasized,
         color = color,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
@@ -901,15 +902,15 @@ private fun MeetupFieldsFlow(state: MeetupCardUiState, onPhoto: Boolean) {
                     // 照片之上白色系国旗容易糊掉边界，统一描一圈细边。
                     modifier = Modifier
                         .size(width = MeetupFlagWidth, height = MeetupFlagHeight)
-                        .clip(MaterialTheme.shapes.extraSmall)
+                        .clip(AppShapes.xs)
                         .border(
                             width = 1.dp,
                             color = if (onPhoto) {
                                 Color.White.copy(alpha = 0.7f)
                             } else {
-                                MaterialTheme.colorScheme.outlineVariant
+                                AppTheme.colors.separator
                             },
-                            shape = MaterialTheme.shapes.extraSmall,
+                            shape = AppShapes.xs,
                         ),
                 )
             }
@@ -924,22 +925,22 @@ private val MeetupFlagHeight = 16.dp
 /** 字段胶囊：照片之上用半透明黑底保证可读。 */
 @Composable
 private fun MeetupFieldChip(text: String, onPhoto: Boolean) {
-    Surface(
+    AppSurface(
         color = if (onPhoto) {
             Color.Black.copy(alpha = 0.4f)
         } else {
-            MaterialTheme.colorScheme.surfaceContainerHigh
+            AppTheme.colors.tertiaryGroupedBackground
         },
         contentColor = if (onPhoto) {
             Color.White
         } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
+            AppTheme.colors.secondaryLabel
         },
-        shape = MaterialTheme.shapes.small,
+        shape = AppShapes.s,
     ) {
-        Text(
+        AppText(
             text = text,
-            style = MaterialTheme.typography.labelLarge,
+            style = AppTheme.type.subheadlineEmphasized,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -951,9 +952,9 @@ private fun MeetupFieldChip(text: String, onPhoto: Boolean) {
 @Composable
 private fun MeetupShortText(state: MeetupCardUiState, color: Color) {
     if (!state.config.showShortText || state.config.shortText.isBlank()) return
-    Text(
+    AppText(
         text = state.config.shortText,
-        style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 22.sp),
+        style = AppTheme.type.body.copy(lineHeight = 22.sp),
         color = color,
         maxLines = 2,
         overflow = TextOverflow.Ellipsis,

@@ -7,7 +7,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.compoments.SortOption
  */
 data class WorldSearchOptions(
     val featured: Boolean? = null,
-    val sortOption: SortOption = SortOption.Popularity,
+    val sortOption: SortOption = SortOption.Relevance,
     val user: String? = null,
     val userId: String? = null,
     val resultsCount: Int = 50,

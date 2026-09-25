@@ -43,7 +43,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass
 import androidx.window.core.layout.computeWindowSizeClass
 import androidx.navigation3.runtime.NavEntry
@@ -124,6 +126,7 @@ internal class AppListDetailSceneStrategy<T : Any>(
         val scaffoldEntryIndices = mutableListOf<Int>()
         val entriesAsNavItems = mutableListOf<ThreePaneScaffoldDestinationItem<Any>>()
         var detailPlaceholder: (@Composable ThreePaneScaffoldScope.() -> Unit)? = null
+        var listPaneMinWidth = 0.dp
 
         var index = entries.lastIndex
         while (index >= 0) {
@@ -141,6 +144,7 @@ internal class AppListDetailSceneStrategy<T : Any>(
                 )
                 if (paneMetadata is ListPaneMetadata) {
                     detailPlaceholder = paneMetadata.detailPlaceholder
+                    listPaneMinWidth = paneMetadata.minWidth
                 }
             }
             index--
@@ -161,6 +165,7 @@ internal class AppListDetailSceneStrategy<T : Any>(
             entriesAsNavItems = entriesAsNavItems,
             getPaneRole = { getPaneMetadata(it)?.role },
             detailPlaceholder = resolvedDetailPlaceholder,
+            listPaneMinWidth = listPaneMinWidth,
             paneExpansionDragHandle = paneExpansionDragHandle,
             paneExpansionState = paneExpansionState,
         )
@@ -176,6 +181,7 @@ internal class AppListDetailSceneStrategy<T : Any>(
     private class ListPaneMetadata(
         override val sceneKey: Any,
         val detailPlaceholder: @Composable ThreePaneScaffoldScope.() -> Unit,
+        val minWidth: Dp,
     ) : PaneMetadata {
         override val role: ThreePaneScaffoldRole = ListDetailPaneScaffoldRole.List
     }
@@ -192,8 +198,9 @@ internal class AppListDetailSceneStrategy<T : Any>(
         fun listPane(
             sceneKey: Any = Unit,
             detailPlaceholder: @Composable ThreePaneScaffoldScope.() -> Unit = {},
+            minWidth: Dp = 0.dp,
         ): Map<String, Any> = mapOf(
-            PaneMetadataKey to ListPaneMetadata(sceneKey, detailPlaceholder),
+            PaneMetadataKey to ListPaneMetadata(sceneKey, detailPlaceholder, minWidth),
         )
 
         fun detailPane(sceneKey: Any = Unit): Map<String, Any> = mapOf(
@@ -218,6 +225,7 @@ private class AppListDetailScene<T : Any>(
     val entriesAsNavItems: List<ThreePaneScaffoldDestinationItem<Any>>,
     val getPaneRole: (NavEntry<T>) -> ThreePaneScaffoldRole?,
     val detailPlaceholder: @Composable ThreePaneScaffoldScope.() -> Unit,
+    val listPaneMinWidth: Dp,
     val paneExpansionDragHandle:
         (@Composable ThreePaneScaffoldScope.(PaneExpansionState) -> Unit)?,
     val paneExpansionState: PaneExpansionState?,
@@ -347,13 +355,15 @@ private class AppListDetailScene<T : Any>(
         val lastList = entries.findLast { getPaneRole(it) == ListDetailPaneScaffoldRole.List }
         val lastDetail = entries.findLast { getPaneRole(it) == ListDetailPaneScaffoldRole.Detail }
 
+        // 列表栏按窗口宽度的 40% 分，但不窄于列表页要求的最小宽度
+        val listPaneWidth = maxOf(LocalAppContentSize.current.width * 0.4f, listPaneMinWidth)
         ListDetailPaneScaffold(
             directive = directive,
             scaffoldState = scaffoldState,
             listPane = lastList?.let { entry ->
                 {
                     AnimatedPane(
-                        modifier = Modifier.preferredWidth(0.4f),
+                        modifier = Modifier.preferredWidth(listPaneWidth),
                         boundsAnimationSpec = PaneBoundsAnimationSpec,
                     ) {
                         CompositionLocalProvider(

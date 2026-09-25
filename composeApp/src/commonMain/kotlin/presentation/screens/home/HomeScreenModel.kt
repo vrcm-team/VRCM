@@ -1,6 +1,7 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -14,14 +15,16 @@ import io.github.vrcmteam.vrcm.network.api.users.data.UpdateUserInfoData
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
 import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
-import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPagerModel
+import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesTab
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardDisplayRoute
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardEditorRoute
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.meetup.MeetupCardRepository
-import io.github.vrcmteam.vrcm.service.FriendService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.koin.core.logger.Logger
 
@@ -29,11 +32,22 @@ import org.koin.core.logger.Logger
 class HomeScreenModel(
     private val authService: AuthService,
     private val usersApi: UsersApi,
-    private val friendService: FriendService,
-    private val friendLocationPagerModel: FriendLocationPagerModel,
     private val logger: Logger,
     private val meetupCardRepository: MeetupCardRepository,
 ) : ViewModel() {
+    private val shellState = HomeShellState()
+
+    val selectedDestinationIndex: Int
+        get() = shellState.selectedDestinationIndex
+
+    val selectedHomeTabIndex: Int
+        get() = shellState.selectedHomeTabIndex
+
+    val selectedFavoritesTabIndex: Int
+        get() = shellState.selectedFavoritesTabIndex
+
+    val drawerVisible: Boolean
+        get() = shellState.drawerVisible
 
     /** 长按头像的入口分流：已有配置直接展示，首次使用进入编辑器。 */
     fun meetupCardStartRoute(): AppRoute = if (meetupCardRepository.isConfigured(userId)) {
@@ -44,9 +58,6 @@ class HomeScreenModel(
 
     private val _currentUser = mutableStateOf<CurrentUserData?>(null)
 
-    var selectedPagerIndex by mutableIntStateOf(0)
-        private set
-
     val userId: String
         get() = authService.accountDto().userId
 
@@ -55,16 +66,48 @@ class HomeScreenModel(
 
     var currentUser by _currentUser
 
-    fun onPagerSettled(index: Int) {
-        selectedPagerIndex = index
+    internal fun selectDestination(destination: HomeDestination): Boolean {
+        return shellState.selectDestination(destination)
+    }
+
+    internal fun selectHomeTab(tab: HomeTab) {
+        shellState.selectHomeTab(tab)
+    }
+
+    internal fun selectFavoritesTab(tab: FavoritesTab) {
+        shellState.selectFavoritesTab(tab)
+    }
+
+    fun showDrawer() {
+        shellState.showDrawer()
+    }
+
+    fun hideDrawer() {
+        shellState.hideDrawer()
+    }
+
+    fun clearOverlays() {
+        shellState.clearOverlays()
+    }
+
+    fun logout() {
+        clearOverlays()
+        viewModelScope.launch { authService.logout() }
     }
 
     init {
-        friendService.preloadFriendList()
-        friendLocationPagerModel.preloadFriendLocations()
         refreshCurrentUser()
         viewModelScope.launch {
             authService.currentUserState.collect { _currentUser.value = it }
+        }
+        viewModelScope.launch {
+            // 换了账号（含登出）才收起个人抽屉等覆盖层，同账号重新认证不算。
+            // 在 ViewModel 里只订阅一次：页面每次重新进入组合都重新订阅的话，回放的当前会话会误把抽屉关掉
+            SharedFlowCentre.currentSession
+                .map { it?.account?.userId }
+                .distinctUntilChanged()
+                .drop(1)
+                .collect { clearOverlays() }
         }
     }
 
@@ -103,4 +146,56 @@ class HomeScreenModel(
     }
 
 
+}
+
+internal enum class HomeDestination {
+    Home,
+    Favorites,
+    Notifications,
+}
+
+internal enum class HomeTab {
+    Location,
+    Activity,
+}
+
+@Stable
+internal class HomeShellState {
+    var selectedDestinationIndex by mutableIntStateOf(HomeDestination.Home.ordinal)
+        private set
+
+    var selectedHomeTabIndex by mutableIntStateOf(HomeTab.Location.ordinal)
+        private set
+
+    var selectedFavoritesTabIndex by mutableIntStateOf(FavoritesTab.Player.ordinal)
+        private set
+
+    var drawerVisible by mutableStateOf(false)
+        private set
+
+    fun selectDestination(destination: HomeDestination): Boolean {
+        val reselected = selectedDestinationIndex == destination.ordinal
+        selectedDestinationIndex = destination.ordinal
+        return reselected
+    }
+
+    fun selectHomeTab(tab: HomeTab) {
+        selectedHomeTabIndex = tab.ordinal
+    }
+
+    fun selectFavoritesTab(tab: FavoritesTab) {
+        selectedFavoritesTabIndex = tab.ordinal
+    }
+
+    fun showDrawer() {
+        drawerVisible = true
+    }
+
+    fun hideDrawer() {
+        drawerVisible = false
+    }
+
+    fun clearOverlays() {
+        drawerVisible = false
+    }
 }

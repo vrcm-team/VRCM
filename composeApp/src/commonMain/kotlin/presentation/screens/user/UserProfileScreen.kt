@@ -10,18 +10,20 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.presentation.designsystem.*
 import io.github.vrcmteam.vrcm.presentation.navigation.AppDetailRoute
 import org.koin.compose.viewmodel.koinViewModel
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
@@ -29,6 +31,7 @@ import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
+import io.github.vrcmteam.vrcm.network.api.users.data.PlayerInteractionOverride
 import io.github.vrcmteam.vrcm.network.api.attributes.FriendRequestStatus.*
 import io.github.vrcmteam.vrcm.network.api.files.resolveOriginalImageUrl
 import io.github.vrcmteam.vrcm.presentation.compoments.*
@@ -39,6 +42,7 @@ import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreen
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryPickerScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.group.data.GroupProfileVo
@@ -51,14 +55,19 @@ import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.presentation.supports.LanguageIcons
 import io.github.vrcmteam.vrcm.presentation.supports.WebIcons
+import io.github.vrcmteam.vrcm.presentation.supports.rememberConsumeRemainingUpwardScrollConnection
 import io.github.vrcmteam.vrcm.network.api.users.data.LimitedUserGroup
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.network.api.worlds.data.FavoritedWorld
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.currentSessionDeletedAvatarIds
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import io.github.vrcmteam.vrcm.service.BoopResult
+import io.github.vrcmteam.vrcm.service.data.ContentReportType
+import io.github.vrcmteam.vrcm.service.data.ReportTarget
+import io.github.vrcmteam.vrcm.service.InviteMessageAction
 import io.github.vrcmteam.vrcm.service.FriendActivityEvent
 import io.github.vrcmteam.vrcm.service.FriendActivityEventType
 import kotlinx.coroutines.launch
@@ -87,23 +96,39 @@ internal class OneShotEntranceAnimationGate {
 data class UserProfileScreen(
     private val userProfileVO: UserProfileVo,
     private val sharedSuffixKey: String = "",
+    private val openActionMenuOnEntry: Boolean = false,
 ) : AppDetailRoute {
     @Transient
     private val groupEntranceAnimationGate = OneShotEntranceAnimationGate()
 
+    @Transient
+    private val actionMenuEntranceGate = OneShotEntranceAnimationGate()
+
     // Keep dialog/shared-element state distinct for profiles with different IDs.
     override val key = "UserProfileScreen:${userProfileVO.id}"
 
-    @OptIn(ExperimentalMaterial3Api::class)
-    @ExperimentalSharedTransitionApi
+        @ExperimentalSharedTransitionApi
     @Composable
     override fun Content() {
         val currentNavigator = currentNavigator
         val userProfileScreenModel: UserProfileScreenModel = koinViewModel { parametersOf(userProfileVO) }
         val animateGroupEntrance = remember { groupEntranceAnimationGate.consume() }
+        val localeStrings = strings
+        val interactionLoadFailedMessage = localeStrings.profileInteractionLoadFailed
+        val interactionClosedSuccessMessage = localeStrings.profileInteractionClosedSuccess
+        val interactionRestoredSuccessMessage = localeStrings.profileInteractionRestoredSuccess
+        val interactionUpdateFailedMessage = localeStrings.profileInteractionUpdateFailed
+        val deletedAvatarIds = currentSessionDeletedAvatarIds()
+        val visibleCreatedAvatars = remember(userProfileScreenModel.createdAvatars, deletedAvatarIds) {
+            userProfileScreenModel.createdAvatars.filterNot { it.id in deletedAvatarIds }
+        }
 
         LaunchedEffect(userProfileVO.id) {
+            userProfileScreenModel.setPlayerChatboxModerationTarget(userProfileVO.id)
+            userProfileScreenModel.setPlayerVoiceModerationTarget(userProfileVO.id)
             userProfileScreenModel.refreshUser(userProfileVO.id)
+            userProfileScreenModel.refreshPlayerBlockStatus(localeStrings.profileBlockStatusLoadFailed)
+            userProfileScreenModel.refreshPlayerInteractionStatus(interactionLoadFailedMessage)
         }
 
         LaunchedEffect(Unit) {
@@ -113,15 +138,33 @@ data class UserProfileScreen(
         }
 
         val currentUser = userProfileScreenModel.userState
+        val playerBlockState by userProfileScreenModel.playerBlockState.collectAsState()
         val userGroups = userProfileScreenModel.userGroups
         val mutualGroups = userProfileScreenModel.mutualGroups
-        var bottomSheetIsVisible by remember { mutableStateOf(false) }
-        val sheetState = rememberModalBottomSheetState()
+        val playerChatboxModerationState by userProfileScreenModel.playerChatboxModerationState.collectAsState()
+        val playerVoiceModerationState by userProfileScreenModel.playerVoiceModerationState.collectAsState()
+        val playerInteractionState by userProfileScreenModel.playerInteractionState.collectAsState()
+        var bottomSheetIsVisible by remember {
+            mutableStateOf(openActionMenuOnEntry && actionMenuEntranceGate.consume())
+        }
+        val sheetState = rememberAppSheetState()
+        val actionMenuNestedScrollConnection =
+            rememberConsumeRemainingUpwardScrollConnection()
         var openAlertDialog by remember { mutableStateOf(false) }
         var openEditProfileDialog by remember { mutableStateOf(false) }
         var openEditNoteDialog by remember { mutableStateOf(false) }
         var openBoopDialog by remember { mutableStateOf(false) }
+        var pendingPlayerBlockChange by remember { mutableStateOf<Boolean?>(null) }
+        var openReportDialog by remember { mutableStateOf(false) }
         var boopSending by remember { mutableStateOf(false) }
+        var pendingInteractionOverride by remember(userProfileVO.id) {
+            mutableStateOf<PlayerInteractionOverride?>(null)
+        }
+        var interactionSubmitting by remember(userProfileVO.id) { mutableStateOf(false) }
+        var pendingImageInviteSelection by rememberSaveable { mutableStateOf<String?>(null) }
+        val imageInviteState by userProfileScreenModel.imageInviteState.collectAsState()
+        val imageInviteSentMessage = strings.imageInviteSent
+        val inviteMessageSelection by userProfileScreenModel.inviteMessageSelection.collectAsState()
         val actionScope = rememberCoroutineScope()
         // Control showing favorite group management for Friend type
         var showFriendFavoriteSheet by remember { mutableStateOf(false) }
@@ -152,6 +195,30 @@ data class UserProfileScreen(
             }
         }
 
+        // Compact navigation recreates this entry after Gallery returns; consume the result once.
+        LaunchedEffect(pendingImageInviteSelection) {
+            val sessionId = pendingImageInviteSelection ?: return@LaunchedEffect
+            userProfileScreenModel.finishImageInviteSelection(sessionId)
+            if (!userProfileScreenModel.isImageInviteSelectionPending(sessionId)) {
+                pendingImageInviteSelection = null
+            }
+        }
+
+        LaunchedEffect(imageInviteState) {
+            if (imageInviteState is ImageInviteUiState.Sent) {
+                SharedFlowCentre.toastText.emit(ToastText.Success(imageInviteSentMessage))
+                userProfileScreenModel.dismissImageInvite()
+            }
+        }
+
+        val openImageInvitePicker = {
+            userProfileScreenModel.beginImageInvite(currentUser.id)?.let { sessionId ->
+                pendingImageInviteSelection = sessionId
+                currentNavigator.push(GalleryPickerScreen(sessionId))
+            }
+            Unit
+        }
+
         CompositionLocalProvider(LocalSharedSuffixKey provides sharedSuffixKey) {
             ProfileScaffold(
                 imageModifier = Modifier.sharedBoundsBy("${userProfileVO.id}UserIcon"),
@@ -161,10 +228,9 @@ data class UserProfileScreen(
                 onMenu = { bottomSheetIsVisible = true },
                 outerScrollState = outerScrollState,
                 innerScrollState = innerScrollState,
-                topBarActions = { colors ->
+                topBarActions = {
                     OfficialUrlShareButton(
                         url = "https://vrchat.com/home/user/${currentUser.id}",
-                        colors = colors,
                     )
                 },
             ) { _, contentMinHeight ->
@@ -175,7 +241,7 @@ data class UserProfileScreen(
                     userGroups = userGroups,
                     mutualGroups = mutualGroups,
                     createdWorlds = userProfileScreenModel.createdWorlds,
-                    createdAvatars = userProfileScreenModel.createdAvatars,
+                    createdAvatars = visibleCreatedAvatars,
                     favoritedWorlds = userProfileScreenModel.favoritedWorlds,
                     friendActivitySummary = userProfileScreenModel.friendActivitySummary,
                     friendActivityEvents = userProfileScreenModel.friendActivityEvents,
@@ -192,20 +258,52 @@ data class UserProfileScreen(
             sheetState = sheetState,
             onDismissRequest = { bottomSheetIsVisible = false }
         ) {
-            SheetItems(
-                currentUser = currentUser,
-                userProfileScreenModel = userProfileScreenModel,
-                hideSheet = { sheetState.hide() },
-                onHideCompletion = {
-                    if (!sheetState.isVisible) bottomSheetIsVisible = false
-                },
-                openAlertDialog = { openAlertDialog = true },
-                openEditProfileDialog = { openEditProfileDialog = true },
-                onManageFriendFavorite = { showFriendFavoriteSheet = true },
-                openEditNoteDialog = { openEditNoteDialog = true },
-                boopEnabled = userProfileScreenModel.isBoopAllowed,
-                openBoopDialog = { openBoopDialog = true },
-            )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .nestedScroll(actionMenuNestedScrollConnection)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                AppSheetActionGroup {
+                    SheetItems(
+                        currentUser = currentUser,
+                        userProfileScreenModel = userProfileScreenModel,
+                        hideSheet = { sheetState.hide() },
+                        onHideCompletion = {
+                            if (!sheetState.isVisible) bottomSheetIsVisible = false
+                        },
+                        openAlertDialog = { openAlertDialog = true },
+                        openEditProfileDialog = { openEditProfileDialog = true },
+                        onManageFriendFavorite = { showFriendFavoriteSheet = true },
+                        openEditNoteDialog = { openEditNoteDialog = true },
+                        boopEnabled = userProfileScreenModel.isBoopAllowed,
+                        openBoopDialog = { openBoopDialog = true },
+                        playerChatboxModerationState = playerChatboxModerationState,
+                        playerVoiceModerationState = playerVoiceModerationState,
+                        playerInteractionState = playerInteractionState,
+                        requestPlayerInteractionOverride = { pendingInteractionOverride = it },
+                        retryPlayerInteractionLoad = {
+                            userProfileScreenModel.refreshPlayerInteractionStatus(interactionLoadFailedMessage)
+                        },
+                        playerBlockState = playerBlockState,
+                        retryPlayerBlockStatus = {
+                            userProfileScreenModel.refreshPlayerBlockStatus(
+                                localeStrings.profileBlockStatusLoadFailed
+                            )
+                        },
+                        confirmPlayerBlockChange = { pendingPlayerBlockChange = it },
+                        openReportDialog = { openReportDialog = true },
+                        openImageInvitePicker = openImageInvitePicker,
+                        openInviteMessageSelection = { action ->
+                            userProfileScreenModel.openInviteMessageSelection(
+                                action = action,
+                                targetUserId = currentUser.id,
+                                targetDisplayName = currentUser.displayName,
+                            )
+                        },
+                    )
+                }
+            }
         }
         // Friend FavoriteType group management bottom sheet
         FavoriteGroupBottomSheet(
@@ -218,15 +316,24 @@ data class UserProfileScreen(
             openAlertDialog = openAlertDialog,
             onDismissRequest = { openAlertDialog = false }
         ) {
-            Text(text = userProfileScreenModel.userJson)
+            AppText(text = userProfileScreenModel.userJson)
         }
         // 编辑资料底部弹窗
         val editSuccessMsg = strings.editProfileUpdateSuccess
+        val editFailureMsg = strings.editProfileUpdateFailed
+        val avatarCopyingEnabledMessage = strings.editProfileAvatarCopyingEnabled
+        val avatarCopyingDisabledMessage = strings.editProfileAvatarCopyingDisabled
         val bioLinksUpdateState by userProfileScreenModel.bioLinksUpdateState.collectAsState()
+        val boopPrivacyState by userProfileScreenModel.boopPrivacyState.collectAsState()
+        val avatarCopyingPrivacyState by userProfileScreenModel
+            .avatarCopyingPrivacyState
+            .collectAsState()
         EditProfileSheet(
             isVisible = openEditProfileDialog,
             currentUser = currentUser,
             bioLinksUpdateState = bioLinksUpdateState,
+            boopPrivacyState = boopPrivacyState,
+            avatarCopyingPrivacyState = avatarCopyingPrivacyState,
             onDismiss = { openEditProfileDialog = false },
             onStatusSave = { status, statusDescription ->
                 userProfileScreenModel.updateUserProfile(status = status, statusDescription = statusDescription, successMessage = editSuccessMsg)
@@ -246,6 +353,24 @@ data class UserProfileScreen(
                     successMessage = editSuccessMsg,
                 )
             },
+            onBoopPrivacyChange = { isEnabled ->
+                userProfileScreenModel.updateBoopPrivacy(
+                    isEnabled = isEnabled,
+                    successMessage = editSuccessMsg,
+                    failureMessage = editFailureMsg,
+                )
+            },
+            onAvatarCopyingChange = { isAllowed ->
+                userProfileScreenModel.updateAvatarCopyingPrivacy(
+                    isAllowed = isAllowed,
+                    successMessage = if (isAllowed) {
+                        avatarCopyingEnabledMessage
+                    } else {
+                        avatarCopyingDisabledMessage
+                    },
+                )
+            },
+            onAvatarCopyingRetry = userProfileScreenModel::retryAvatarCopyingPrivacyLoad,
         )
         // 编辑备注弹窗
         val noteSavedMsg = strings.userNoteSaved
@@ -283,6 +408,92 @@ data class UserProfileScreen(
                 }
             },
         )
+        PlayerInteractionOverrideDialog(
+            requestedOverride = pendingInteractionOverride,
+            targetName = currentUser.displayName,
+            submitting = interactionSubmitting,
+            onDismiss = { if (!interactionSubmitting) pendingInteractionOverride = null },
+            onConfirm = { requestedOverride ->
+                if (!interactionSubmitting) {
+                    actionScope.launch {
+                        interactionSubmitting = true
+                        val closing = requestedOverride == PlayerInteractionOverride.InteractOff
+                        userProfileScreenModel.setPlayerInteractionOverride(
+                            override = requestedOverride,
+                            successMessage = if (closing) {
+                                interactionClosedSuccessMessage
+                            } else {
+                                interactionRestoredSuccessMessage
+                            },
+                            failureMessage = interactionUpdateFailedMessage,
+                        )
+                        interactionSubmitting = false
+                        pendingInteractionOverride = null
+                    }
+                }
+            },
+        )
+        PlayerBlockConfirmationDialog(
+            desiredBlockedState = pendingPlayerBlockChange,
+            currentState = playerBlockState,
+            displayName = currentUser.displayName,
+            onDismiss = { pendingPlayerBlockChange = null },
+            onConfirm = { blocked ->
+                actionScope.launch {
+                    val succeeded = userProfileScreenModel.setPlayerBlocked(
+                        blocked = blocked,
+                        successMessage = if (blocked) {
+                            localeStrings.profileBlockSuccess
+                        } else {
+                            localeStrings.profileUnblockSuccess
+                        },
+                        failureMessage = if (blocked) {
+                            localeStrings.profileBlockFailed
+                        } else {
+                            localeStrings.profileUnblockFailed
+                        },
+                    )
+                    if (succeeded) pendingPlayerBlockChange = null
+                }
+            },
+        )
+        if (openReportDialog) {
+            ContentReportSheet(
+                target = ReportTarget(
+                    type = ContentReportType.User,
+                    contentId = currentUser.id,
+                    displayName = currentUser.displayName,
+                ),
+                onDismiss = { openReportDialog = false },
+            )
+        }
+        ImageInviteDialog(
+            state = imageInviteState,
+            targetName = currentUser.displayName,
+            onSend = userProfileScreenModel::sendImageInvite,
+            onRetryPreparation = userProfileScreenModel::retryImageInvitePreparation,
+            onChooseAnother = openImageInvitePicker,
+            onDismiss = userProfileScreenModel::dismissImageInvite,
+        )
+        val inviteSentMessage = strings.profileInviteSent
+        val requestInviteSentMessage = strings.profileRequestInviteSent
+        val notInInstanceMessage = strings.profileInviteNotInInstance
+        InviteMessageSelectorDialog(
+            state = inviteMessageSelection,
+            onDismiss = userProfileScreenModel::dismissInviteMessageSelection,
+            onRetry = userProfileScreenModel::retryInviteMessageSelection,
+            onSend = { slot ->
+                userProfileScreenModel.sendInviteMessage(
+                    slot = slot,
+                    successMessage = if (inviteMessageSelection?.action == InviteMessageAction.RequestInvite) {
+                        requestInviteSentMessage
+                    } else {
+                        inviteSentMessage
+                    },
+                    notInInstanceMessage = notInInstanceMessage,
+                )
+            },
+        )
     }
 
 }
@@ -299,6 +510,17 @@ private fun ColumnScope.SheetItems(
     openEditNoteDialog: () -> Unit,
     boopEnabled: Boolean,
     openBoopDialog: () -> Unit,
+    playerChatboxModerationState: PlayerChatboxModerationState,
+    playerVoiceModerationState: PlayerVoiceModerationState,
+    playerInteractionState: PlayerInteractionState,
+    requestPlayerInteractionOverride: (PlayerInteractionOverride) -> Unit,
+    retryPlayerInteractionLoad: () -> Unit,
+    playerBlockState: PlayerBlockState,
+    retryPlayerBlockStatus: () -> Unit,
+    confirmPlayerBlockChange: (Boolean) -> Unit,
+    openReportDialog: () -> Unit,
+    openImageInvitePicker: () -> Unit,
+    openInviteMessageSelection: (InviteMessageAction) -> Unit,
 ) {
     val navigator = LocalNavigator.currentOrThrow
     val localeStrings = strings
@@ -344,6 +566,41 @@ private fun ColumnScope.SheetItems(
             }
         })
 
+        PlayerInteractionSheetItem(
+            targetUserId = currentUser.id,
+            state = playerInteractionState,
+            hideSheet = hideSheet,
+            onHideCompletion = onHideCompletion,
+            requestOverride = requestPlayerInteractionOverride,
+            retryLoad = retryPlayerInteractionLoad,
+        )
+
+        val blockActionText = when {
+            !playerBlockState.isSessionAvailable -> localeStrings.profileBlockStatusUnavailable
+            playerBlockState.isLoading -> localeStrings.profileBlockStatusChecking
+            playerBlockState.loadFailed -> localeStrings.profileBlockStatusRetry
+            playerBlockState.isBlocked == true -> localeStrings.profileUnblock
+            playerBlockState.isBlocked == false -> localeStrings.profileBlock
+            else -> localeStrings.profileBlockStatusChecking
+        }
+        val blockActionEnabled = when {
+            !playerBlockState.isSessionAvailable -> false
+            playerBlockState.isLoading || playerBlockState.isUpdating -> false
+            playerBlockState.loadFailed -> true
+            else -> playerBlockState.isBlocked != null
+        }
+        SheetButtonItem(text = blockActionText, enabled = blockActionEnabled, onClick = {
+            if (playerBlockState.loadFailed) {
+                retryPlayerBlockStatus()
+            } else {
+                val blocked = playerBlockState.isBlocked ?: return@SheetButtonItem
+                scope.launch { hideSheet() }.invokeOnCompletion {
+                    onHideCompletion()
+                    confirmPlayerBlockChange(!blocked)
+                }
+            }
+        })
+
         if (currentUser.isFriend) {
             SheetButtonItem(text = localeStrings.profileBoop, enabled = boopEnabled, onClick = {
                 scope.launch { hideSheet() }.invokeOnCompletion {
@@ -351,17 +608,34 @@ private fun ColumnScope.SheetItems(
                     openBoopDialog()
                 }
             })
+            SheetButtonItem(text = localeStrings.profileRequestInvite, onClick = {
+                scope.launch { hideSheet() }.invokeOnCompletion {
+                    onHideCompletion()
+                    openInviteMessageSelection(InviteMessageAction.RequestInvite)
+                }
+            })
             SheetButtonItem(text = localeStrings.profileInviteToMyInstance, onClick = {
                 scope.launch { hideSheet() }.invokeOnCompletion {
                     onHideCompletion()
-                    userProfileScreenModel.inviteToMyInstance(
-                        userId = currentUser.id,
-                        successMessage = localeStrings.profileInviteSent,
-                        notInInstanceMessage = localeStrings.profileInviteNotInInstance,
-                    )
+                    openInviteMessageSelection(InviteMessageAction.Invite)
+                }
+            })
+            SheetButtonItem(text = localeStrings.profileImageInvite, onClick = {
+                scope.launch { hideSheet() }.invokeOnCompletion {
+                    onHideCompletion()
+                    openImageInvitePicker()
                 }
             })
         }
+
+        PlayerChatboxModerationSheetItem(
+            state = playerChatboxModerationState,
+            screenModel = userProfileScreenModel,
+        )
+        PlayerVoiceModerationSheetItem(
+            state = playerVoiceModerationState,
+            screenModel = userProfileScreenModel,
+        )
     }
 
     SheetButtonItem(
@@ -390,7 +664,293 @@ private fun ColumnScope.SheetItems(
             openAlertDialog()
         }
     })
+    if (!currentUser.isSelf) {
+        SheetButtonItem(
+            text = localeStrings.report,
+            onClick = {
+                scope.launch { hideSheet() }.invokeOnCompletion {
+                    onHideCompletion()
+                    openReportDialog()
+                }
+            },
+            content = { label ->
+                AppText(label, color = AppTheme.colors.destructive)
+            },
+        )
+    }
 
+}
+
+@Composable
+private fun ColumnScope.PlayerInteractionSheetItem(
+    targetUserId: String,
+    state: PlayerInteractionState,
+    hideSheet: suspend () -> Unit,
+    onHideCompletion: () -> Unit,
+    requestOverride: (PlayerInteractionOverride) -> Unit,
+    retryLoad: () -> Unit,
+) {
+    val localeStrings = strings
+    val scope = rememberCoroutineScope()
+    val stateTarget = when (state) {
+        PlayerInteractionState.Unavailable -> null
+        is PlayerInteractionState.Checking -> state.targetUserId
+        is PlayerInteractionState.Ready -> state.targetUserId
+        is PlayerInteractionState.Updating -> state.targetUserId
+        is PlayerInteractionState.Failed -> state.targetUserId
+    }
+    if (stateTarget != null && stateTarget != targetUserId) {
+        SheetButtonItem(text = localeStrings.profileInteractionChecking, enabled = false, onClick = {})
+        return
+    }
+
+    when (state) {
+        PlayerInteractionState.Unavailable -> SheetButtonItem(
+            text = localeStrings.profileInteractionUnavailable,
+            enabled = false,
+            onClick = {},
+        )
+        is PlayerInteractionState.Checking -> SheetButtonItem(
+            text = localeStrings.profileInteractionChecking,
+            enabled = false,
+            onClick = {},
+        )
+        is PlayerInteractionState.Ready -> {
+            val requestedOverride =
+                if (state.snapshot.effectiveOverride == PlayerInteractionOverride.InteractOff) {
+                    PlayerInteractionOverride.InteractOn
+                } else {
+                    PlayerInteractionOverride.InteractOff
+                }
+            SheetButtonItem(
+                text = if (requestedOverride == PlayerInteractionOverride.InteractOff) {
+                    localeStrings.profileInteractionClose
+                } else {
+                    localeStrings.profileInteractionRestore
+                },
+                onClick = {
+                    scope.launch { hideSheet() }.invokeOnCompletion {
+                        onHideCompletion()
+                        requestOverride(requestedOverride)
+                    }
+                },
+            )
+        }
+        is PlayerInteractionState.Updating -> SheetButtonItem(
+            text = if (state.requestedOverride == PlayerInteractionOverride.InteractOff) {
+                localeStrings.profileInteractionClosing
+            } else {
+                localeStrings.profileInteractionRestoring
+            },
+            enabled = false,
+            onClick = {},
+        )
+        is PlayerInteractionState.Failed -> SheetButtonItem(
+            text = localeStrings.profileInteractionRetry,
+            onClick = {
+                val retryOverride = state.retryOverride
+                if (retryOverride == null) {
+                    retryLoad()
+                } else {
+                    scope.launch { hideSheet() }.invokeOnCompletion {
+                        onHideCompletion()
+                        requestOverride(retryOverride)
+                    }
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun PlayerInteractionOverrideDialog(
+    requestedOverride: PlayerInteractionOverride?,
+    targetName: String,
+    submitting: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (PlayerInteractionOverride) -> Unit,
+) {
+    val requested = requestedOverride ?: return
+    val localeStrings = strings
+    val closing = requested == PlayerInteractionOverride.InteractOff
+    AppAlert(
+        onDismissRequest = onDismiss,
+        title = {
+            AppText(
+                if (closing) localeStrings.profileInteractionCloseConfirmTitle
+                else localeStrings.profileInteractionRestoreConfirmTitle,
+            )
+        },
+        text = {
+            AppText(
+                (if (closing) localeStrings.profileInteractionCloseConfirmMessage
+                else localeStrings.profileInteractionRestoreConfirmMessage)
+                    .replace("%s", targetName),
+            )
+        },
+        confirmButton = {
+            AppButton(
+                enabled = !submitting,
+                onClick = { onConfirm(requested) },
+                style = AppButtonStyle.Plain,
+            ) {
+                AppText(
+                    when {
+                        submitting && closing -> localeStrings.profileInteractionClosing
+                        submitting -> localeStrings.profileInteractionRestoring
+                        else -> localeStrings.confirm
+                    },
+                )
+            }
+        },
+        dismissButton = {
+            AppButton(enabled = !submitting, onClick = onDismiss, style = AppButtonStyle.Plain) {
+                AppText(localeStrings.cancel)
+            }
+        },
+    )
+}
+
+@Composable
+private fun ColumnScope.PlayerChatboxModerationSheetItem(
+    state: PlayerChatboxModerationState,
+    screenModel: UserProfileScreenModel,
+) {
+    val localeStrings = strings
+    val text = when (state) {
+        PlayerChatboxModerationState.Unavailable -> return
+        PlayerChatboxModerationState.Checking -> localeStrings.profileChatboxModerationChecking
+        is PlayerChatboxModerationState.Failed -> localeStrings.profileChatboxModerationRetry
+        is PlayerChatboxModerationState.Ready -> if (state.isMuted) {
+            localeStrings.profileChatboxModerationUnmute
+        } else {
+            localeStrings.profileChatboxModerationMute
+        }
+        is PlayerChatboxModerationState.Updating -> if (state.willMute) {
+            localeStrings.profileChatboxModerationMuting
+        } else {
+            localeStrings.profileChatboxModerationUnmuting
+        }
+    }
+    val enabled = state is PlayerChatboxModerationState.Ready ||
+        state is PlayerChatboxModerationState.Failed
+
+    SheetButtonItem(
+        text = text,
+        enabled = enabled,
+        onClick = {
+            when (state) {
+                is PlayerChatboxModerationState.Failed ->
+                    screenModel.retryPlayerChatboxModeration()
+                is PlayerChatboxModerationState.Ready ->
+                    screenModel.togglePlayerChatboxModeration(
+                        mutedMessage = localeStrings.profileChatboxModerationMuted,
+                        unmutedMessage = localeStrings.profileChatboxModerationUnmuted,
+                        failureMessage = localeStrings.profileChatboxModerationUpdateFailed,
+                    )
+                else -> Unit
+            }
+        },
+    )
+}
+
+@Composable
+private fun ColumnScope.PlayerVoiceModerationSheetItem(
+    state: PlayerVoiceModerationState,
+    screenModel: UserProfileScreenModel,
+) {
+    val localeStrings = strings
+    val text = when (state) {
+        PlayerVoiceModerationState.Unavailable -> return
+        is PlayerVoiceModerationState.Checking -> localeStrings.profileVoiceModerationChecking
+        is PlayerVoiceModerationState.Failed -> localeStrings.profileVoiceModerationRetry
+        is PlayerVoiceModerationState.Ready -> if (state.isMuted) {
+            localeStrings.profileVoiceModerationUnmute
+        } else {
+            localeStrings.profileVoiceModerationMute
+        }
+        is PlayerVoiceModerationState.Updating -> if (state.willMute) {
+            localeStrings.profileVoiceModerationMuting
+        } else {
+            localeStrings.profileVoiceModerationUnmuting
+        }
+    }
+    val enabled = state is PlayerVoiceModerationState.Ready ||
+        state is PlayerVoiceModerationState.Failed
+
+    SheetButtonItem(
+        text = text,
+        enabled = enabled,
+        onClick = {
+            when (state) {
+                is PlayerVoiceModerationState.Failed -> screenModel.retryPlayerVoiceModeration()
+                is PlayerVoiceModerationState.Ready -> screenModel.togglePlayerVoiceModeration(
+                    mutedMessage = localeStrings.profileVoiceModerationMuted,
+                    unmutedMessage = localeStrings.profileVoiceModerationUnmuted,
+                    failureMessage = localeStrings.profileVoiceModerationUpdateFailed,
+                )
+                else -> Unit
+            }
+        },
+    )
+}
+
+@Composable
+private fun PlayerBlockConfirmationDialog(
+    desiredBlockedState: Boolean?,
+    currentState: PlayerBlockState,
+    displayName: String,
+    onDismiss: () -> Unit,
+    onConfirm: (Boolean) -> Unit,
+) {
+    val blocked = desiredBlockedState ?: return
+    val localeStrings = strings
+    val canSubmit = !currentState.isUpdating && currentState.isBlocked == !blocked
+    AppAlert(
+        onDismissRequest = { if (!currentState.isUpdating) onDismiss() },
+        title = {
+            AppText(
+                if (blocked) {
+                    localeStrings.profileBlockConfirmTitle
+                } else {
+                    localeStrings.profileUnblockConfirmTitle
+                }
+            )
+        },
+        text = {
+            AppText(
+                (if (blocked) {
+                    localeStrings.profileBlockConfirmMessage
+                } else {
+                    localeStrings.profileUnblockConfirmMessage
+                }).replace("%name%", displayName)
+            )
+        },
+        confirmButton = {
+            AppButton(
+                enabled = canSubmit,
+                onClick = { onConfirm(blocked) },
+                style = AppButtonStyle.Prominent,
+            ) {
+                if (currentState.isUpdating) {
+                    AppActivityIndicator(
+                        modifier = Modifier.size(18.dp),
+                    )
+                } else {
+                    AppText(if (blocked) localeStrings.profileBlock else localeStrings.profileUnblock)
+                }
+            }
+        },
+        dismissButton = {
+            AppButton(
+                enabled = !currentState.isUpdating,
+                onClick = onDismiss,
+                style = AppButtonStyle.Plain,
+            ) {
+                AppText(localeStrings.cancel)
+            }
+        },
+    )
 }
 
 @Composable
@@ -462,15 +1022,11 @@ private fun ColumnScope.SheetButtonItem(
     text: String? = null,
     enabled: Boolean = true,
     onClick: () -> Unit,
-    content: @Composable RowScope.(String) -> Unit = { Text(text = it) },
+    content: @Composable RowScope.(String) -> Unit = { AppText(text = it) },
 ) {
-    TextButton(
-        modifier = Modifier
-            .align(Alignment.CenterHorizontally)
-            .fillMaxWidth()
-            .padding(vertical = 2.dp, horizontal = 24.dp),
+    AppSheetAction(
         enabled = enabled,
-        onClick = onClick
+        onClick = onClick,
     ) {
         content(text.orEmpty())
     }
@@ -483,9 +1039,9 @@ private fun JsonAlertDialog(
     content: @Composable BoxScope.() -> Unit,
 ) {
     if (openAlertDialog) {
-        AlertDialog(
+        AppAlert(
             icon = {
-                Icon(AppIcons.Person, contentDescription = "AlertDialogIcon")
+                AppIcon(AppIcons.Person, contentDescription = "AlertDialogIcon")
             },
             text = {
                 Box(
@@ -500,10 +1056,11 @@ private fun JsonAlertDialog(
             },
             onDismissRequest = onDismissRequest,
             confirmButton = {
-                TextButton(
-                    onClick = onDismissRequest
+                AppButton(
+                    onClick = onDismissRequest,
+                    style = AppButtonStyle.Plain,
                 ) {
-                    Text("Back")
+                    AppText("Back")
                 }
             }
         )
@@ -738,15 +1295,15 @@ private fun UserGroupsSection(
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             itemsIndexed(shownGroups, key = { _, group -> group.groupId }) { index, group ->
-                Surface(
+                AppSurface(
                     modifier = Modifier
                         .animateItem(fadeInSpec = entranceFadeSpec(index))
                         .width(180.dp)
                         .height(88.dp)
-                        .clip(MaterialTheme.shapes.large)
+                        .clip(AppShapes.l)
                         .clickable { onGroupClick(group) },
-                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
-                    contentColor = MaterialTheme.colorScheme.primary
+                    color = AppTheme.colors.secondaryGroupedBackground,
+                    contentColor = AppTheme.colors.tint
                 ) {
                     Column(
                         modifier = Modifier.padding(10.dp),
@@ -762,32 +1319,51 @@ private fun UserGroupsSection(
                                 modifier = Modifier.sharedBoundsBy("${group.groupId}GroupIcon")
                             )
                             Column(
-                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                                verticalArrangement = Arrangement.spacedBy(2.dp),
                             ) {
-                                Text(
-                                    modifier = Modifier.sharedBoundsBy(
-                                        key = groupNameSharedKey(group.groupId),
-                                        resizeMode = SharedTextBoundsResizeMode,
-                                    ),
-                                    text = group.name,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    AppText(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .sharedBoundsBy(
+                                                key = groupNameSharedKey(group.groupId),
+                                                resizeMode = SharedTextBoundsResizeMode,
+                                            ),
+                                        text = group.name,
+                                        style = AppTheme.type.subheadline,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    if (group.isRepresenting) {
+                                        ATooltipBox(
+                                            tooltip = { AppText(strings.groupRepresentationEnabled) },
+                                        ) {
+                                            AppIcon(
+                                                imageVector = AppIcons.CheckCircle,
+                                                contentDescription = strings.groupRepresentationEnabled,
+                                                modifier = Modifier.size(16.dp),
+                                                tint = AppTheme.colors.secondaryTint,
+                                            )
+                                        }
+                                    }
+                                }
                                 if (group.shortCode.isNotBlank()) {
-                                    Text(
+                                    AppText(
                                         text = "#${group.shortCode}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        style = AppTheme.type.caption2Emphasized,
+                                        color = AppTheme.colors.secondaryLabel,
                                         maxLines = 1
                                     )
                                 }
                             }
                         }
-                        Text(
+                        AppText(
                             text = "${group.memberCount} ${strings.groupMembers}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = AppTheme.type.caption2Emphasized,
+                            color = AppTheme.colors.secondaryLabel,
                             maxLines = 1
                         )
                     }
@@ -809,16 +1385,16 @@ private fun SectionHeader(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Text(
+        AppText(
             text = title,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.primary
+            style = AppTheme.type.headline,
+            color = AppTheme.colors.label
         )
         if (countText != null) {
-            Text(
+            AppText(
                 text = countText,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = AppTheme.type.caption2Emphasized,
+                color = AppTheme.colors.secondaryLabel
             )
         }
     }
@@ -855,7 +1431,7 @@ private fun <T> StackedLocationCardList(
         modifier = Modifier
             .fillMaxWidth()
             .height(128.dp)
-            .clip(MaterialTheme.shapes.large)
+            .clip(AppShapes.l)
             .graphicsLayer { alpha = entranceAlpha.value }
             .clickable {
                 if (items.size == 1) {
@@ -871,7 +1447,7 @@ private fun <T> StackedLocationCardList(
             val baseOffset = 10.dp * i
             val baseScale = 1f - (0.1f * i)
             val baseAlpha = 1f - (0.25f * i)
-            Surface(
+            AppSurface(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(112.dp)
@@ -882,19 +1458,18 @@ private fun <T> StackedLocationCardList(
                         scaleY = baseScale
                         alpha = baseAlpha
                     },
-                shape = MaterialTheme.shapes.large,
-                color = MaterialTheme.colorScheme.surfaceVariant
+                shape = AppShapes.l,
+                color = AppTheme.colors.fill
             ) {}
         }
 
         // 前方主卡片
-        Surface(
+        AppSurface(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(112.dp)
                 .align(Alignment.BottomCenter),
-            tonalElevation = (-2).dp,
-            shape = MaterialTheme.shapes.large
+            shape = AppShapes.l
         ) {
             Row(
                 modifier = Modifier.padding(8.dp),
@@ -926,19 +1501,20 @@ private fun <T> StackedLocationCardList(
                         .padding(vertical = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Text(
+                    AppText(
                         text = title(firstItem),
-                        style = MaterialTheme.typography.titleMedium,
+                        style = AppTheme.type.headline,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.primary
+                        color = AppTheme.colors.tint
                     )
-                    Text(
+                    AppText(
                         text = subtitle(firstItem),
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 3,
+                        style = AppTheme.type.caption1,
+                        // 堆叠时右下角有"+N"角标，少排一行给它让位
+                        maxLines = if (items.size > 1) 2 else 3,
                         overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = AppTheme.colors.secondaryLabel
                     )
                 }
             }
@@ -946,18 +1522,18 @@ private fun <T> StackedLocationCardList(
 
         // 标签气泡（左上角）
         if (label != null) {
-            Surface(
+            AppSurface(
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(4.dp),
-                shape = MaterialTheme.shapes.small,
-                color = MaterialTheme.colorScheme.secondaryContainer
+                shape = AppShapes.s,
+                color = AppTheme.colors.fill
             ) {
-                Text(
+                AppText(
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                     text = label,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    style = AppTheme.type.caption2Emphasized,
+                    color = AppTheme.colors.label,
                     maxLines = 1
                 )
             }
@@ -970,15 +1546,15 @@ private fun <T> StackedLocationCardList(
                     .align(Alignment.BottomEnd)
                     .padding(bottom = 12.dp, end = 16.dp)
                     .background(
-                        color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.8f),
-                        shape = CircleShape
+                        color = AppTheme.colors.tint,
+                        shape = AppShapes.capsule
                     )
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                    .padding(horizontal = 8.dp, vertical = 3.dp)
             ) {
-                Text(
+                AppText(
                     text = "+${items.size - 1}",
-                    color = MaterialTheme.colorScheme.onTertiary,
-                    style = MaterialTheme.typography.labelMedium
+                    color = AppTheme.colors.onTint,
+                    style = AppTheme.type.caption1Emphasized
                 )
             }
         }
@@ -994,8 +1570,8 @@ private fun DetailTopBar(
     sysTopPadding: Dp,
     onReturn: () -> Unit,
 ) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+    AppSurface(
+        color = AppTheme.colors.secondaryGroupedBackground,
     ) {
         Row(
             modifier = Modifier
@@ -1005,19 +1581,19 @@ private fun DetailTopBar(
                 .padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClick = onReturn) {
-                Icon(
+            AppIconButton(onClick = onReturn) {
+                AppIcon(
                     imageVector = AppIcons.ArrowBackIosNew,
                     contentDescription = "Back",
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = AppTheme.colors.tint
                 )
             }
             Spacer(modifier = Modifier.weight(1f))
-            Text(
+            AppText(
                 text = title,
-                style = MaterialTheme.typography.titleMedium,
+                style = AppTheme.type.headline,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
+                color = AppTheme.colors.tint,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(horizontal = 16.dp)
@@ -1078,12 +1654,20 @@ class CardListDetailScreen(
         val navigator = currentNavigator
         val scope = rememberCoroutineScope()
         val animateListEntrance = remember { entranceAnimationGate.consume() }
+        val deletedAvatarIds = currentSessionDeletedAvatarIds()
+        val visibleItems = remember(items, screenType, deletedAvatarIds) {
+            if (screenType == CardScreenType.AVATAR) {
+                items.filterNot { it.id in deletedAvatarIds }
+            } else {
+                items
+            }
+        }
         val hiddenWorldCannotViewText = strings.hiddenWorldCannotView
         val sysTopPadding = getInsetPadding(WindowInsets::getTop)
         CompositionLocalProvider(LocalSharedSuffixKey provides sharedSuffixKey) {
-            Surface(
+            AppSurface(
                 modifier = Modifier.fillMaxSize(),
-                color = MaterialTheme.colorScheme.surfaceContainerLow
+                color = AppTheme.colors.secondaryGroupedBackground
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     DetailTopBar(
@@ -1092,7 +1676,7 @@ class CardListDetailScreen(
                         onReturn = { navigator.pop() }
                     )
                     CardListContent(
-                        items = items,
+                        items = visibleItems,
                         key = { it.listKey },
                         imageUrl = { it.imageUrl ?: it.thumbnailUrl },
                         itemTitle = { it.title },
@@ -1174,15 +1758,14 @@ private fun <T> CardListContent(
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         itemsIndexed(shownItems, key = { _, item -> key(item) }) { index, item ->
-            Surface(
+            AppSurface(
                 modifier = Modifier
                     .animateItem(fadeInSpec = entranceFadeSpec(index))
                     .fillMaxWidth()
                     .height(108.dp)
-                    .clip(MaterialTheme.shapes.large)
+                    .clip(AppShapes.l)
                     .then(if (onClickItem != null) Modifier.clickable { onClickItem(item) } else Modifier),
-                tonalElevation = (-2).dp,
-                shape = MaterialTheme.shapes.large
+                shape = AppShapes.l
             ) {
                 Row(
                     modifier = Modifier.padding(8.dp),
@@ -1210,19 +1793,19 @@ private fun <T> CardListContent(
                             .padding(vertical = 4.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Text(
+                        AppText(
                             text = itemTitle(item),
-                            style = MaterialTheme.typography.titleMedium,
+                            style = AppTheme.type.headline,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            color = MaterialTheme.colorScheme.primary
+                            color = AppTheme.colors.tint
                         )
-                        Text(
+                        AppText(
                             text = itemSubtitle(item),
-                            style = MaterialTheme.typography.bodySmall,
+                            style = AppTheme.type.caption1,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = AppTheme.colors.secondaryLabel
                         )
                     }
                 }
@@ -1464,7 +2047,6 @@ private fun UserProfileIdentity(
 }
 
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
 private fun BottomCardTab(
     bioMinHeight: Dp = 0.dp,
     userProfileVO: UserProfileVo,
@@ -1479,22 +2061,22 @@ private fun BottomCardTab(
         AnimatedContent(targetState = state) {
             when (it) {
                 0 -> {
-                    Surface(
+                    AppSurface(
                         modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = bioMinHeight),
-                        color = MaterialTheme.colorScheme.surfaceContainerLowest,
-                        contentColor = MaterialTheme.colorScheme.primary,
-                        shape = MaterialTheme.shapes.extraLarge
+                        color = AppTheme.colors.secondaryGroupedBackground,
+                        shape = AppShapes.xl
                     ) {
                         Column {
                             Column(modifier = Modifier.padding(12.dp)) {
                                 // TODO: UI 需要重写后恢复“查看最近更改”入口，相关逻辑暂时保留。
                                 /*
                                 if (latestBioChange != null) {
-                                    TextButton(
+                                    AppButton(
                                         modifier = Modifier.align(Alignment.End),
                                         onClick = { showBioChange = !showBioChange },
+                                        style = AppButtonStyle.Plain,
                                     ) {
-                                        Text(
+                                        AppText(
                                             if (showBioChange) strings.friendActivityBioDiffHide
                                             else strings.friendActivityBioDiffShow,
                                         )
@@ -1512,22 +2094,22 @@ private fun BottomCardTab(
                                         }
                                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                             lines.forEach { line ->
-                                                Text(
+                                                AppText(
                                                     text = when {
                                                         line.unchanged -> "  ${line.text}"
                                                         line.added -> "+ ${line.text}"
                                                         else -> "- ${line.text}"
                                                     },
                                                     color = when {
-                                                        line.unchanged -> MaterialTheme.colorScheme.primary
-                                                        line.added -> MaterialTheme.colorScheme.tertiary
-                                                        else -> MaterialTheme.colorScheme.error
+                                                        line.unchanged -> AppTheme.colors.label
+                                                        line.added -> AppTheme.colors.success
+                                                        else -> AppTheme.colors.destructive
                                                     },
                                                 )
                                             }
                                         }
                                     } else {
-                                        Text(text = userProfileVO.bio)
+                                        AppText(text = userProfileVO.bio)
                                     }
                                 }
                             }
@@ -1563,9 +2145,9 @@ private fun LangAndLinkRow(userProfileVO: UserProfileVo) {
             LanguagesRow(speakLanguages, width)
         }
         if (speakLanguages.isNotEmpty() && bioLinks.isNotEmpty()) {
-            VerticalDivider(
+            AppVerticalDivider(
                 modifier = Modifier.height(width).padding(vertical = 6.dp),
-                color = MaterialTheme.colorScheme.outlineVariant,
+                color = AppTheme.colors.separator,
                 thickness = 1.dp,
             )
         }
@@ -1576,7 +2158,6 @@ private fun LangAndLinkRow(userProfileVO: UserProfileVo) {
 }
 
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun LanguagesRow(
     speakLanguages: List<String>,
@@ -1593,7 +2174,7 @@ internal fun LanguagesRow(
         speakLanguages.forEach { language ->
             val imageVector = LanguageIcons.getFlag(language)
             ATooltipBox(
-                tooltip = { Text(text = language) }
+                tooltip = { AppText(text = language) }
             ) {
                 if (imageVector == null) {
                     Box(
@@ -1601,12 +2182,12 @@ internal fun LanguagesRow(
                             .fillMaxHeight()
                             .width(width)
                             .padding(vertical = 3.dp)
-                            .background(MaterialTheme.colorScheme.inversePrimary, MaterialTheme.shapes.extraSmall)
+                            .background(AppTheme.colors.tintSoft, AppShapes.xs)
                     ) {
-                        Icon(
+                        AppIcon(
                             modifier = Modifier.align(Alignment.Center),
                             imageVector = AppIcons.QuestionMark,
-                            tint = MaterialTheme.colorScheme.onPrimary,
+                            tint = AppTheme.colors.onTintSoft,
                             contentDescription = "NotKnownLanguageIcon",
                         )
                     }
@@ -1617,7 +2198,7 @@ internal fun LanguagesRow(
                         modifier = Modifier
                             .fillMaxHeight()
                             .align(Alignment.CenterVertically)
-                            .clip(MaterialTheme.shapes.extraSmall)
+                            .clip(AppShapes.xs)
                             .width(width),
                         contentScale = ContentScale.FillWidth
                     )
@@ -1627,7 +2208,6 @@ internal fun LanguagesRow(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LinksRow(
     bioLinks: List<String>,
@@ -1644,20 +2224,15 @@ fun LinksRow(
         val appPlatform = getAppPlatform()
         bioLinks.forEach { link ->
             val webIconVector = WebIcons.selectIcon(link)
-            TooltipBox(
-                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                tooltip = {
-                    PlainTooltip {
-                        Text(text = link)
-                    }
-                },
-                state = rememberTooltipState()
+            AppTooltipBox(
+                tooltip = { AppText(text = link) },
             ) {
-                FilledIconButton(
+                AppIconButton(
                     modifier = Modifier.size(width),
                     onClick = { appPlatform.openUrl(link) },
+                    style = AppButtonStyle.Prominent,
                 ) {
-                    Icon(
+                    AppIcon(
                         modifier = Modifier
                             .padding(6.dp)
                             .enableIf(webIconVector == null) { rotate(-45F) },
@@ -1670,7 +2245,6 @@ fun LinksRow(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EditNoteDialog(
     isVisible: Boolean,
@@ -1683,9 +2257,9 @@ private fun EditNoteDialog(
     var noteText by remember { mutableStateOf(initialNote) }
     val maxLen = 256
 
-    ModalBottomSheet(
+    AppSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetState = rememberAppSheetState(skipPartiallyExpanded = true),
     ) {
         Column(
             modifier = Modifier
@@ -1693,25 +2267,26 @@ private fun EditNoteDialog(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
         ) {
             EditHeader(localeStrings.userNoteEditTitle, onDismiss)
-            OutlinedTextField(
+            AppTextField(
                 value = noteText,
                 onValueChange = { if (it.length <= maxLen) noteText = it },
                 modifier = Modifier.fillMaxWidth(),
                 maxLines = 8,
                 placeholder = {
-                    Text(
+                    AppText(
                         localeStrings.userNoteEditTitle,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        color = AppTheme.colors.secondaryLabel.copy(alpha = 0.5f)
                     )
                 },
-                supportingText = { Text("${noteText.length}/$maxLen") },
+                supportingText = { AppText("${noteText.length}/$maxLen") },
             )
             Spacer(Modifier.height(16.dp))
-            Button(
+            AppButton(
                 onClick = { onSave(noteText) },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                style = AppButtonStyle.Prominent,
             ) {
-                Text(localeStrings.editProfileSave)
+                AppText(localeStrings.editProfileSave)
             }
         }
     }

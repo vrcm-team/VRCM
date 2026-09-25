@@ -7,6 +7,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.material3.adaptive.layout.ThreePaneScaffoldScope
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.rememberNavBackStack
 
@@ -18,7 +20,10 @@ interface AppRoute : NavKey {
     fun Content()
 }
 
-interface AppListRoute : AppRoute
+interface AppListRoute : AppRoute {
+    /** 宽屏分栏时列表栏至少要多宽：按窗口比例分到的不够时用它（例如列表栏里还常驻着导航）。 */
+    val minListPaneWidth: Dp get() = 0.dp
+}
 
 interface AppDetailRoute : AppRoute
 
@@ -44,6 +49,7 @@ internal fun AppRoute.adaptivePaneMetadata(
     AppRoutePane.List -> AppListDetailSceneStrategy.listPane(
         sceneKey = AppListDetailSceneKey,
         detailPlaceholder = detailPlaceholder,
+        minWidth = (this as AppListRoute).minListPaneWidth,
     )
     AppRoutePane.Detail -> AppListDetailSceneStrategy.detailPane(AppListDetailSceneKey)
     AppRoutePane.FullWindow -> emptyMap()

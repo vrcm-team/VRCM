@@ -114,4 +114,13 @@ class SettingsDao(
     var clipboardReadingEnabled: Boolean
         get() = settingsSettings.getBoolean(DaoKeys.Settings.CLIPBOARD_READING_ENABLED_KEY, true)
         set(value) = settingsSettings.putBoolean(DaoKeys.Settings.CLIPBOARD_READING_ENABLED_KEY, value)
+
+    /** 上次真正读取剪贴板时的变化标记；重启 App 后剪贴板没变也不用再读一次。 */
+    var lastClipboardChangeToken: Long?
+        get() = settingsSettings.getLongOrNull(DaoKeys.Settings.LAST_CLIPBOARD_CHANGE_TOKEN_KEY)
+        set(value) {
+            value?.let {
+                settingsSettings.putLong(DaoKeys.Settings.LAST_CLIPBOARD_CHANGE_TOKEN_KEY, it)
+            } ?: settingsSettings.remove(DaoKeys.Settings.LAST_CLIPBOARD_CHANGE_TOKEN_KEY)
+        }
 }

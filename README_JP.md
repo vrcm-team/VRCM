@@ -18,7 +18,7 @@
 ## VRChat の交流をスマートフォンへ
 
 <div align="center">
-  <img src="image/MultiPlatformPreview.png" width="720" alt="VRCM クロスプラットフォーム VRChat ソーシャルコンパニオンの画面プレビュー"/>
+  <img src="image/MultiPlatformPreview.png" width="720" alt="デスクトップ、Android、iPhone の VRCM ホーム。デスクトップは横長レイアウトで、左に縦のタブバー、一覧と詳細を左右に並べて表示"/>
 </div>
 
 VRCM は、交流と使いやすさを中心に設計されたクロスプラットフォームの VRChat コンパニオンアプリです。オンライン状況の確認だけでなく、交友関係を知り、一緒に遊んだ記録を振り返り、共有リンクからワールド参加、交流、オフラインイベントまでをスマートフォン上でつなぎます。
@@ -26,7 +26,7 @@ VRCM は、交流と使いやすさを中心に設計されたクロスプラッ
 > VRCM と VRCX は製品の方向性が異なります。VRCX がデスクトップでのログ閲覧や情報管理を重視する一方、VRCM はモバイルでの交流、手軽なインタラクション、外出先でもすぐに使えることを優先しています。
 > Desktop 版の基本サポートと必要な保守は継続しますが、当面は重点的な開発対象とせず、VRCX と同等のデスクトップ機能の深さを目指す予定もありません。
 
-[最新版をダウンロード](https://github.com/vrcm-team/VRCM/releases/latest) · [1.1.3 新機能の詳細](docs/releases/1.1.3_JP.md)
+[最新版をダウンロード](https://github.com/vrcm-team/VRCM/releases/latest) · [公式サイト](https://vrcm-team.github.io/VRCM/?lang=ja) · [1.1.3 新機能の詳細](docs/releases/1.1.3_JP.md)
 
 </div>
 
@@ -40,7 +40,7 @@ VRCM は、交流と使いやすさを中心に設計されたクロスプラッ
 - **共通のつながり**：共通フレンドと共通グループをプロフィールの流れで確認できます。
 
 <div align="center">
-  <img src="image/Feature-Friend-Network.png" width="300" alt="個人情報をマスクしたフレンド関係グラフの実機画面"/>
+  <img src="image/Feature-Friend-Network.png" width="300" alt="Android 実機のフレンド関係グラフ（自分中心表示）。フレンドにはモザイク"/>
 </div>
 
 > アクティビティと一緒に遊んだ時間は、VRCM の動作中に観測できた範囲のみ記録されます。Android ではバックグラウンド監視を有効にすると、アプリを閉じた後も観測を継続できます。VRChat アカウントの完全な履歴ではありません。
@@ -48,7 +48,7 @@ VRCM は、交流と使いやすさを中心に設計されたクロスプラッ
 ### モバイル向けショートカットとゲーム連携
 
 - **クリップボード認識**：VRChat のユーザー、ワールド、グループ、アバターの公式 URL/ID をコピーし、VRCM に戻って確認すると対象ページへ直接移動できます。
-- **リンクを VRCM で開く**：Android では対応する `vrchat.com` リンクを VRCM に直接渡せます。
+- **リンクを VRCM で開く**：Android では対応する `vrchat.com` リンクを VRCM で開けます。Android 12 以降は、先に VRCM のアプリ情報 →「デフォルトで開く」→「リンクを追加」で `vrchat.com` と `www.vrchat.com` にチェックを入れてください。設定しない場合、これらのリンクはブラウザで開きます。
 - **システム共有**：Android/iOS の共有シートで公開プロフィール URL を共有。Desktop では URL コピーに切り替わります。
 - **すぐに交流**：フレンドのインスタンス確認、自分への招待、複数種類の Boop、フレンドリクエストや招待の処理に対応します。
 
@@ -60,7 +60,7 @@ VRCM は、交流と使いやすさを中心に設計されたクロスプラッ
 - **モバイル写真管理**：Gallery の閲覧、拡大、保存、一括削除に対応。非 VRC+ ユーザーも Print を閲覧できます。
 
 <div align="center">
-  <img src="image/Feature-Gallery-Mobile.png" width="360" alt="写真カテゴリとアップロード操作を表示した Android 実機の Gallery 画面"/>
+  <img src="image/Feature-Gallery-Mobile.png" width="300" alt="写真カテゴリとアップロード操作を表示した Android 実機の Gallery 画面"/>
 </div>
 
 ### Android リアルタイム通知
@@ -82,7 +82,7 @@ VRCM は、交流と使いやすさを中心に設計されたクロスプラッ
 - VRChat プロフィールとプロフィール内ソーシャルリンクの QR コードを最大 4 個表示し、システムギャラリーに保存できます。
 
 <div align="center">
-  <img src="image/Feature-Meetup-Card.png" width="300" alt="スマートフォンに表示した交流会向けネームカード"/>
+  <img src="image/Feature-Meetup-Card.png" width="300" alt="情報バーテンプレートの全画面ネームカード：写真、名前、言語の国旗、プロフィールの QR コード"/>
 </div>
 
 ## その他の機能
@@ -105,7 +105,7 @@ VRCM は、交流と使いやすさを中心に設計されたクロスプラッ
 - Kotlin Multiplatform 2.2.20 / Compose Multiplatform 1.10.3
 - Ktor、kotlinx.serialization、Room、Coil
 - Koin、Lifecycle ViewModel、Navigation 3、Material 3 Adaptive
-- Android minSdk 24、targetSdk 35、compileSdk 36、Java 21
+- Android minSdk 24、targetSdk 36、compileSdk 36、Java 21
 
 ## プライバシーと免責事項
 

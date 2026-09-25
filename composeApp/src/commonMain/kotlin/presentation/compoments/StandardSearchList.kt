@@ -7,12 +7,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,8 +22,14 @@ import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.network.api.groups.data.LimitedGroup
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonStyle
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.currentSessionDeletedAvatarIds
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.group.data.GroupProfileVo
@@ -39,6 +39,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.world.components.FavoriteGroupBottomSheet
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
+import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import kotlinx.coroutines.launch
 
 /**
@@ -77,6 +78,10 @@ fun StandardSearchList(
     val coroutineScope = rememberCoroutineScope()
     val currentNavigator = currentNavigator
     val retryLoadMore = onRetryLoadMore
+    val deletedAvatarIds = currentSessionDeletedAvatarIds()
+    val visibleAvatarList = remember(avatarList, deletedAvatarIds) {
+        avatarList.filterNot { it.id in deletedAvatarIds }
+    }
     var hiddenWorldToManage by remember { mutableStateOf<WorldData?>(null) }
     var showHiddenWorldFavoriteSheet by remember { mutableStateOf(false) }
     var hiddenAvatarToManage by remember { mutableStateOf<AvatarData?>(null) }
@@ -182,12 +187,12 @@ fun StandardSearchList(
                                 contentAlignment = Alignment.Center,
                             ) {
                                 if (isLoadingMore) {
-                                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                                    AppActivityIndicator(modifier = Modifier.size(24.dp))
                                 } else {
-                                    TextButton(onClick = { retryLoadMore?.invoke() }) {
-                                        Icon(Icons.Default.Refresh, contentDescription = null)
+                                    AppButton(onClick = { retryLoadMore?.invoke() }, style = AppButtonStyle.Plain) {
+                                        AppIcon(AppIcons.Refresh, contentDescription = null)
                                         Spacer(modifier = Modifier.width(8.dp))
-                                        Text(strings.retry)
+                                        AppText(strings.retry)
                                     }
                                 }
                             }
@@ -195,7 +200,7 @@ fun StandardSearchList(
                     }
                 } else {
                     renderAvatarItems(
-                        avatars = avatarList,
+                        avatars = visibleAvatarList,
                         onAvatarClick = onAvatarClick
                     )
                 }

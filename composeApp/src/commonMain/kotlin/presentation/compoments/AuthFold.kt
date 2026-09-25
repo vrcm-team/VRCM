@@ -1,23 +1,25 @@
 package io.github.vrcmteam.vrcm.presentation.compoments
 
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.presentation.animations.IconBoundsTransform
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppCard
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthUIState
@@ -38,6 +40,7 @@ fun AuthFold(
     cardAlpha: Float = 1.00f,
     cardHeightDp: Dp,
     shapeDp: Dp = 30.dp,
+    backgroundColor: Color = AppTheme.colors.tintSoft,
     cardContext: @Composable () -> Unit = {},
 ) {
     // 底部栏高度
@@ -45,20 +48,16 @@ fun AuthFold(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(color = MaterialTheme.colorScheme.primaryContainer)
+            .background(color = backgroundColor)
     ) {
-        Card(
+        AppCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .offset(y = cardYOffset)
                 .alpha(cardAlpha)
                 .height(cardHeightDp + bottomPadding)
                 .align(Alignment.BottomCenter),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.onPrimary,
-                contentColor = MaterialTheme.colorScheme.primary
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            color = AppTheme.colors.secondaryGroupedBackground,
             shape = RoundedCornerShape(topStart = shapeDp, topEnd = shapeDp),
         ) {
             Box(
@@ -75,26 +74,38 @@ fun AuthFold(
                 }
             }
         }
-        AImage(
-            modifier = Modifier
-                .offset(y = iconYOffset)
-                .size(128.dp)
-                .align(Alignment.Center)
-                .enableIf(enabledIconAnime) {
-                    sharedBoundsBy(
-                        key = "${authUIState.userId}UserIcon",
-                        suffixKey = AuthHomeSharedSuffixKey,
-                        boundsTransform = IconBoundsTransform
-                    )
-                }
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.background)
-                .enableIf(clickIcon != null && authUIState.iconUrl != null) {
-                    clickable(onClick = clickIcon!!)
-                },
-            imageData = authUIState.iconUrl,
-            error = rememberVectorPainter(vectorResource(Res.drawable.logo)),
-            contentDescription = "AuthFoldLogo"
-        )
+        val iconModifier = Modifier
+            .offset(y = iconYOffset)
+            .size(128.dp)
+            .align(Alignment.Center)
+            .enableIf(enabledIconAnime) {
+                sharedBoundsBy(
+                    key = "${authUIState.userId}UserIcon",
+                    suffixKey = AuthHomeSharedSuffixKey,
+                    boundsTransform = IconBoundsTransform
+                )
+            }
+            .clip(CircleShape)
+            .background(AppTheme.colors.groupedBackground)
+            .enableIf(clickIcon != null && authUIState.iconUrl != null) {
+                clickable(onClick = clickIcon!!)
+            }
+        val logo = rememberVectorPainter(vectorResource(Res.drawable.logo))
+        if (authUIState.iconUrl == null) {
+            // 没有头像时直接画本地 logo：不经过异步加载的占位和淡入，首帧就与 iOS 启动屏的徽标一致
+            Image(
+                painter = logo,
+                contentDescription = "AuthFoldLogo",
+                modifier = iconModifier,
+                contentScale = ContentScale.Crop,
+            )
+        } else {
+            AImage(
+                modifier = iconModifier,
+                imageData = authUIState.iconUrl,
+                error = logo,
+                contentDescription = "AuthFoldLogo"
+            )
+        }
     }
 }

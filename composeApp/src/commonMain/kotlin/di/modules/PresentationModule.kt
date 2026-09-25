@@ -7,17 +7,34 @@ import coil3.network.ktor3.KtorNetworkFetcherFactory
 import coil3.request.crossfade
 import coil3.util.DebugLogger
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthScreenModel
+import io.github.vrcmteam.vrcm.presentation.screens.activity.FriendActivityTimelineModel
 import io.github.vrcmteam.vrcm.presentation.favorites.AuthenticatedFavoriteEntrySource
 import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntrySource
-import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreenModel
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarGalleryLoader
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarGalleryLoader
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarCoverLimits
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarDeleter
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarDeletionResultStore
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarEditor
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarModerationSource
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarFallbackSetter
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarSelector
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarImpostorDeletionSource
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarImpostorBuilder
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileLoader
-import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarSelector
-import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarProfileLoader
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreenModel
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarDeleter
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarEditor
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarModerationSource
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarFallbackSetter
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarProfileLoader
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarSelector
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarGalleryUploader
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarGalleryUploader
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarImpostorDeletionSource
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarImpostorBuilder
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreenModel
+import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesGroupsModel
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryDataSource
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GallerySelectionSessionStore
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.NetworkGalleryDataSource
@@ -34,31 +51,47 @@ import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImagePro
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.canvasSpec
 import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreenModel
+import io.github.vrcmteam.vrcm.presentation.screens.inventory.InventoryScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationCenterModel
+import io.github.vrcmteam.vrcm.presentation.screens.settings.RewardCodeScreenModel
+import io.github.vrcmteam.vrcm.presentation.screens.settings.AuthenticatedInviteMessageSlotsSource
+import io.github.vrcmteam.vrcm.presentation.screens.settings.InviteMessageSlotsModel
+import io.github.vrcmteam.vrcm.presentation.screens.settings.InviteMessageSlotsSource
+import io.github.vrcmteam.vrcm.presentation.screens.settings.PlayerModerationListScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.editor.MeetupPhotoPreparer
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.editor.MeetupPhotoSelectionCoordinator
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.editor.MeetupPhotoSessionStore
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendListPagerModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPagerModel
+import io.github.vrcmteam.vrcm.presentation.screens.home.pager.GroupInstancePagerModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.SearchListPagerModel
 import io.github.vrcmteam.vrcm.presentation.screens.user.FriendNetworkScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.user.MutualFriendsScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.world.RecentWorldsScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreenModel
+import io.github.vrcmteam.vrcm.presentation.screens.world.NetworkWorldEditor
+import io.github.vrcmteam.vrcm.presentation.screens.world.WorldEditor
+import io.github.vrcmteam.vrcm.presentation.screens.world.NetworkWorldImageEditor
+import io.github.vrcmteam.vrcm.presentation.screens.world.WorldImageEditor
 import io.github.vrcmteam.vrcm.presentation.settings.SettingsModel
 import io.github.vrcmteam.vrcm.presentation.settings.theme.ThemeColor
-import io.github.vrcmteam.vrcm.presentation.theme.blue.BlueThemeColor
-import io.github.vrcmteam.vrcm.presentation.theme.green.GreenThemeColor
-import io.github.vrcmteam.vrcm.presentation.theme.pink.PinkThemeColor
+import io.github.vrcmteam.vrcm.network.api.inventory.InventoryApi
+import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.PrintUploadService
 import io.github.vrcmteam.vrcm.service.PrintUploader
+import io.github.vrcmteam.vrcm.service.FriendActivityService
+import io.github.vrcmteam.vrcm.service.FriendService
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.ktor.client.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import okio.FileSystem
 import org.koin.core.definition.Definition
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.factoryOf
+import org.koin.core.module.dsl.onClose
 import org.koin.core.module.dsl.singleOf
 import org.koin.core.module.dsl.viewModel
 import org.koin.core.module.dsl.viewModelOf
@@ -73,9 +106,50 @@ val presentationModule: Module = module {
     // background monitoring report; it only holds the settings DAO and the theme color list.
     single { SettingsModel(get(), getAll()) }
     viewModelOf(::AuthScreenModel)
+    viewModel { FriendActivityTimelineModel(get<FriendActivityService>()) }
     viewModelOf(::HomeScreenModel)
-    singleOf(::NotificationCenterModel)
-    viewModelOf(::UserProfileScreenModel)
+    viewModel {
+        InventoryScreenModel(
+            authService = get<AuthService>(),
+            inventoryApi = get<InventoryApi>(),
+            economyApi = get(),
+        )
+    }
+    singleOf(::NotificationCenterModel) {
+        onClose { it?.close() }
+    }
+    singleOf(::AuthenticatedInviteMessageSlotsSource) bind InviteMessageSlotsSource::class
+    viewModel { InviteMessageSlotsModel(get()) }
+    viewModelOf(::PlayerModerationListScreenModel)
+    viewModel { parameters ->
+        UserProfileScreenModel(
+            userProfileVO = parameters.get(),
+            authService = get(),
+            usersApi = get(),
+            profileAppearanceApi = get(),
+            groupsApi = get(),
+            friendService = get(),
+            notificationApi = get(),
+            playerChatboxModerationApi = get(),
+            playerModerationApi = get(),
+            logger = get(),
+            instancesApi = get(),
+            worldsApi = get(),
+            avatarsApi = get(),
+            favoriteApi = get(),
+            inviteApi = get(),
+            gallerySelectionSessionStore = get(),
+            imageInviteRemote = get(),
+            inviteMessageActionService = get(),
+            userProfileCacheStore = get(),
+            favoriteListCacheStore = get(),
+            accountCacheManager = get(),
+            friendLocationPagerModel = get(),
+            friendActivityService = get(),
+            boopService = get(),
+            boopPrivacyService = get(),
+        )
+    }
     viewModelOf(::MutualFriendsScreenModel)
     viewModelOf(::FriendNetworkScreenModel)
     singleOf(::NetworkGalleryDataSource) bind GalleryDataSource::class
@@ -102,7 +176,9 @@ val presentationModule: Module = module {
         )
     }
     singleOf(::PrintUploadService) bind PrintUploader::class
-    single<ImageEditorSubmitter> { NetworkImageEditorSubmitter(get(), get(), get()) }
+    singleOf(::NetworkWorldImageEditor) bind WorldImageEditor::class
+    singleOf(::NetworkAvatarGalleryUploader) bind AvatarGalleryUploader::class
+    single<ImageEditorSubmitter> { NetworkImageEditorSubmitter(get(), get(), get(), get(), get()) }
     viewModel { parameters ->
         val sessionId = parameters.get<String>()
         val sessionStore = get<PrintImageEditorSessionStore>()
@@ -117,6 +193,14 @@ val presentationModule: Module = module {
             processor = when (session.target) {
                 ImageEditorTarget.Print -> get()
                 is ImageEditorTarget.AvatarCover -> get(AvatarCoverImageProcessorQualifier)
+                is ImageEditorTarget.AvatarGallery -> DefaultPrintImageProcessor(
+                    codec = get(),
+                    spec = session.target.canvasSpec,
+                    maxOutputBytes = PrintImageLimits.MAX_GALLERY_ENCODED_OUTPUT_BYTES,
+                    limitOutputToVisibleSource = true,
+                    shrinkOversizedOutput = true,
+                )
+                is ImageEditorTarget.WorldCover -> get(AvatarCoverImageProcessorQualifier)
                 is ImageEditorTarget.Gallery -> DefaultPrintImageProcessor(
                     codec = get(),
                     spec = session.target.canvasSpec,
@@ -132,16 +216,56 @@ val presentationModule: Module = module {
         )
     }
     singleOf (::FriendLocationPagerModel)
+    viewModelOf(::GroupInstancePagerModel)
     viewModelOf(::FriendListPagerModel)
+    viewModelOf(::FavoritesGroupsModel)
     viewModelOf(::SearchListPagerModel)
     viewModelOf(::WorldProfileScreenModel)
-    viewModelOf(::GroupProfileScreenModel)
+    viewModel {
+        GroupProfileScreenModel(
+            groupsApi = get(),
+            usersApi = get(),
+            authService = get(),
+            logger = get(),
+            groupProfileCacheStore = get(),
+            friends = get<FriendService>().friendState,
+        )
+    }
     singleOf(::AuthenticatedFavoriteEntrySource) bind FavoriteEntrySource::class
     singleOf(::NetworkAvatarProfileLoader) bind AvatarProfileLoader::class
+    singleOf(::NetworkAvatarGalleryLoader) bind AvatarGalleryLoader::class
     singleOf(::NetworkAvatarSelector) bind AvatarSelector::class
+    singleOf(::NetworkAvatarModerationSource) bind AvatarModerationSource::class
+    singleOf(::NetworkAvatarFallbackSetter) bind AvatarFallbackSetter::class
     singleOf(::NetworkAvatarEditor) bind AvatarEditor::class
-    viewModel { AvatarProfileScreenModel(get(), get(), get(), avatarEditor = get()) }
+    singleOf(::NetworkAvatarDeleter) bind AvatarDeleter::class
+    single { AvatarDeletionResultStore() }
+    singleOf(::NetworkAvatarImpostorDeletionSource) bind AvatarImpostorDeletionSource::class
+    singleOf(::NetworkAvatarImpostorBuilder) bind AvatarImpostorBuilder::class
+    singleOf(::NetworkWorldEditor) bind WorldEditor::class
+    viewModel {
+        AvatarProfileScreenModel(
+            avatarProfileLoader = get(),
+            avatarSelector = get(),
+            avatarModerationSource = get(),
+            favoriteEntrySource = get(),
+            avatarEditor = get(),
+            avatarImpostorDeletionSource = get(),
+            avatarImpostorBuilder = get(),
+            avatarGalleryLoader = get(),
+            avatarDeleter = get(),
+            avatarDeletionResults = get(),
+            avatarFallbackSetter = get(),
+        )
+    }
     viewModelOf(::RecentWorldsScreenModel)
+    viewModel {
+        RewardCodeScreenModel(
+            redeemer = get(),
+            sessions = SharedFlowCentre.currentSession,
+            requestDispatcher = Dispatchers.IO,
+        )
+    }
     single<ImageLoader> { imageLoaderDefinition(it) }
     configThemeColor()
 }
@@ -164,8 +288,7 @@ private val imageLoaderDefinition: Definition<ImageLoader> = {
 }
 
 private fun Module.configThemeColor() {
-    single(named(ThemeColor.Default.name)){ ThemeColor.Default }
-    single(named(BlueThemeColor.name)){ BlueThemeColor }
-    single(named(PinkThemeColor.name)){ PinkThemeColor }
-    single (named(GreenThemeColor.name)){ GreenThemeColor}
+    ThemeColor.all.forEach { themeColor ->
+        single(named(themeColor.name)) { themeColor }
+    }
 }

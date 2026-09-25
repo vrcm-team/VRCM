@@ -12,6 +12,7 @@ import platform.Foundation.NSData
 import platform.Foundation.NSURL
 import platform.Foundation.create
 import platform.Foundation.dataWithContentsOfURL
+import platform.Photos.PHAccessLevelAddOnly
 import platform.Photos.PHAssetCreationRequest
 import platform.Photos.PHAssetResourceTypePhoto
 import platform.Photos.PHAuthorizationStatusAuthorized
@@ -158,7 +159,7 @@ private fun ByteArray.toNSData(): NSData = usePinned { pinned ->
 
 
 /**
- * 请求相册权限
+ * 请求相册"仅添加"权限：保存图片只需写入相册，不申请读取整个相册（选图走系统 PHPicker，无需授权）。
  */
 @OptIn(ExperimentalForeignApi::class)
 private suspend fun requestPhotoLibraryPermission(): Boolean = withContext(Dispatchers.Main) {
@@ -166,13 +167,13 @@ private suspend fun requestPhotoLibraryPermission(): Boolean = withContext(Dispa
     semaphore.acquire()
 
     var authorized = false
-    val authStatus = PHPhotoLibrary.authorizationStatus()
+    val authStatus = PHPhotoLibrary.authorizationStatusForAccessLevel(PHAccessLevelAddOnly)
 
     if (authStatus == PHAuthorizationStatusAuthorized) {
         authorized = true
         semaphore.release()
     } else {
-        PHPhotoLibrary.requestAuthorization { status ->
+        PHPhotoLibrary.requestAuthorizationForAccessLevel(PHAccessLevelAddOnly) { status ->
             authorized = (status == PHAuthorizationStatusAuthorized)
             semaphore.release()
         }

@@ -21,6 +21,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
@@ -56,6 +57,8 @@ data class FriendActivitySummary(
 data class FriendActivityEvent(
     val id: Long,
     val friendUserId: String,
+    val displayName: String,
+    val profileImageUrl: String,
     val type: FriendActivityEventType,
     val occurredAtMillis: Long,
     val previousValue: String?,
@@ -169,7 +172,7 @@ internal class FriendActivityTrackingState(
 
 @OptIn(ExperimentalCoroutinesApi::class, ExperimentalTime::class)
 class FriendActivityService internal constructor(
-    friendService: FriendService,
+    private val friendService: FriendService,
     private val store: RoomFriendActivityStore,
     private val worldsApi: WorldsApi,
     private val logger: Logger,
@@ -285,9 +288,88 @@ class FriendActivityService internal constructor(
                         .distinct()
                         .forEach { worldId -> resolveWorldName(session.account.userId, worldId) }
                 }
-                .map { events -> events.mapNotNull(FriendActivityEventEntity::toEventOrNull) }
+                .mapToEventsWithCurrentFriendIcons()
         }
     }
+
+    fun observeAllEvents(
+        token: AccountSessionToken,
+        types: Set<FriendActivityEventType> = emptySet(),
+        limit: Int = 200,
+        offset: Int = 0,
+    ): Flow<List<FriendActivityEvent>> =
+        store.observeAllEvents(token.userId, types, limit, offset)
+            .onEach { events ->
+                if (SharedFlowCentre.isCurrentSession(token)) {
+                    events.asSequence()
+                        .filter { it.worldName == null }
+                        .mapNotNull(FriendActivityEventEntity::worldId)
+                        .distinct()
+                        .forEach { worldId -> resolveWorldName(token.userId, worldId) }
+                }
+            }.mapToEventsWithCurrentFriendIcons().mapNotNull { events ->
+                events.takeIf { SharedFlowCentre.isCurrentSession(token) }
+            }
+
+    fun observeAllEventsBefore(
+        token: AccountSessionToken,
+        types: Set<FriendActivityEventType> = emptySet(),
+        beforeOccurredAtMillis: Long,
+        beforeId: Long,
+        limit: Int = 200,
+    ): Flow<List<FriendActivityEvent>> =
+        store.observeAllEventsBefore(
+                ownerUserId = token.userId,
+                types = types,
+                beforeOccurredAtMillis = beforeOccurredAtMillis,
+                beforeId = beforeId,
+                limit = limit,
+            ).onEach { events ->
+                if (SharedFlowCentre.isCurrentSession(token)) {
+                    events.asSequence()
+                        .filter { it.worldName == null }
+                        .mapNotNull(FriendActivityEventEntity::worldId)
+                        .distinct()
+                        .forEach { worldId -> resolveWorldName(token.userId, worldId) }
+                }
+            }.mapToEventsWithCurrentFriendIcons().mapNotNull { events ->
+                events.takeIf { SharedFlowCentre.isCurrentSession(token) }
+            }
+
+    fun observeAllEventsThrough(
+        token: AccountSessionToken,
+        types: Set<FriendActivityEventType> = emptySet(),
+        oldestOccurredAtMillis: Long,
+        oldestId: Long,
+        limit: Int,
+    ): Flow<List<FriendActivityEvent>> =
+        store.observeAllEventsThrough(
+            ownerUserId = token.userId,
+            types = types,
+            oldestOccurredAtMillis = oldestOccurredAtMillis,
+            oldestId = oldestId,
+            limit = limit,
+        ).onEach { events ->
+            if (SharedFlowCentre.isCurrentSession(token)) {
+                events.asSequence()
+                    .filter { it.worldName == null }
+                    .mapNotNull(FriendActivityEventEntity::worldId)
+                    .distinct()
+                    .forEach { worldId -> resolveWorldName(token.userId, worldId) }
+            }
+        }.mapToEventsWithCurrentFriendIcons().mapNotNull { events ->
+            events.takeIf { SharedFlowCentre.isCurrentSession(token) }
+        }
+
+    private fun Flow<List<FriendActivityEventEntity>>.mapToEventsWithCurrentFriendIcons(): Flow<List<FriendActivityEvent>> =
+        combine(friendService.friendState) { entities, friends ->
+            entities.mapNotNull { entity ->
+                entity.toEventOrNull()?.let { event ->
+                    val iconUrl = friends[event.friendUserId]?.iconUrl
+                    if (iconUrl.isNullOrBlank()) event else event.copy(profileImageUrl = iconUrl)
+                }
+            }
+        }
 
     fun observeRecentTogether(
         sinceMillis: Long,
@@ -322,15 +404,14 @@ class FriendActivityService internal constructor(
     }
 
     private fun resolveWorldName(ownerUserId: String, worldId: String) {
-        serviceScope.launch {
-            try {
-                worldNameResolver.resolve(ownerUserId, worldId)
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Throwable) {
+        worldNameResolver.request(
+            scope = serviceScope,
+            ownerUserId = ownerUserId,
+            worldId = worldId,
+            onFailure = { error ->
                 logger.error("Friend activity world lookup failed for $worldId: ${error.message}")
-            }
-        }
+            },
+        )
     }
 
     private companion object {
@@ -442,7 +523,8 @@ private fun FriendActivitySourceSnapshot.toInputSnapshot(
         FriendActivityObservation(
             userId = friend.id,
             displayName = friend.displayName,
-            profileImageUrl = friend.profileImageUrl,
+            // Keep activity avatars aligned with the friend location cards, which use iconUrl.
+            profileImageUrl = friend.iconUrl,
             location = friend.location,
             status = friend.status.value,
             statusDescription = friend.statusDescription,
@@ -499,6 +581,8 @@ private fun FriendActivityEventEntity.toEventOrNull(): FriendActivityEvent? {
     return FriendActivityEvent(
         id = id,
         friendUserId = friendUserId,
+        displayName = displayName,
+        profileImageUrl = profileImageUrl,
         type = eventType,
         occurredAtMillis = occurredAtMillis,
         previousValue = previousValue,

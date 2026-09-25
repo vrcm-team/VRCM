@@ -10,14 +10,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -38,9 +30,19 @@ import coil3.ImageLoader
 import coil3.compose.SubcomposeAsyncImage
 import io.github.vrcmteam.vrcm.network.api.files.FileApi
 import io.github.vrcmteam.vrcm.network.api.files.data.FileData
+import io.github.vrcmteam.vrcm.network.api.files.data.FileStatus
 import io.github.vrcmteam.vrcm.network.api.files.data.FileTagType
 import io.github.vrcmteam.vrcm.presentation.compoments.EmptyContent
+import io.github.vrcmteam.vrcm.presentation.compoments.ListStateOverlay
 import io.github.vrcmteam.vrcm.presentation.compoments.RefreshBox
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIconButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppNavBar
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppScaffold
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
@@ -57,8 +59,7 @@ import org.koin.compose.viewmodel.koinViewModel
 @Serializable
 data class GalleryPickerScreen(val sessionId: String) : AppRoute {
 
-    @OptIn(ExperimentalMaterial3Api::class)
-    @Composable
+        @Composable
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
         val sessionStore: GallerySelectionSessionStore = koinInject()
@@ -77,13 +78,17 @@ data class GalleryPickerScreen(val sessionId: String) : AppRoute {
 
         val onPick: (FileData) -> Unit = onPick@{ file ->
             if (completed) return@onPick
+            val latestVersion = file.versions
+                .filter { it.status == FileStatus.Complete && !it.deleted }
+                .maxOfOrNull { it.version }
+                ?: return@onPick
             val accepted = sessionStore.complete(
                 sessionId,
                 GallerySelection(
                     fileId = file.id,
                     fileName = file.name,
                     extension = file.extension,
-                    imageUrl = FileApi.convertFileUrl(file.id, 2048),
+                    imageUrl = FileApi.imageUrl(file.id, latestVersion, 2048),
                 ),
             )
             if (accepted) {
@@ -92,35 +97,31 @@ data class GalleryPickerScreen(val sessionId: String) : AppRoute {
             }
         }
 
-        Scaffold(
+        AppScaffold(
             topBar = {
-                CenterAlignedTopAppBar(
+                AppNavBar(
                     title = {
-                        Text(
+                        AppText(
                             text = strings.meetupCardPickPhotoTitle,
                             textAlign = TextAlign.Center,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                     },
                     navigationIcon = {
-                        IconButton(onClick = { navigator.pop() }) {
-                            Icon(
+                        AppIconButton(onClick = { navigator.pop() }) {
+                            AppIcon(
                                 painter = rememberVectorPainter(AppIcons.ArrowBackIosNew),
-                                tint = MaterialTheme.colorScheme.primary,
                                 contentDescription = "back",
                             )
                         }
                     },
                 )
             },
-            contentColor = MaterialTheme.colorScheme.primary,
         ) { paddingValues ->
+            // 顶部留白做外边距；底部安全区交给网格的 contentPadding，图片能滚到系统导航条下面
             RefreshBox(
-                modifier = Modifier.fillMaxSize().padding(paddingValues),
+                modifier = Modifier.fillMaxSize().padding(top = paddingValues.calculateTopPadding()),
                 isRefreshing = galleryScreenModel.isRefreshingByTag(FileTagType.Gallery),
                 doRefresh = { galleryScreenModel.refreshFiles(FileTagType.Gallery) },
             ) {
@@ -132,7 +133,12 @@ data class GalleryPickerScreen(val sessionId: String) : AppRoute {
                 } else {
                     LazyVerticalGrid(
                         columns = GridCells.Adaptive(minSize = 160.dp),
-                        contentPadding = PaddingValues(8.dp),
+                        contentPadding = PaddingValues(
+                            start = 8.dp,
+                            top = 8.dp,
+                            end = 8.dp,
+                            bottom = 8.dp + paddingValues.calculateBottomPadding(),
+                        ),
                         modifier = Modifier.fillMaxSize(),
                     ) {
                         items(items = files, key = FileData::id) { file ->
@@ -140,6 +146,11 @@ data class GalleryPickerScreen(val sessionId: String) : AppRoute {
                         }
                     }
                 }
+                // 自动加载不再把内容顶下来露出指示器：还没有内容时在中间放一个
+                ListStateOverlay(
+                    isEmpty = files.isEmpty(),
+                    isLoading = galleryScreenModel.isRefreshingByTag(FileTagType.Gallery),
+                )
             }
         }
     }
@@ -159,22 +170,21 @@ data class GalleryPickerScreen(val sessionId: String) : AppRoute {
                 .fillMaxSize()
                 .aspectRatio(16f / 9f)
                 .padding(2.dp)
-                .clip(MaterialTheme.shapes.medium)
+                .clip(AppShapes.m)
                 .clickable { onPick(file) },
             loading = {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(
+                    AppActivityIndicator(
                         modifier = Modifier.size(24.dp),
-                        strokeWidth = 2.dp,
                     )
                 }
             },
             error = {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
+                    AppText(
                         text = strings.galleryTabLoadFailed,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
+                        style = AppTheme.type.caption1,
+                        color = AppTheme.colors.destructive,
                     )
                 }
             },

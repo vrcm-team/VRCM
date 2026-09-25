@@ -76,6 +76,7 @@ object DaoKeys{
         const val PRESENCE_FILTER_KEY = "${PREFIX}.friendPresenceFilter"
         const val BACKGROUND_FRIEND_MONITORING_ENABLED_KEY = "${PREFIX}.backgroundFriendMonitoringEnabled"
         const val CLIPBOARD_READING_ENABLED_KEY = "${PREFIX}.clipboardReadingEnabled"
+        const val LAST_CLIPBOARD_CHANGE_TOKEN_KEY = "${PREFIX}.lastClipboardChangeToken"
 
     }
 

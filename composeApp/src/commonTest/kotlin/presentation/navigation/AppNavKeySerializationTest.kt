@@ -4,17 +4,26 @@ import androidx.navigation3.runtime.NavKey
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthScreen
 import io.github.vrcmteam.vrcm.presentation.screens.auth.StartupAnimeScreen
+import io.github.vrcmteam.vrcm.presentation.screens.activity.FriendActivityTimelineScreen
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
+import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesScreen
+import io.github.vrcmteam.vrcm.presentation.screens.favorites.MyGroupsScreen
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreen
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageEditorScreen
 import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.group.data.GroupProfileVo
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreen
+import io.github.vrcmteam.vrcm.presentation.screens.inventory.InventoryScreen
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardDisplayRoute
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardEditorRoute
 import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationScreen
-import io.github.vrcmteam.vrcm.presentation.screens.settings.NotificationSettingsScreen
+import io.github.vrcmteam.vrcm.presentation.screens.search.GlobalSearchScreen
+import io.github.vrcmteam.vrcm.presentation.screens.settings.SettingsScreen
+import io.github.vrcmteam.vrcm.presentation.screens.settings.RewardCodeScreen
+import io.github.vrcmteam.vrcm.presentation.screens.settings.InviteMessageSlotsScreen
+import io.github.vrcmteam.vrcm.presentation.screens.settings.PlayerModerationListScreen
+import io.github.vrcmteam.vrcm.presentation.screens.settings.PlayerModerationCleanupScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.CardListDetailScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.CardScreenType
 import io.github.vrcmteam.vrcm.presentation.screens.user.FriendNetworkScreen
@@ -37,6 +46,11 @@ class AppNavKeySerializationTest {
             AuthScreen,
             AuthAnimeScreen(isAuthed = true),
             HomeScreen,
+            InventoryScreen,
+            FriendActivityTimelineScreen,
+            FavoritesScreen,
+            MyGroupsScreen,
+            GlobalSearchScreen,
             GalleryScreen,
             PrintImageEditorScreen(sessionId = "session_test"),
             FriendNetworkScreen,
@@ -54,7 +68,11 @@ class AppNavKeySerializationTest {
             ),
             MeetupCardDisplayRoute(ownerUserId = "usr_test"),
             MeetupCardEditorRoute(ownerUserId = "usr_test"),
-            NotificationSettingsScreen,
+            SettingsScreen,
+            RewardCodeScreen,
+            InviteMessageSlotsScreen,
+            PlayerModerationListScreen,
+            PlayerModerationCleanupScreen,
             NotificationScreen(targetNotificationId = "notification_test"),
         )
 

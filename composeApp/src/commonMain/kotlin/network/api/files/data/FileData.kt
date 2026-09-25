@@ -23,6 +23,9 @@ enum class FileTagType(val value: String) {
     @SerialName("avatarimage")
     AvatarImage("avatarimage"),
 
+    @SerialName("worldimage")
+    WorldImage("worldimage"),
+
     @SerialName("print")
     Print("print");
     
@@ -43,7 +46,8 @@ data class FileData(
     val extension: String,
     val animationStyle: String?,
     val tags: List<String>,
-    val versions: List<FileVersion>
+    val versions: List<FileVersion>,
+    val order: Int? = null,
 )
 
 /**

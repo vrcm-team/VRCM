@@ -85,10 +85,6 @@ kotlin {
             implementation(libs.navigation3.ui)
             implementation(libs.navigationevent.compose)
             implementation(libs.material3.adaptive.navigation3)
-//            implementation(compose.material)
-            implementation(compose.material3)
-            implementation(compose.materialIconsExtended)
-//            implementation(compose.materialIconsExtended)
             implementation(compose.components.resources)
             implementation(libs.androidx.lifecycle.runtime.compose)
             implementation(libs.androidx.lifecycle.viewmodel)
@@ -163,6 +159,20 @@ android {
         versionCode = libs.versions.app.code.get().toInt()
         versionName = libs.versions.app.version.get()
     }
+
+    // 分发渠道：github 是 GitHub Release 的 APK，应用内检查并下载安装新版本；
+    // play 是上架 Google Play 的 AAB，按 Play 政策只能由 Play 更新，不带自更新代码和安装权限。
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("github") {
+            dimension = "distribution"
+            isDefault = true
+        }
+        create("play") {
+            dimension = "distribution"
+        }
+    }
+    sourceSets["github"].manifest.srcFile("src/androidGithub/AndroidManifest.xml")
 //    buildFeatures {
 //        compose = true
 //    }
@@ -220,6 +230,11 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
 
+}
+
+// 渠道专属依赖要等上面的 productFlavors 建好对应配置后再添加
+dependencies {
+    add("playImplementation", libs.play.app.update.ktx)
 }
 
 

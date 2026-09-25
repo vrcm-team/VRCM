@@ -1,8 +1,12 @@
 package io.github.vrcmteam.vrcm.di.modules
 
+import io.github.vrcmteam.vrcm.network.api.appstore.AppStoreApi
+import io.github.vrcmteam.vrcm.network.api.avatars.AvatarModerationApi
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
+import io.github.vrcmteam.vrcm.network.api.economy.EconomyApi
 import io.github.vrcmteam.vrcm.network.api.favorite.FavoriteApi
+import io.github.vrcmteam.vrcm.network.api.feedback.FeedbackApi
 import io.github.vrcmteam.vrcm.network.api.files.FileApi
 import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
 import io.github.vrcmteam.vrcm.network.api.github.GitHubApi
@@ -11,6 +15,8 @@ import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
 import io.github.vrcmteam.vrcm.network.api.inventory.InventoryApi
 import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
 import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
+import io.github.vrcmteam.vrcm.network.api.playermoderation.PlayerChatboxModerationApi
+import io.github.vrcmteam.vrcm.network.api.playermoderation.PlayerModerationApi
 import io.github.vrcmteam.vrcm.network.api.prints.PrintsApi
 import io.github.vrcmteam.vrcm.network.api.profile.ProfileAppearanceApi
 import io.github.vrcmteam.vrcm.network.api.status.VrchatStatusApi
@@ -31,21 +37,27 @@ import org.koin.dsl.module
 internal val networkModule = module(true) {
     singleOf(::AuthApi)
     singleOf(::AvatarsApi)
+    singleOf(::AvatarModerationApi)
     singleOf(::FileApi)
     singleOf(::FriendsApi)
     singleOf(::InstancesApi)
     singleOf(::UsersApi)
     singleOf(::NotificationApi)
+    singleOf(::PlayerChatboxModerationApi)
+    singleOf(::PlayerModerationApi)
     singleOf(::InviteApi)
     singleOf(::WorldsApi)
     singleOf(::FavoriteApi)
+    singleOf(::FeedbackApi)
     singleOf(::WebSocketApi)
     singleOf(::GitHubApi)
+    singleOf(::AppStoreApi)
     singleOf(::GroupsApi)
     singleOf(::PrintsApi)
     singleOf(::ProfileAppearanceApi)
     singleOf(::VrchatStatusApi)
     singleOf(::InventoryApi)
+    singleOf(::EconomyApi)
     singleOf(::ApiNoticeCenter)
     single<HttpClient> { apiClientDefinition(it) }
     single { createNetworkJson() }

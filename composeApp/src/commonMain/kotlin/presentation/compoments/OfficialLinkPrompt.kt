@@ -5,13 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -30,6 +23,15 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import io.github.vrcmteam.vrcm.getAppPlatform
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppAlert
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonStyle
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
+import io.github.vrcmteam.vrcm.presentation.extensions.clipboardChangeToken
 import io.github.vrcmteam.vrcm.presentation.navigation.AppNavigator
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
@@ -50,6 +52,7 @@ import io.github.vrcmteam.vrcm.service.OfficialLinkRequest
 import io.github.vrcmteam.vrcm.service.OfficialLinkService
 import io.github.vrcmteam.vrcm.service.OfficialLinkTarget
 import io.github.vrcmteam.vrcm.service.OfficialLinkType
+import io.github.vrcmteam.vrcm.storage.SettingsDao
 import org.koin.compose.koinInject
 
 internal val LocalOfficialLinkInspectionMarker = staticCompositionLocalOf<(String) -> Unit> { {} }
@@ -61,11 +64,14 @@ internal fun OfficialLinkPrompt(
     content: @Composable () -> Unit,
 ) {
     val clipboard = LocalClipboardManager.current
+    val platform = getAppPlatform()
     val service: OfficialLinkService = koinInject()
+    val settingsDao: SettingsDao = koinInject()
     val locale = strings
     val incomingRequest by inbox.pendingRequest.collectAsState()
     var foregroundGeneration by remember { mutableIntStateOf(0) }
     val clipboardInspectionGate = remember { OfficialLinkClipboardInspectionGate() }
+    val clipboardChangeTracker = remember(settingsDao) { ClipboardChangeTracker(settingsDao) }
     val isAuthenticated = navigator.items.any { it is HomeScreen }
     val controller = rememberOfficialLinkPromptController(service, navigator, inbox)
     val markClipboardInspected = remember(controller) { controller::markClipboardInspected }
@@ -97,8 +103,12 @@ internal fun OfficialLinkPrompt(
         ) {
             return@LaunchedEffect
         }
-        val clipboardText = runCatching { clipboard.getText()?.text }.getOrNull() ?: return@LaunchedEffect
-        controller.inspectClipboard(clipboardText)
+        val changeToken = platform.clipboardChangeToken()
+        if (!clipboardChangeTracker.shouldRead(changeToken)) return@LaunchedEffect
+        val clipboardText = runCatching { clipboard.getText()?.text }.getOrNull()
+        // 读过就记下：用户在系统提示里选了"不允许"，这份内容也算问过了，不再重复询问
+        clipboardChangeTracker.markRead(changeToken)
+        if (clipboardText != null) controller.inspectClipboard(clipboardText)
     }
 
     LaunchedEffect(controller, incomingRequest?.id, isAuthenticated) {
@@ -161,6 +171,20 @@ internal class OfficialLinkClipboardInspectionGate {
     }
 }
 
+/**
+ * 剪贴板只在内容变化后才读：平台的变化标记和上次真正读取时记下的一样，就说明还是那份内容。
+ * iOS 读取其他 App 复制的内容会弹"允许粘贴"，这样同一份内容最多问一次，重启 App 也不再问。
+ * 平台给不出标记（null，如桌面）时照常读取，同一个链接由 [OfficialLinkPromptController] 去重。
+ */
+internal class ClipboardChangeTracker(private val settingsDao: SettingsDao) {
+    fun shouldRead(changeToken: Long?): Boolean =
+        changeToken == null || changeToken != settingsDao.lastClipboardChangeToken
+
+    fun markRead(changeToken: Long?) {
+        if (changeToken != null) settingsDao.lastClipboardChangeToken = changeToken
+    }
+}
+
 @Composable
 private fun rememberOfficialLinkPromptController(
     service: OfficialLinkService,
@@ -199,12 +223,12 @@ private fun ClipboardConfirmationDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
+    AppAlert(
         onDismissRequest = onDismiss,
-        icon = { Icon(AppIcons.Link, contentDescription = null) },
-        title = { Text(locale.officialLinkPromptTitle) },
+        icon = { AppIcon(AppIcons.Link, contentDescription = null) },
+        title = { AppText(locale.officialLinkPromptTitle) },
         text = {
-            Text(
+            AppText(
                 locale.officialLinkPromptMessage.replace(
                     "%s",
                     targetType.localizedName(locale),
@@ -212,16 +236,17 @@ private fun ClipboardConfirmationDialog(
             )
         },
         confirmButton = {
-            Button(
+            AppButton(
                 modifier = Modifier.widthIn(min = 96.dp),
                 onClick = onConfirm,
+                style = AppButtonStyle.Prominent,
             ) {
-                Text(locale.officialLinkOpen)
+                AppText(locale.officialLinkOpen)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(locale.cancel)
+            AppButton(onClick = onDismiss, style = AppButtonStyle.Plain) {
+                AppText(locale.cancel)
             }
         },
     )
@@ -229,17 +254,17 @@ private fun ClipboardConfirmationDialog(
 
 @Composable
 private fun ResolvingOfficialLinkDialog(locale: LocaleStrings) {
-    AlertDialog(
+    AppAlert(
         onDismissRequest = {},
-        icon = { Icon(AppIcons.Link, contentDescription = null) },
-        title = { Text(locale.officialLinkPromptTitle) },
+        icon = { AppIcon(AppIcons.Link, contentDescription = null) },
+        title = { AppText(locale.officialLinkPromptTitle) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                Text(locale.loading)
+                AppActivityIndicator(modifier = Modifier.size(24.dp))
+                AppText(locale.loading)
             }
         },
         confirmButton = {},
@@ -253,26 +278,26 @@ private fun OfficialLinkFailureDialog(
     onRetry: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
+    AppAlert(
         onDismissRequest = onDismiss,
-        icon = { Icon(AppIcons.Link, contentDescription = null) },
-        title = { Text(locale.officialLinkPromptTitle) },
+        icon = { AppIcon(AppIcons.Link, contentDescription = null) },
+        title = { AppText(locale.officialLinkPromptTitle) },
         text = {
-            Text(
+            AppText(
                 text = locale.officialLinkOpenFailed,
-                color = MaterialTheme.colorScheme.error,
+                color = AppTheme.colors.destructive,
             )
         },
         confirmButton = {
             if (retryAvailable) {
-                Button(onClick = onRetry) {
-                    Text(locale.retry)
+                AppButton(onClick = onRetry, style = AppButtonStyle.Prominent) {
+                    AppText(locale.retry)
                 }
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(locale.cancel)
+            AppButton(onClick = onDismiss, style = AppButtonStyle.Plain) {
+                AppText(locale.cancel)
             }
         },
     )

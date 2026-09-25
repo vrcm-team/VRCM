@@ -1,17 +1,20 @@
 package io.github.vrcmteam.vrcm.service
 
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
+import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteGroupVisibility
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.favorite.FavoriteApi
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteData
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteGroupData
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteLimits
-import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.storage.FavoriteLocalDao
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.toCollection
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 internal class FavoriteGroupCache {
     private val flows = FavoriteType.entries.associateWith {
@@ -25,10 +28,86 @@ internal class FavoriteGroupCache {
         flows.getValue(type).value = favorites
     }
 
+    fun clearGroupMembers(
+        type: FavoriteType,
+        ownerId: String,
+        groupName: String,
+    ): Pair<FavoriteGroupData, List<FavoriteData>>? {
+        val current = flow(type).value
+        val target = current.entries.firstOrNull { (group, _) ->
+            group.ownerId == ownerId && group.name == groupName && group.type == type.value
+        } ?: return null
+        replace(
+            type,
+            buildMap {
+                current.forEach { (group, favorites) ->
+                    put(group, if (group == target.key) emptyList() else favorites)
+                }
+            },
+        )
+        return target.key to target.value
+    }
+
+    fun removeFavorite(type: FavoriteType, favorite: FavoriteData): Boolean {
+        var removed = false
+        val updated = buildMap {
+            flow(type).value.forEach { (group, favorites) ->
+                val remaining = favorites.filterNot { current -> current.id == favorite.id }
+                if (remaining.size != favorites.size) removed = true
+                put(group, remaining)
+            }
+        }
+        if (removed) replace(type, updated)
+        return removed
+    }
+
+    fun updateGroup(
+        type: FavoriteType,
+        ownerId: String,
+        groupName: String,
+        transform: (FavoriteGroupData) -> FavoriteGroupData,
+    ): FavoriteGroupData? {
+        var updatedGroup: FavoriteGroupData? = null
+        val updated = buildMap {
+            flow(type).value.forEach { (group, favorites) ->
+                val nextGroup = if (group.ownerId == ownerId && group.name == groupName) {
+                    transform(group).also { updatedGroup = it }
+                } else {
+                    group
+                }
+                put(nextGroup, favorites)
+            }
+        }
+        if (updatedGroup != null) replace(type, updated)
+        return updatedGroup
+    }
+
     fun clear() {
         flows.values.forEach { it.value = emptyMap() }
     }
 }
+
+internal data class FavoriteGroupClearRequest(
+    val favoriteType: FavoriteType,
+    val group: FavoriteGroupData,
+    val favorites: List<FavoriteData>,
+    val ownerId: String,
+) {
+    val groupName: String get() = group.name
+}
+
+internal data class FavoriteGroupClearCommit(
+    val group: FavoriteGroupData,
+    val removedFavorites: List<FavoriteData>,
+)
+
+internal data class FavoriteGroupUpdate(
+    val favoriteType: FavoriteType,
+    val groupName: String,
+    val ownerId: String,
+    val displayName: String,
+    val visibility: FavoriteGroupVisibility,
+)
 
 /**
  * 收藏服务类
@@ -40,16 +119,35 @@ class FavoriteService(
     private val favoriteLocalDao: FavoriteLocalDao,
 ) {
 
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val favoritesByGroupCache = FavoriteGroupCache()
+    private var favoritesOwnerUserId: String? = SharedFlowCentre.currentSession.value?.token?.userId
+    private var favoritesOwnerToken: AccountSessionToken? =
+        SharedFlowCentre.currentSession.value?.token
+    private val cacheMutex = Mutex()
+    private val requestGenerations = mutableMapOf<FavoriteType, Long>()
 
     // 收藏限制信息缓存
     private var _favoriteLimits: FavoriteLimits? = null
 
     init {
-        CoroutineScope(Dispatchers.Default).launch {
-            SharedFlowCentre.authed.collect {
-                favoritesByGroupCache.clear()
+        serviceScope.launch {
+            SharedFlowCentre.currentSession.collect { session ->
+                cacheMutex.withLock {
+                    synchronizeFavoritesOwnerLocked(session?.token)
+                }
             }
+        }
+    }
+
+    private fun synchronizeFavoritesOwnerLocked(nextToken: AccountSessionToken?) {
+        if (favoritesOwnerToken == nextToken) return
+        val nextUserId = nextToken?.userId
+        if (favoritesOwnerUserId != nextUserId) favoritesByGroupCache.clear()
+        favoritesOwnerUserId = nextUserId
+        favoritesOwnerToken = nextToken
+        FavoriteType.entries.forEach { type ->
+            requestGenerations[type] = (requestGenerations[type] ?: 0L) + 1L
         }
     }
 
@@ -59,7 +157,7 @@ class FavoriteService(
 
 
     init {
-        CoroutineScope(Job()).launch(Dispatchers.IO) {
+        serviceScope.launch(Dispatchers.IO) {
             loadFavoriteLimits()
         }
     }
@@ -130,44 +228,56 @@ class FavoriteService(
         return Triple(true, type, parts[2])
     }
 
-    suspend fun loadFavoriteByGroup(favoriteType: FavoriteType) = runCatching {
-        val newFavoritesMap = mutableMapOf<String, MutableList<FavoriteData>>()
-        // 尝试加载远程收藏
-        favoriteApi.fetchFavorite(favoriteType)
-            .toCollection(mutableListOf())
-            .flatten()
-            .forEach { favoriteData ->
-                val tag = favoriteData.tags.firstOrNull() ?: return@forEach
-                newFavoritesMap.getOrPut(tag) { mutableListOf() }.add(favoriteData)
+    suspend fun loadFavoriteByGroup(favoriteType: FavoriteType): Result<Unit> {
+        val result = runCatching {
+            val sessionToken = cacheMutex.withLock {
+                val currentToken = SharedFlowCentre.currentSession.value?.token
+                    ?: error("No authenticated session")
+                synchronizeFavoritesOwnerLocked(currentToken)
+                requestGenerations[favoriteType] = (requestGenerations[favoriteType] ?: 0L) + 1L
+                currentToken to requestGenerations.getValue(favoriteType)
+            }
+            val token = sessionToken.first
+            val generation = sessionToken.second
+            val newFavoritesMap = mutableMapOf<String, MutableList<FavoriteData>>()
+            favoriteApi.fetchFavorite(favoriteType)
+                .toCollection(mutableListOf())
+                .flatten()
+                .forEach { favoriteData ->
+                    val tag = favoriteData.tags.firstOrNull() ?: return@forEach
+                    newFavoritesMap.getOrPut(tag) { mutableListOf() }.add(favoriteData)
+                }
+
+            val remoteGroups = favoriteApi.getFavoriteGroupsByType(favoriteType)
+
+            val localGroup = localGroupOf(favoriteType)
+            val localIds = favoriteLocalDao.load(favoriteType)
+            val localFavorites = localIds.map { fid ->
+                FavoriteData(
+                    favoriteId = fid,
+                    id = toLocalFavoriteId(favoriteType, fid),
+                    tags = listOf(localGroup.name),
+                    type = favoriteType.value
+                )
             }
 
-
-        val remoteGroups = runCatching {
-            favoriteApi.getFavoriteGroupsByType(favoriteType)
-        }.onFailure {
-            SharedFlowCentre.toastText.emit(ToastText.Error(it.message ?: "Load Favorite Groups Failed"))
-        }.getOrElse { emptyList() }
-
-        // 本地收藏
-        val localGroup = localGroupOf(favoriteType)
-        val localIds = favoriteLocalDao.load(favoriteType)
-        val localFavorites = localIds.map { fid ->
-            FavoriteData(
-                favoriteId = fid,
-                id = toLocalFavoriteId(favoriteType, fid),
-                tags = listOf(localGroup.name),
-                type = favoriteType.value
-            )
+            cacheMutex.withLock {
+                val currentToken = SharedFlowCentre.currentSession.value?.token
+                if (currentToken == token && favoritesOwnerToken == token &&
+                    requestGenerations[favoriteType] == generation
+                ) {
+                    favoritesByGroupCache.replace(
+                        favoriteType,
+                        remoteGroups.associateWith { newFavoritesMap[it.name] ?: listOf() } +
+                            (localGroup to localFavorites),
+                    )
+                }
+            }
         }
-
-        // 合并远程与本地
-        favoritesByGroupCache.replace(
-            favoriteType,
-            remoteGroups.associateWith { (newFavoritesMap[it.name] ?: listOf()) } +
-                (localGroup to localFavorites),
-        )
-    }.onFailure {
-        SharedFlowCentre.toastText.emit(ToastText.Error(it.message ?: "Load Favorite By Group Failed"))
+        result.exceptionOrNull()?.let { error ->
+            if (error is CancellationException) throw error
+        }
+        return result
     }
 
 
@@ -208,17 +318,145 @@ class FavoriteService(
     /**
      * 移除收藏
      *
-     * @param id 收藏记录ID（注意：这是FavoriteData.id）
+     * @param favorite 收藏数据；远端和本地删除均以收藏记录 ID 为准
      */
     suspend fun removeFavorite(
-        id: String,
+        favorite: FavoriteData,
     ) {
-        val (isLocal, type, favoriteId) = parseLocalFavoriteId(id)
+        val (isLocal, type, favoriteId) = parseLocalFavoriteId(favorite.id)
         if (isLocal && type != null && favoriteId != null) {
             val current = favoriteLocalDao.load(type)
             favoriteLocalDao.save(type, current.filterNot { it == favoriteId })
         } else {
-            favoriteApi.deleteFavorite(id)
+            favoriteApi.deleteFavorite(favorite.id)
+        }
+    }
+
+    internal suspend fun commitFavoriteRemoval(
+        sessionToken: AccountSessionToken,
+        favoriteType: FavoriteType,
+        favorite: FavoriteData,
+    ): Boolean = cacheMutex.withLock {
+        check(SharedFlowCentre.isCurrentSession(sessionToken)) {
+            "Authenticated session changed while removing a favorite"
+        }
+        synchronizeFavoritesOwnerLocked(sessionToken)
+        requestGenerations[favoriteType] = (requestGenerations[favoriteType] ?: 0L) + 1L
+        favoritesByGroupCache.removeFavorite(favoriteType, favorite)
+    }
+
+    internal suspend fun prepareFavoriteGroupClear(
+        sessionToken: AccountSessionToken,
+        favoriteType: FavoriteType,
+        groupName: String,
+    ): FavoriteGroupClearRequest = cacheMutex.withLock {
+        check(SharedFlowCentre.isCurrentSession(sessionToken)) {
+            "Authenticated session changed before clearing the favorite group"
+        }
+        synchronizeFavoritesOwnerLocked(sessionToken)
+        val target = favoritesByGroupCache.flow(favoriteType).value.entries.firstOrNull { (group, _) ->
+            group.ownerId == sessionToken.userId &&
+                group.ownerId != "local" &&
+                group.name == groupName &&
+                group.type == favoriteType.value
+        } ?: error("Favorite group is unavailable for the current account")
+        check(target.value.isNotEmpty()) { "Favorite group is already empty" }
+        FavoriteGroupClearRequest(
+            favoriteType = favoriteType,
+            group = target.key,
+            favorites = target.value,
+            ownerId = sessionToken.userId,
+        )
+    }
+
+    internal suspend fun sendFavoriteGroupClear(request: FavoriteGroupClearRequest) {
+        favoriteApi.clearFavoriteGroup(
+            favoriteType = request.favoriteType,
+            favoriteGroupName = request.groupName,
+            userId = request.ownerId,
+        )
+    }
+
+    internal suspend fun commitFavoriteGroupClear(
+        sessionToken: AccountSessionToken,
+        request: FavoriteGroupClearRequest,
+    ): FavoriteGroupClearCommit = cacheMutex.withLock {
+        check(SharedFlowCentre.isCurrentSession(sessionToken) && request.ownerId == sessionToken.userId) {
+            "Authenticated session changed while clearing the favorite group"
+        }
+        // Authentication can publish a renewed token before this collector observes it.
+        synchronizeFavoritesOwnerLocked(sessionToken)
+        requestGenerations[request.favoriteType] =
+            (requestGenerations[request.favoriteType] ?: 0L) + 1L
+        val (group, removedFavorites) = favoritesByGroupCache.clearGroupMembers(
+            type = request.favoriteType,
+            ownerId = request.ownerId,
+            groupName = request.groupName,
+        ) ?: (request.group to request.favorites)
+        FavoriteGroupClearCommit(group, removedFavorites)
+    }
+
+    internal suspend fun prepareFavoriteGroupUpdate(
+        sessionToken: AccountSessionToken,
+        favoriteType: FavoriteType,
+        groupName: String,
+        displayName: String,
+        visibility: FavoriteGroupVisibility,
+    ): FavoriteGroupUpdate {
+        val normalizedDisplayName = displayName.trim()
+        require(normalizedDisplayName.isNotEmpty()) { "Favorite group display name cannot be blank" }
+
+        return cacheMutex.withLock {
+            check(SharedFlowCentre.isCurrentSession(sessionToken)) {
+                "Authenticated session changed before updating the favorite group"
+            }
+            synchronizeFavoritesOwnerLocked(sessionToken)
+            val group = favoritesByGroupCache.flow(favoriteType).value.keys.firstOrNull {
+                it.ownerId == sessionToken.userId && it.name == groupName &&
+                    it.type == favoriteType.value
+            } ?: error("Favorite group is unavailable for the current account")
+            FavoriteGroupUpdate(
+                favoriteType = favoriteType,
+                groupName = group.name,
+                ownerId = sessionToken.userId,
+                displayName = normalizedDisplayName,
+                visibility = visibility,
+            )
+        }
+    }
+
+    internal suspend fun sendFavoriteGroupUpdate(update: FavoriteGroupUpdate) {
+        favoriteApi.updateFavoriteGroup(
+            favoriteType = update.favoriteType,
+            favoriteGroupName = update.groupName,
+            userId = update.ownerId,
+            displayName = update.displayName,
+            visibility = update.visibility,
+        )
+    }
+
+    internal suspend fun commitFavoriteGroupUpdate(
+        sessionToken: AccountSessionToken,
+        update: FavoriteGroupUpdate,
+    ): FavoriteGroupData {
+        return cacheMutex.withLock {
+            check(SharedFlowCentre.isCurrentSession(sessionToken) && update.ownerId == sessionToken.userId) {
+                "Authenticated session changed while updating the favorite group"
+            }
+            // The auth flow can publish a renewed token before this service collector observes it.
+            synchronizeFavoritesOwnerLocked(sessionToken)
+            requestGenerations[update.favoriteType] =
+                (requestGenerations[update.favoriteType] ?: 0L) + 1L
+            favoritesByGroupCache.updateGroup(
+                type = update.favoriteType,
+                ownerId = sessionToken.userId,
+                groupName = update.groupName,
+            ) { currentGroup ->
+                currentGroup.copy(
+                    displayName = update.displayName,
+                    visibility = update.visibility.value,
+                )
+            } ?: error("Favorite group disappeared while the update was in progress")
         }
     }
 
@@ -226,4 +464,7 @@ class FavoriteService(
     fun getFavoriteByFavoriteId(favoriteType: FavoriteType, favoriteId: String): FavoriteData? =
         favoritesByGroup(favoriteType).value.values.flatten().firstOrNull { it.favoriteId == favoriteId }
 
+    internal fun dispose() {
+        serviceScope.cancel()
+    }
 }

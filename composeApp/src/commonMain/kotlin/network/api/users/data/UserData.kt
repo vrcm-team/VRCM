@@ -46,6 +46,8 @@ data class UserData(
     override val userIcon: String = "",
     val worldId: String = "",
     override val pronouns: String? = null,
+    val bannerType: String? = null,
+    val bannerUrl: String? = null,
 ) : IUser, IAccessType {
     override val iconUrl: String
         get() = profileIconUrl.ifBlank { userIcon.ifBlank { profileImageUrl } }

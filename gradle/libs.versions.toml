@@ -10,7 +10,7 @@ kotlinx-atomicfu = "0.27.0"
 kotlinx-datetime = "0.7.1"
 android-minSdk = "24"
 android-compileSdk = "36"
-android-targetSdk = "35"
+android-targetSdk = "36"
 androidx-activityCompose = "1.10.1"
 androidx-lifecycle = "2.10.0"
 androidx-exifinterface = "1.4.2"
@@ -33,6 +33,7 @@ awebp = "3.0.5"
 room = "2.8.4"
 sqlite = "2.6.2"
 ksp = "2.2.20-2.0.4"
+play-app-update = "2.1.0"
 
 [libraries]
 # kotlinx
@@ -88,6 +89,8 @@ androidx-sqlite-bundled = { module = "androidx.sqlite:sqlite-bundled", version.r
 # chrisbanes-haze
 chrisbanes-haze = { module = "dev.chrisbanes.haze:haze", version.ref = "chrisbanes-haze" }
 
+# Google Play 应用内更新（只给 play 渠道查询商店上的新版本）
+play-app-update-ktx = { module = "com.google.android.play:app-update-ktx", version.ref = "play-app-update" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

@@ -7,10 +7,14 @@ import io.github.vrcmteam.vrcm.presentation.screens.auth.StartupAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreen
+import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesScreen
+import io.github.vrcmteam.vrcm.presentation.screens.favorites.MyGroupsScreen
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageEditorScreen
 import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.group.data.GroupProfileVo
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreen
+import io.github.vrcmteam.vrcm.presentation.screens.inventory.InventoryScreen
+import io.github.vrcmteam.vrcm.presentation.screens.search.GlobalSearchScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.CardListDetailScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.CardScreenType
 import io.github.vrcmteam.vrcm.presentation.screens.user.FriendNetworkScreen
@@ -55,8 +59,12 @@ class AppRoutePanePolicyTest {
     fun independentTasksUseTheFullWindow() {
         val routes = listOf(
             GalleryScreen,
+            FavoritesScreen,
+            MyGroupsScreen,
+            GlobalSearchScreen,
             PrintImageEditorScreen(sessionId = "session_test"),
             FriendNetworkScreen,
+            InventoryScreen,
             StartupAnimeScreen,
             AuthScreen,
             AuthAnimeScreen(isAuthed = true),
@@ -74,6 +82,10 @@ class AppRoutePanePolicyTest {
                 .isNotEmpty()
         )
         assertTrue(GalleryScreen.adaptivePaneMetadata().isEmpty())
+        assertTrue(FavoritesScreen.adaptivePaneMetadata().isEmpty())
+        assertTrue(MyGroupsScreen.adaptivePaneMetadata().isEmpty())
+        assertTrue(GlobalSearchScreen.adaptivePaneMetadata().isEmpty())
         assertTrue(FriendNetworkScreen.adaptivePaneMetadata().isEmpty())
+        assertTrue(InventoryScreen.adaptivePaneMetadata().isEmpty())
     }
 }

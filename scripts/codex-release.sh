@@ -133,20 +133,17 @@ replace_versions() {
     's/^(\s*MARKETING_VERSION\s*=\s*)\Q$ENV{OLD_VERSION}\E(\s*;)/$1$ENV{NEW_VERSION}$2/mg' "$IOS_PROJECT_FILE"
   NEW_CODE="$new_code" perl -0pi -e \
     's/^(\s*CURRENT_PROJECT_VERSION\s*=\s*)[0-9]+(\s*;)/$1$ENV{NEW_CODE}$2/mg' "$IOS_PROJECT_FILE"
-  OLD_VERSION="$old_version" NEW_VERSION="$VERSION" perl -0pi -e \
-    's/(<key>CFBundleShortVersionString<\/key>\s*<string>)\Q$ENV{OLD_VERSION}\E(<\/string>)/$1$ENV{NEW_VERSION}$2/' "$IOS_PLIST_FILE"
-  NEW_CODE="$new_code" perl -0pi -e \
-    's/(<key>CFBundleVersion<\/key>\s*<string>)[^<]+(<\/string>)/$1$ENV{NEW_CODE}$2/' "$IOS_PLIST_FILE"
 
   [[ "$(read_version)" == "$VERSION" ]] || fail "Version Catalog 版本同步失败"
   [[ "$(read_runtime_version)" == "$VERSION" ]] || fail "运行时 APP_VERSION 同步失败"
   grep -q "^#define AppVersion \"$VERSION\"" "$INSTALLER_FILE" || fail "Inno Setup 版本同步失败"
   grep -q "MARKETING_VERSION = $VERSION;" "$IOS_PROJECT_FILE" || fail "Xcode 工程版本同步失败"
   grep -q "CURRENT_PROJECT_VERSION = $new_code;" "$IOS_PROJECT_FILE" || fail "Xcode 工程 version code 同步失败"
-  grep -A1 -q '<key>CFBundleShortVersionString</key>' "$IOS_PLIST_FILE" || fail "iOS plist 版本字段缺失"
-  grep -A1 -q "<string>$VERSION</string>" "$IOS_PLIST_FILE" || fail "iOS plist 版本同步失败"
-  grep -A1 -q '<key>CFBundleVersion</key>' "$IOS_PLIST_FILE" || fail "iOS plist version code 字段缺失"
-  grep -A1 -q "<string>$new_code</string>" "$IOS_PLIST_FILE" || fail "iOS plist version code 同步失败"
+  # Info.plist 只引用 Xcode 工程的版本设置，避免与 MARKETING_VERSION / CURRENT_PROJECT_VERSION 两处各写一份。
+  grep -A1 '<key>CFBundleShortVersionString</key>' "$IOS_PLIST_FILE" | grep -F '$(MARKETING_VERSION)' >/dev/null || \
+    fail "iOS plist 的 CFBundleShortVersionString 应引用 \$(MARKETING_VERSION)"
+  grep -A1 '<key>CFBundleVersion</key>' "$IOS_PLIST_FILE" | grep -F '$(CURRENT_PROJECT_VERSION)' >/dev/null || \
+    fail "iOS plist 的 CFBundleVersion 应引用 \$(CURRENT_PROJECT_VERSION)"
   log "版本已同步：$old_version/$old_app_version/$old_code -> $VERSION/$VERSION/$new_code"
 }
 
@@ -170,8 +167,9 @@ copy_latest_matching() {
 }
 
 build_android() {
-  run_gradle :composeApp:assembleRelease
-  copy_latest_matching "$ROOT_DIR/composeApp/build/outputs/apk/release" '*.apk' "$ARTIFACT_DIR/VRCM-v$VERSION.apk"
+  # GitHub Release 只发 github 渠道的 APK；play 渠道用 :composeApp:bundlePlayRelease 打 AAB 上传 Google Play
+  run_gradle :composeApp:assembleGithubRelease
+  copy_latest_matching "$ROOT_DIR/composeApp/build/outputs/apk/github/release" '*.apk' "$ARTIFACT_DIR/VRCM-v$VERSION.apk"
 }
 
 find_iscc() {
@@ -214,7 +212,8 @@ build_ios() {
   xcodebuild \
     -project "$ROOT_DIR/iosApp/iosApp.xcodeproj" \
     -scheme iosApp -configuration Release -sdk iphoneos \
-    -archivePath "$archive_dir" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO archive
+    -archivePath "$archive_dir" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+    VRCM_DISTRIBUTION_CHANNEL=GitHub archive
   "$IPA_SCRIPT" "$archive_dir" "$ARTIFACT_DIR/VRCM-v$VERSION.ipa"
 }
 
@@ -222,7 +221,7 @@ generate_notes() {
   NOTES_PATH="$RELEASE_DIR/VRCM-v$VERSION-release-notes.md"
   if [[ -n "$NOTES_FILE" ]]; then
     [[ -f "$NOTES_FILE" ]] || fail "文案文件不存在：$NOTES_FILE"
-    if [[ "$NOTES_FILE" != "$NOTES_PATH" ]]; then
+    if ! [[ "$NOTES_FILE" -ef "$NOTES_PATH" ]]; then
       cp -f "$NOTES_FILE" "$NOTES_PATH"
     fi
     return 0

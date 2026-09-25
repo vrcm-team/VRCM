@@ -51,8 +51,9 @@
 - `gradle/libs.versions.toml` 的 `app-version` 和 `app-code`；
 - `composeApp/src/commonMain/kotlin/core/shared/AppConst.kt` 的运行时 `APP_VERSION`（设置页、更新检查和请求 User-Agent 使用）；
 - `installer/VRCM.iss` 的 Inno Setup 版本；
-- iOS Xcode 工程的 `MARKETING_VERSION`、`CURRENT_PROJECT_VERSION`；
-- `iosApp/iosApp/Info.plist` 的 `CFBundleShortVersionString`、`CFBundleVersion`。
+- iOS Xcode 工程的 `MARKETING_VERSION`、`CURRENT_PROJECT_VERSION`。
+
+`iosApp/iosApp/Info.plist` 的 `CFBundleShortVersionString`、`CFBundleVersion` 分别引用 `$(MARKETING_VERSION)`、`$(CURRENT_PROJECT_VERSION)`，脚本只校验这一引用关系、不再写入具体版本号。上传 App Store Connect 时同一版本号下的 build 号必须递增，重复上传同一版本请用 `--code` 指定新的 version code。
 
 目标版本与当前版本相同且未指定 `--code` 时，version code 保持不变；目标版本变化时自动递增 1。未指定 `--notes-file` 时，脚本会调用本地 Codex，以前一版本的 GitHub Release、版本提交和 `docs/releases/` 详解作为上下文，同时生成 Release 正文和英文、简体中文、日文三份版本详解。Release 正文按“新增 / 优化 / 修复”及对应英文段落组织，最后附上 `详情 / Details` 文档链接；版本详解则围绕用户场景说明功能入口、实际效果、平台差异和必要限制。提示词要求按用户能感知的结果归纳同类改动，不照抄提交标题、不暴露无关实现术语，且禁止把纯英文提交标题混入中文区。
 

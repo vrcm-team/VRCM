@@ -1,0 +1,2 @@
+/* Photo library add-only permission, requested when the user saves an image. */
+"NSPhotoLibraryAddUsageDescription" = "VRCM adds the images you choose to save, such as VRChat Gallery photos, Prints and your Nameplate, to your photo library.";

@@ -14,8 +14,10 @@ class GroupNotificationTypeTest {
             "group.event.starting",
             "group.informative",
             "group.joinRequest",
+            "group.post",
             "group.transfer",
             "group.queueReady",
+            "moderation.warning.group",
         ).forEach { type ->
             assertTrue(isGroupNotificationType("  $type "))
         }

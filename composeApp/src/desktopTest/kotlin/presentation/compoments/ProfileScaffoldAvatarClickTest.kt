@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -18,6 +17,7 @@ import coil3.intercept.Interceptor
 import coil3.memory.MemoryCache
 import coil3.request.ErrorResult
 import coil3.request.ImageRequest
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import org.koin.compose.KoinApplication
 import org.koin.dsl.module
 import java.util.concurrent.CopyOnWriteArrayList
@@ -57,7 +57,7 @@ class ProfileScaffoldAvatarClickTest {
                     )
                 },
             ) {
-                MaterialTheme {
+                AppTheme {
                     Box(modifier = Modifier.size(width = 400.dp, height = 600.dp)) {
                         ProfileScaffold(
                             profileImageUrl = TargetImageUrl,
@@ -97,7 +97,7 @@ class ProfileScaffoldAvatarClickTest {
                     )
                 },
             ) {
-                MaterialTheme {
+                AppTheme {
                     Box(modifier = Modifier.size(width = 400.dp, height = 600.dp)) {
                         ProfileScaffold(
                             profileImageUrl = null,

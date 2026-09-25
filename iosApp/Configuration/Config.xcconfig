@@ -1,3 +1,6 @@
 TEAM_ID=VRCM_TEAM
 BUNDLE_ID=io.github.vrcmteam.vrcm
 APP_NAME=VRCM
+// 分发渠道：Xcode 归档上传 App Store Connect 时保持 AppStore，应用内查询商店上架版本、更新跳转 App Store；
+// 打 GitHub Release 的 IPA 时由 Gradle 归档任务和发版脚本覆盖为 GitHub，应用内改为检查 GitHub 新版本。
+VRCM_DISTRIBUTION_CHANNEL=AppStore

@@ -1,0 +1,11 @@
+  {
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "intro-page",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8765", "--directory", "docs/介绍页"],
+      "port": 8765
+    }
+  ]
+}

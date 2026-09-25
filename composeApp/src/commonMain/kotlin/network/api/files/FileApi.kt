@@ -11,6 +11,7 @@ import io.github.vrcmteam.vrcm.network.extensions.checkSuccessResult
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
+import io.ktor.client.plugins.onUpload
 import io.ktor.http.*
 
 
@@ -31,6 +32,10 @@ class FileApi(private val client: HttpClient) {
         fun imageUrl(fileId: String, fileVersion: Int, fileSize: Int = 1024): String {
             if (fileId.isBlank() || fileVersion < 1) return ""
             return "https://api.vrchat.cloud/api/1/image/$fileId/$fileVersion/$fileSize"
+        }
+        fun originalFileUrl(fileId: String, fileVersion: Int): String {
+            if (fileId.isBlank() || fileVersion < 1) return ""
+            return "https://api.vrchat.cloud/api/1/file/$fileId/$fileVersion/file"
         }
         fun convertFileUrl(fileUrl: String, fileSize: Int = 1024): String {
             if (fileUrl.isEmpty()) return ""
@@ -73,6 +78,18 @@ class FileApi(private val client: HttpClient) {
     ) = client.get(FILES_API_PREFIX) {
         tag?.let { parameter("tag", it.value) }
         userId?.let { parameter("userId", it) }
+        parameter("n", n.coerceIn(1, 100))
+        parameter("offset", offset.coerceAtLeast(0))
+    }.checkSuccess<List<FileData>>()
+
+    /** 获取指定模型关联的只读 Gallery 文件。 */
+    suspend fun getAvatarGalleryFiles(
+        avatarId: String,
+        n: Int = 100,
+        offset: Int = 0,
+    ) = client.get(FILES_API_PREFIX) {
+        parameter("tag", "avatargallery")
+        parameter("galleryId", avatarId)
         parameter("n", n.coerceIn(1, 100))
         parameter("offset", offset.coerceAtLeast(0))
     }.checkSuccess<List<FileData>>()
@@ -141,13 +158,34 @@ class FileApi(private val client: HttpClient) {
         ).checkSuccessResult<FileData>()
     }
 
+    /** Uploads an image to an avatar's private Gallery and reports actual request progress. */
+    suspend fun uploadAvatarGalleryImage(
+        fileBytes: ByteArray,
+        fileName: String,
+        mimeType: String,
+        avatarId: String,
+        onProgress: suspend (bytesSent: Long, totalBytes: Long?) -> Unit = { _, _ -> },
+    ): Result<FileData> = client.submitFormWithBinaryData(
+        url = "${FILE_API_PREFIX}/image",
+        formData = formData {
+            append("file", fileBytes, Headers.build {
+                append(HttpHeaders.ContentType, mimeType)
+                append(HttpHeaders.ContentDisposition, "filename=\"blob\"")
+            })
+            append("tag", "avatargallery")
+            append("galleryId", avatarId)
+        },
+    ) {
+        onUpload { bytesSent, contentLength -> onProgress(bytesSent, contentLength) }
+    }.checkSuccessResult()
+
     /**
      * 获取特定文件ID的文件信息
      * @param fileId 文件ID
      * @return 文件信息
      */
     suspend fun getFileInfo(fileId: String): Result<FileResponse> = runCatching {
-        client.get("$FILES_API_PREFIX/$fileId").checkSuccess<FileResponse>()
+        client.get("$FILE_API_PREFIX/$fileId").checkSuccess<FileResponse>()
     }
     /**
      * 删除指定文件
@@ -173,7 +211,8 @@ internal fun vrcxImageUploadParameters(
 ): FileImageUploadParameters = when (tagType) {
     FileTagType.Gallery,
     FileTagType.Icon,
-    FileTagType.AvatarImage -> FileImageUploadParameters(tag = tagType.value)
+    FileTagType.AvatarImage,
+    FileTagType.WorldImage -> FileImageUploadParameters(tag = tagType.value)
 
     FileTagType.Sticker -> FileImageUploadParameters(
         tag = tagType.value,

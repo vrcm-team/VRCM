@@ -1,0 +1,2 @@
+/* Photo library add-only permission, requested when the user saves an image. */
+"NSPhotoLibraryAddUsageDescription" = "VRCM 会把你选择保存的图片（如 VRChat 图库照片、拍立得和身份铭牌）存入系统相册。";

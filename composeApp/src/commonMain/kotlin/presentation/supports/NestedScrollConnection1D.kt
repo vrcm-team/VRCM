@@ -6,6 +6,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.unit.Velocity
 
 /**
  * 一维的嵌套滑动连接器
@@ -64,5 +65,33 @@ fun commonNestedScrollConnection(
     NestedScrollConnection1D(orientation) {
         consumer(it)
         0f
+    }
+}
+
+/**
+ * 消费子滚动容器剩余的上滑位移与速度，避免其在内容底部继续驱动外层容器。
+ * 下滑方向保持未消费，使外层弹层仍可响应下滑关闭手势。
+ */
+@Composable
+fun rememberConsumeRemainingUpwardScrollConnection(): NestedScrollConnection = remember {
+    object : NestedScrollConnection {
+        override fun onPostScroll(
+            consumed: Offset,
+            available: Offset,
+            source: NestedScrollSource,
+        ): Offset = if (available.y < 0f) {
+            Offset(x = 0f, y = available.y)
+        } else {
+            Offset.Zero
+        }
+
+        override suspend fun onPostFling(
+            consumed: Velocity,
+            available: Velocity,
+        ): Velocity = if (available.y < 0f) {
+            Velocity(x = 0f, y = available.y)
+        } else {
+            Velocity.Zero
+        }
     }
 }

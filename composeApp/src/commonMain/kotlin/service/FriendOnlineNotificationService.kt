@@ -7,6 +7,7 @@ import io.github.vrcmteam.vrcm.network.api.attributes.NotificationType
 import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
 import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationData
 import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationDataV2
+import io.github.vrcmteam.vrcm.network.api.notification.data.resolveNotificationGroupId
 import io.github.vrcmteam.vrcm.network.api.groups.GroupsApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.websocket.data.content.NotificationContent
@@ -181,10 +182,15 @@ class FriendOnlineNotificationService(
                     iconUrl = notification.imageUrl
                         ?: details.imageUrl
                         ?: resolveGroupIcon(
-                            groupId = notification.groupId
-                                ?: details.groupId
-                                ?: details.ownerId
-                                ?: extractGroupId(notification.link),
+                            groupId = resolveNotificationGroupId(
+                                notification.link,
+                                notification.groupId,
+                                notification.details?.groupId,
+                                notification.data.groupId,
+                                notification.details?.ownerId,
+                                notification.data.ownerId,
+                                notification.senderUserId,
+                            ),
                         ),
                 )
             }
@@ -350,10 +356,15 @@ class FriendOnlineNotificationService(
                     iconUrl = notification.imageUrl
                         ?: details.imageUrl
                         ?: resolveGroupIcon(
-                            groupId = notification.groupId
-                                ?: details.groupId
-                                ?: details.ownerId
-                                ?: extractGroupId(notification.link),
+                            groupId = resolveNotificationGroupId(
+                                notification.link,
+                                notification.groupId,
+                                notification.details?.groupId,
+                                notification.data.groupId,
+                                notification.details?.ownerId,
+                                notification.data.ownerId,
+                                notification.senderUserId,
+                            ),
                         ),
                 )
             }
@@ -370,15 +381,6 @@ class FriendOnlineNotificationService(
         ?.takeIf { it.startsWith("grp_") }
         ?.takeIf(String::isNotEmpty)
         ?.let { id -> runCatching { groupsApi.fetchGroup(id).iconUrl }.getOrNull() }
-
-    private fun extractGroupId(link: String?): String? = link
-        ?.split(',', '&', '?')
-        ?.firstNotNullOfOrNull { part ->
-            val marker = "grp_"
-            part.substringAfter(marker, "")
-                .takeIf(String::isNotEmpty)
-                ?.let { marker + it.takeWhile { char -> char.isLetterOrDigit() || char == '-' } }
-        }
 
     private suspend fun onFriendsChanged(
         token: AccountSessionToken,
@@ -432,8 +434,10 @@ private val GROUP_NOTIFICATION_TYPES = setOf(
     "group.event.starting",
     "group.informative",
     "group.joinrequest",
+    "group.post",
     "group.transfer",
     "group.queueready",
+    "moderation.warning.group",
 )
 
 private fun NotificationContent.senderName(): String =

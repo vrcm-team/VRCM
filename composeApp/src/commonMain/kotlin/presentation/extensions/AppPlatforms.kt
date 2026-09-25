@@ -11,7 +11,7 @@ expect val AppPlatform.supportsSystemShare: Boolean
 expect fun AppPlatform.shareUrl(url: String): Boolean
 
 /**
- * 查看当前设备是否支持模糊效果
- * 比如低于Android 12的安卓设备不支持
+ * 剪贴板的变化标记：每次有 App 复制新内容都会变。只读系统的元数据、不碰内容，
+ * 不会触发 iOS 的"允许粘贴"或 Android 的剪贴板读取提示；平台给不出时返回 null。
  */
-expect val AppPlatform.isSupportBlur :Boolean
+expect fun AppPlatform.clipboardChangeToken(): Long?

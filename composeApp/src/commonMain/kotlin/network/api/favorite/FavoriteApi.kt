@@ -6,6 +6,7 @@ import io.github.vrcmteam.vrcm.network.api.favorite.data.AddFavoriteRequest
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteData
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteGroupData
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteLimits
+import io.github.vrcmteam.vrcm.network.api.favorite.data.UpdateFavoriteGroupRequest
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -111,10 +112,29 @@ class FavoriteApi(private val client: HttpClient) {
     /**
      * 删除收藏
      *
-     * @param favoriteId 收藏记录ID（注意：这是FavoriteData的favoriteId）
+     * @param favoriteId 收藏记录 ID（FavoriteData.id）
      */
     suspend fun deleteFavorite(favoriteId: String) {
         client.delete("$FAVORITES_API_PREFIX/$favoriteId").checkSuccess<Unit>()
+    }
+
+    /** Clears every favorite relationship in an owned official group without deleting the group. */
+    suspend fun clearFavoriteGroup(
+        favoriteType: FavoriteType,
+        favoriteGroupName: String,
+        userId: String,
+    ) {
+        client.delete {
+            url {
+                path(
+                    FAVORITE_API_PREFIX,
+                    "group",
+                    favoriteType.value,
+                    favoriteGroupName,
+                    userId,
+                )
+            }
+        }.checkSuccess { Unit }
     }
 
     /**
@@ -124,6 +144,28 @@ class FavoriteApi(private val client: HttpClient) {
      */
     suspend fun getFavoriteLimits(): FavoriteLimits {
         return client.get("$AUTH_API_PREFIX/$USER_API_PREFIX/$FAVORITE_LIMITS_API_SUFFIX").checkSuccess()
+    }
+
+    suspend fun updateFavoriteGroup(
+        favoriteType: FavoriteType,
+        favoriteGroupName: String,
+        userId: String,
+        displayName: String,
+        visibility: FavoriteGroupVisibility,
+    ) {
+        client.put {
+            url {
+                path(
+                    FAVORITE_API_PREFIX,
+                    "group",
+                    favoriteType.value,
+                    favoriteGroupName,
+                    userId,
+                )
+            }
+            contentType(ContentType.Application.Json)
+            setBody(UpdateFavoriteGroupRequest(displayName, visibility))
+        }.checkSuccess { Unit }
     }
 
 }

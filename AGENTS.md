@@ -8,7 +8,7 @@ VRCM 是面向 VRChat 的跨平台好友与内容管理应用，使用 Kotlin Mu
 
 - Kotlin：2.2.20
 - Compose Multiplatform：1.10.3
-- Android：minSdk 24、targetSdk 35、compileSdk 36
+- Android：minSdk 24、targetSdk 36、compileSdk 36；分发渠道 flavor：`github`（GitHub Release APK，带应用内更新）、`play`（Google Play AAB，查 Play 新版本并跳商品页，不带自更新）
 - 包名：`io.github.vrcmteam.vrcm`
 - 主要框架：Navigation 3、Lifecycle ViewModel、Material 3 Adaptive、Koin、Ktor、Multiplatform Settings、Coil
 
@@ -65,8 +65,8 @@ VRCM 是面向 VRChat 的跨平台好友与内容管理应用，使用 Kotlin Mu
 
 ## 四、Compose UI 规范
 
-- 颜色、字体、形状优先使用 `MaterialTheme` 与现有主题定义，禁止无理由硬编码颜色。
-- 图标优先使用项目的 `AppIcons`；不要复制 SVG 路径或新建重复图标实现。
+- 界面走 `presentation/designsystem` 的 Apple HIG 风格设计系统：颜色、字体、形状取 `AppTheme` / `AppShapes` 令牌，控件用 `App*` 组件；不要重新引入 `compose.material3` 组件，禁止无理由硬编码颜色。
+- 图标统一用项目的 `AppIcons`（SF Symbols 风格的自绘符号，项目不再依赖 Material 图标库）；缺的符号按同一画法补进 `AppIcons`，不要复制 SVG 路径或新建重复图标实现。
 - 同级组件的外部间距由最近的共同父容器统一管理，子组件只负责自身内边距，避免同方向重复叠加 padding。
 - 页面内容和文本容器应适应系统字体与不同窗口宽度。不要用固定高度掩盖文本溢出。
 - 工具栏按钮、图片比例、卡片堆叠等需要稳定几何关系的控件可以使用明确尺寸，但必须说明该尺寸承担的布局契约，并验证窄窗口与大字体不会互相遮挡。
@@ -134,8 +134,9 @@ VRCM 是面向 VRChat 的跨平台好友与内容管理应用，使用 Kotlin Mu
 ./gradlew :composeApp:desktopTest                 # Desktop 测试套件
 ./gradlew :composeApp:allTests                    # KMP 聚合测试
 ./gradlew :composeApp:check                       # 模块完整检查
-./gradlew :composeApp:assembleDebug               # Android Debug APK
-./gradlew :composeApp:installDebug                # 安装 Android Debug
+./gradlew :composeApp:assembleDebug               # Android Debug APK（github、play 两个渠道）
+./gradlew :composeApp:installGithubDebug          # 安装 Android Debug（GitHub 渠道）
+./gradlew :composeApp:bundlePlayRelease           # Google Play 上传用 AAB
 ./gradlew :composeApp:createReleaseDistributable  # Desktop 发布包
 ./gradlew :composeApp:linkDebugFrameworkIosArm64  # iOS 调试 Framework
 ```

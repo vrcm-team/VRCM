@@ -1,16 +1,22 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.compoments
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.*
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteData
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteGroupData
+import io.github.vrcmteam.vrcm.presentation.compoments.ATooltipBox
+import io.github.vrcmteam.vrcm.presentation.designsystem.*
+import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.service.FavoriteService
 import org.koin.compose.koinInject
 
@@ -25,7 +31,6 @@ import org.koin.compose.koinInject
  * @param getSelectedGroup 从选项中获取当前选择的分组
  * @param updateOptions 更新选项的函数
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun <T> GroupOptionsUI(
     currentOptions: T,
@@ -35,8 +40,15 @@ fun <T> GroupOptionsUI(
     defaultText: String,
     onOptionsChanged: (T) -> Unit,
     getSelectedGroup: (T) -> FavoriteGroupData?,
-    updateOptions: (T, FavoriteGroupData?) -> T
+    updateOptions: (T, FavoriteGroupData?) -> T,
+    onClearGroup: ((FavoriteGroupData) -> Unit)? = null,
+    clearGroupEnabled: Boolean = false,
+    clearGroupInProgress: Boolean = false,
+    clearGroupContentDescription: String = "",
+    onEditGroup: ((FavoriteGroupData) -> Unit)? = null,
+    editGroupContentDescription: String = "",
 ) {
+    val selectedGroup = getSelectedGroup(currentOptions)
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -46,56 +58,72 @@ fun <T> GroupOptionsUI(
         var expandGroupMenu by remember { mutableStateOf(false) }
         val favoriteService = koinInject<FavoriteService>()
         val maxFavoritesPerGroup = favoriteService.getMaxFavoritesPerGroup(favoriteType)
-        ExposedDropdownMenuBox(
-            expanded = expandGroupMenu,
-            onExpandedChange = { expandGroupMenu = it }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            OutlinedTextField(
-                value = getSelectedGroup(currentOptions)?.displayName ?: defaultText,
-                onValueChange = {},
-                shape = MaterialTheme.shapes.medium,
-                readOnly = true,
-                singleLine = true,
-                trailingIcon = {
-                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandGroupMenu)
-                },
-                colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(
-                    unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
-                ),
-                textStyle = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .defaultMinSize(minHeight = 48.dp) // 使用默认最小高度
-                    .menuAnchor(MenuAnchorType.PrimaryNotEditable)
-            )
-
-            ExposedDropdownMenu(
-                shape = MaterialTheme.shapes.medium,
+            AppPopUpButton(
+                value = selectedGroup?.displayName ?: defaultText,
                 expanded = expandGroupMenu,
-                onDismissRequest = { expandGroupMenu = false }
+                onExpandedChange = { expandGroupMenu = it },
+                modifier = Modifier.weight(1f),
             ) {
-                // 添加"全部"选项
-                DropdownMenuItem(
-                    text = { Text(defaultText) },
-                    trailingIcon = { Text("$total") },
+                AppMenuItem(
+                    text = { AppText(defaultText) },
+                    trailingIcon = { AppText("$total", color = AppTheme.colors.secondaryLabel) },
                     onClick = {
                         onOptionsChanged(updateOptions(currentOptions, null))
                         expandGroupMenu = false
-                    }
+                    },
+                    selected = selectedGroup == null,
                 )
 
-                // 添加所有分组选项
                 favoriteGroups.forEach { (group, data) ->
-                    DropdownMenuItem(
-                        text = { Text(group.displayName) },
-                        trailingIcon = { Text("${data.size}/${maxFavoritesPerGroup}") },
+                    AppMenuItem(
+                        text = { AppText(group.displayName) },
+                        trailingIcon = { AppText("${data.size}/${maxFavoritesPerGroup}", color = AppTheme.colors.secondaryLabel) },
                         onClick = {
                             onOptionsChanged(updateOptions(currentOptions, group))
                             expandGroupMenu = false
-                        }
+                        },
+                        selected = group == selectedGroup,
                     )
+                }
+            }
+
+            if (onEditGroup != null) {
+                val canEdit = selectedGroup != null &&
+                    selectedGroup.ownerId != "local" &&
+                    selectedGroup.type == favoriteType.value
+                ATooltipBox(tooltip = { AppText(editGroupContentDescription) }) {
+                    AppIconButton(
+                        enabled = canEdit,
+                        onClick = { selectedGroup?.let(onEditGroup) },
+                    ) {
+                        AppIcon(AppIcons.Edit, contentDescription = editGroupContentDescription)
+                    }
+                }
+            }
+
+            if (onClearGroup != null) {
+                ATooltipBox(tooltip = { AppText(clearGroupContentDescription) }) {
+                    AppIconButton(
+                        enabled = clearGroupEnabled && !clearGroupInProgress,
+                        onClick = { selectedGroup?.let(onClearGroup) },
+                    ) {
+                        if (clearGroupInProgress) {
+                            AppActivityIndicator(
+                                modifier = Modifier.size(20.dp),
+                            )
+                        } else {
+                            AppIcon(
+                                imageVector = AppIcons.Delete,
+                                contentDescription = clearGroupContentDescription,
+                            )
+                        }
+                    }
                 }
             }
         }
     }
-} 
+}

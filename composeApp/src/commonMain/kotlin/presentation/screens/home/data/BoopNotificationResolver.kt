@@ -32,7 +32,7 @@ internal class BoopNotificationResolver(
     ): List<NotificationItemData> {
         val cachedFallbacks = fallbackCacheLock.withLock { fallbackCache.toMap() }
         val missingUserIds = notifications.asSequence()
-            .filter { it.type == "boop" }
+            .filter { it.type.equals("boop", ignoreCase = true) }
             .mapNotNull { it.senderId }
             .distinct()
             .filterNot { it in friends || it in cachedFallbacks }
@@ -51,7 +51,7 @@ internal class BoopNotificationResolver(
 
         val presentations = cachedFallbacks + fetchedFallbacks + friends
         return notifications.map { notification ->
-            if (notification.type != "boop") return@map notification
+            if (!notification.type.equals("boop", ignoreCase = true)) return@map notification
             val presentation = notification.senderId?.let(presentations::get)
                 ?: return@map notification
             notification.copy(

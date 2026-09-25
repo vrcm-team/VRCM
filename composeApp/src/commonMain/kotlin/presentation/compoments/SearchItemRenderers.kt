@@ -9,9 +9,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -27,6 +25,13 @@ import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.network.api.files.data.PlatformType.*
 import io.github.vrcmteam.vrcm.network.api.groups.data.LimitedGroup
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppCheckbox
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppGroupedItem
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
+import io.github.vrcmteam.vrcm.presentation.designsystem.appRowDividerInset
 import io.github.vrcmteam.vrcm.presentation.extensions.ignoredFormat
 import io.github.vrcmteam.vrcm.presentation.navigation.rememberContainerTransformToken
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
@@ -38,10 +43,48 @@ import io.github.vrcmteam.vrcm.service.platformPackages
  */
 fun LazyListScope.renderUserItems(
     users: List<IUser>,
+    onUserLongClick: ((IUser) -> Unit)? = null,
+    grouped: Boolean = false,
     onUserClick: (IUser, String) -> Unit
 ) {
+    if (!grouped) {
+        items(users, key = { it.id }) { user ->
+            renderUserItem(user, onUserLongClick, onUserClick)
+        }
+        return
+    }
+    // 放在分组灰底的页面里（群组成员）：整个列表拼成一张白色分组卡片，分隔线由卡片画
+    itemsIndexed(users, key = { _, user -> user.id }) { index, user ->
+        AppGroupedItem(
+            index = index,
+            count = users.size,
+            modifier = Modifier.animateItem(),
+            dividerInset = appRowDividerInset(SearchResultLeadingSize),
+        ) {
+            renderUserItem(
+                user = user,
+                onUserLongClick = onUserLongClick,
+                onUserClick = onUserClick,
+                modifier = Modifier,
+                showDivider = false,
+            )
+        }
+    }
+}
+
+fun LazyListScope.renderSelectableUserItems(
+    users: List<IUser>,
+    selectedUserIds: Set<String>,
+    enabled: Boolean,
+    onSelectionToggle: (String) -> Unit,
+) {
     items(users, key = { it.id }) { user ->
-        renderUserItem(user, onUserClick)
+        renderUserItem(
+            user = user,
+            onUserClick = { selectedUser, _ -> onSelectionToggle(selectedUser.id) },
+            selected = user.id in selectedUserIds,
+            enabled = enabled,
+        )
     }
 }
 
@@ -52,27 +95,35 @@ fun LazyListScope.renderUserItems(
 @Composable
 fun LazyItemScope.renderUserItem(
     user: IUser,
-    onUserClick: (IUser, String) -> Unit
+    onUserLongClick: ((IUser) -> Unit)? = null,
+    onUserClick: (IUser, String) -> Unit,
+    selected: Boolean? = null,
+    enabled: Boolean = true,
+    modifier: Modifier = Modifier.animateItem(),
+    showDivider: Boolean = true,
 ) {
     val sharedSuffixKey = rememberContainerTransformToken("user:${user.id}")
         ?: LocalSharedSuffixKey.current
     SearchResultItem(
         item = user,
         onClick = { onUserClick(it, sharedSuffixKey) },
-        modifier = Modifier.animateItem(),
+        onLongClick = onUserLongClick,
+        modifier = modifier,
+        enabled = enabled,
+        showDivider = showDivider,
         leadingContent = {
             UserStateIcon(
                 modifier = Modifier.sharedBoundsBy(
                     key = "${user.id}UserIcon",
                     suffixKey = sharedSuffixKey,
-                ),
+                ).size(SearchResultLeadingSize),
                 iconUrl = user.iconUrl,
             )
         },
         headlineContent = {
             UserInfoRow(
                 iconSize = 16.dp,
-                style = MaterialTheme.typography.titleMedium,
+                style = AppTheme.type.headline,
                 user = user,
                 sharedSuffixKey = sharedSuffixKey,
                 pronouns = user.pronouns,
@@ -81,18 +132,26 @@ fun LazyItemScope.renderUserItem(
         supportingContent = {
             UserStatusRow(
                 iconSize = 8.dp,
-                style = MaterialTheme.typography.bodyMedium,
+                style = AppTheme.type.subheadline,
                 user = user,
                 sharedSuffixKey = sharedSuffixKey,
             )
         },
         trailingContent = {
+            if (selected != null) {
+                AppCheckbox(
+                    checked = selected,
+                    onCheckedChange = null,
+                    enabled = enabled,
+                )
+                return@SearchResultItem
+            }
             // 离线用户显示最后活动时间
             val lastSeenAt = user.lastSeenAt()
             if (user.status != UserStatus.Offline || lastSeenAt == null) return@SearchResultItem
-            Text(
+            AppText(
                 text = lastSeenAt.toLocalDateTime()?.ignoredFormat.orEmpty(),
-                style = MaterialTheme.typography.labelSmall,
+                style = AppTheme.type.caption2Emphasized,
                 maxLines = 1
             )
         }
@@ -119,10 +178,33 @@ fun WorldData.hiddenWorldDisplayName(): String = favoriteId ?: name
  */
 fun LazyListScope.renderWorldItems(
     worlds: List<WorldData>,
+    onWorldLongClick: ((WorldData) -> Unit)? = null,
     onWorldClick: (WorldData, String) -> Unit
 ) {
     items(worlds, key = { it.favoriteId ?: it.id }) { world ->
-        renderWorldItem(world, onWorldClick)
+        renderWorldItem(
+            world = world,
+            onWorldClick = onWorldClick,
+            onWorldLongClick = onWorldLongClick,
+        )
+    }
+}
+
+fun LazyListScope.renderSelectableWorldItems(
+    worlds: List<WorldData>,
+    selectedWorldIds: Set<String>,
+    selectableWorldIds: Set<String>,
+    enabled: Boolean,
+    onSelectionToggle: (String) -> Unit,
+) {
+    items(worlds, key = { it.favoriteId ?: it.id }) { world ->
+        val selectionId = world.favoriteId ?: world.id
+        renderWorldItem(
+            world = world,
+            onWorldClick = { _, _ -> onSelectionToggle(selectionId) },
+            selected = selectionId in selectedWorldIds,
+            enabled = enabled && selectionId in selectableWorldIds,
+        )
     }
 }
 
@@ -133,29 +215,34 @@ fun LazyListScope.renderWorldItems(
 @Composable
 fun LazyItemScope.renderWorldItem(
     world: WorldData,
-    onWorldClick: (WorldData, String) -> Unit
+    onWorldClick: (WorldData, String) -> Unit,
+    onWorldLongClick: ((WorldData) -> Unit)? = null,
+    selected: Boolean? = null,
+    enabled: Boolean = true,
 ) {
     val sharedSuffixKey = rememberContainerTransformToken("world:${world.favoriteId ?: world.id}")
         ?: LocalSharedSuffixKey.current
     SearchResultItem(
         item = world,
         onClick = { onWorldClick(it, sharedSuffixKey) },
+        onLongClick = onWorldLongClick,
         modifier = Modifier.animateItem(),
+        enabled = enabled,
         leadingContent = {
             if (world.isHiddenWorld()) {
                 Box(
                     modifier = Modifier.sharedBoundsBy(
                         key = "${world.id}WorldImage",
                         suffixKey = sharedSuffixKey,
-                    ).size(48.dp)
-                        .clip(MaterialTheme.shapes.medium)
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    ).size(SearchResultLeadingSize)
+                        .clip(AppShapes.m)
+                        .background(AppTheme.colors.fill),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
+                    AppIcon(
                         imageVector = AppIcons.VisibilityOff,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = AppTheme.colors.secondaryLabel,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -164,40 +251,49 @@ fun LazyItemScope.renderWorldItem(
                     modifier = Modifier.sharedBoundsBy(
                         key = "${world.id}WorldImage",
                         suffixKey = sharedSuffixKey,
-                    ).size(48.dp)
-                        .clip(MaterialTheme.shapes.medium),
+                    ).size(SearchResultLeadingSize)
+                        .clip(AppShapes.m),
                     imageData = world.safeImageUrl(),
                 )
             }
         },
         headlineContent = {
-            Text(
+            AppText(
                 text = if (world.isHiddenWorld()) world.hiddenWorldDisplayName() else world.name,
-                style = MaterialTheme.typography.titleMedium,
+                style = AppTheme.type.headline,
                 overflow = TextOverflow.Ellipsis,
                 maxLines = 1
             )
         },
         supportingContent = {
-            Text(
+            AppText(
                 text = if (world.isHiddenWorld()) strings.hiddenWorld else world.authorName,
-                style = MaterialTheme.typography.bodyMedium,
+                style = AppTheme.type.subheadline,
                 maxLines = 1
             )
         },
         trailingContent = {
+            if (selected != null) {
+                AppCheckbox(
+                    checked = selected,
+                    onCheckedChange = null,
+                    enabled = enabled,
+                )
+                return@SearchResultItem
+            }
             // 显示世界平台类型
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ){
-               remember { world.unityPackages.platformPackages.keys.sortedBy { it.name } } .forEach {
+               // 缓存里的世界可能还没有包信息，刷新后同一个列表项要跟着更新
+               remember(world.unityPackages) { world.unityPackages.platformPackages.keys.sortedBy { it.name } }.forEach {
                     val icon = when(it){
-                        Android -> AppIcons.Android
-                        Ios -> AppIcons.Apple
-                        Windows -> AppIcons.Windows
+                        Android -> AppIcons.VrHeadset
+                        Ios -> AppIcons.Phone
+                        Windows -> AppIcons.Computer
                     }
-                    Icon(
+                    AppIcon(
                         imageVector = icon,
                         contentDescription = "PlatformIcon",
                         modifier = Modifier.size(16.dp)
@@ -214,10 +310,32 @@ fun LazyItemScope.renderWorldItem(
  */
 fun LazyListScope.renderAvatarItems(
     avatars: List<AvatarData>,
+    onAvatarLongClick: ((AvatarData) -> Unit)? = null,
     onAvatarClick: (AvatarData, String) -> Unit
 ) {
     items(avatars, key = { it.id }) { avatar ->
-        renderAvatarItem(avatar, onAvatarClick)
+        renderAvatarItem(
+            avatar = avatar,
+            onAvatarClick = onAvatarClick,
+            onAvatarLongClick = onAvatarLongClick,
+        )
+    }
+}
+
+fun LazyListScope.renderSelectableAvatarItems(
+    avatars: List<AvatarData>,
+    selectedAvatarIds: Set<String>,
+    selectableAvatarIds: Set<String>,
+    enabled: Boolean,
+    onSelectionToggle: (String) -> Unit,
+) {
+    items(avatars, key = { it.id }) { avatar ->
+        renderAvatarItem(
+            avatar = avatar,
+            onAvatarClick = { selectedAvatar, _ -> onSelectionToggle(selectedAvatar.id) },
+            selected = avatar.id in selectedAvatarIds,
+            enabled = enabled && avatar.id in selectableAvatarIds,
+        )
     }
 }
 
@@ -228,29 +346,34 @@ fun LazyListScope.renderAvatarItems(
 @Composable
 fun LazyItemScope.renderAvatarItem(
     avatar: AvatarData,
-    onAvatarClick: (AvatarData, String) -> Unit
+    onAvatarClick: (AvatarData, String) -> Unit,
+    onAvatarLongClick: ((AvatarData) -> Unit)? = null,
+    selected: Boolean? = null,
+    enabled: Boolean = true,
 ) {
     val sharedSuffixKey = rememberContainerTransformToken("avatar:${avatar.id}")
         ?: LocalSharedSuffixKey.current
     SearchResultItem(
         item = avatar,
         onClick = { onAvatarClick(it, sharedSuffixKey) },
+        onLongClick = onAvatarLongClick,
         modifier = Modifier.animateItem(),
+        enabled = enabled,
         leadingContent = {
             if (avatar.releaseStatus == "hidden") {
                 Box(
                     modifier = Modifier.sharedBoundsBy(
                         key = "${avatar.id}AvatarImage",
                         suffixKey = sharedSuffixKey,
-                    ).size(48.dp)
-                        .clip(MaterialTheme.shapes.medium)
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    ).size(SearchResultLeadingSize)
+                        .clip(AppShapes.m)
+                        .background(AppTheme.colors.fill),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
+                    AppIcon(
                         imageVector = AppIcons.VisibilityOff,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = AppTheme.colors.secondaryLabel,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -259,28 +382,36 @@ fun LazyItemScope.renderAvatarItem(
                     modifier = Modifier.sharedBoundsBy(
                         key = "${avatar.id}AvatarImage",
                         suffixKey = sharedSuffixKey,
-                    ).size(48.dp)
-                        .clip(MaterialTheme.shapes.medium),
+                    ).size(SearchResultLeadingSize)
+                        .clip(AppShapes.m),
                     imageData = avatar.thumbnailImageUrl,
                 )
             }
         },
         headlineContent = {
-            Text(
+            AppText(
                 text = if (avatar.releaseStatus == "hidden") avatar.id else avatar.name,
-                style = MaterialTheme.typography.titleMedium,
+                style = AppTheme.type.headline,
                 overflow = TextOverflow.Ellipsis,
                 maxLines = 1
             )
         },
         supportingContent = {
-            Text(
+            AppText(
                 text = if (avatar.releaseStatus == "hidden") strings.hiddenModel else avatar.authorName,
-                style = MaterialTheme.typography.bodyMedium,
+                style = AppTheme.type.subheadline,
                 maxLines = 1
             )
         },
         trailingContent = {
+            if (selected != null) {
+                AppCheckbox(
+                    checked = selected,
+                    onCheckedChange = null,
+                    enabled = enabled,
+                )
+                return@SearchResultItem
+            }
             // 显示模型平台类型
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -297,11 +428,11 @@ fun LazyItemScope.renderAvatarItem(
                     }.distinct().sortedBy { it.name }
                 }.forEach {
                     val icon = when (it) {
-                        Android -> AppIcons.Android
-                        Ios -> AppIcons.Apple
-                        Windows -> AppIcons.Windows
+                        Android -> AppIcons.VrHeadset
+                        Ios -> AppIcons.Phone
+                        Windows -> AppIcons.Computer
                     }
-                    Icon(
+                    AppIcon(
                         imageVector = icon,
                         contentDescription = "PlatformIcon",
                         modifier = Modifier.size(16.dp)
@@ -317,10 +448,31 @@ fun LazyItemScope.renderAvatarItem(
  */
 fun LazyListScope.renderGroupItems(
     groups: List<LimitedGroup>,
+    onGroupLongClick: ((LimitedGroup) -> Unit)? = null,
     onGroupClick: (LimitedGroup, String) -> Unit
 ) {
     items(groups, key = { it.id }) { group ->
-        renderGroupItem(group, onGroupClick)
+        renderGroupItem(
+            group = group,
+            onGroupClick = onGroupClick,
+            onGroupLongClick = onGroupLongClick,
+        )
+    }
+}
+
+fun LazyListScope.renderSelectableGroupItems(
+    groups: List<LimitedGroup>,
+    selectedGroupIds: Set<String>,
+    enabled: Boolean,
+    onSelectionToggle: (String) -> Unit,
+) {
+    items(groups, key = { it.id }) { group ->
+        renderGroupItem(
+            group = group,
+            onGroupClick = { selectedGroup, _ -> onSelectionToggle(selectedGroup.id) },
+            selected = group.id in selectedGroupIds,
+            enabled = enabled,
+        )
     }
 }
 
@@ -331,14 +483,19 @@ fun LazyListScope.renderGroupItems(
 @Composable
 fun LazyItemScope.renderGroupItem(
     group: LimitedGroup,
-    onGroupClick: (LimitedGroup, String) -> Unit
+    onGroupClick: (LimitedGroup, String) -> Unit,
+    onGroupLongClick: ((LimitedGroup) -> Unit)? = null,
+    selected: Boolean? = null,
+    enabled: Boolean = true,
 ) {
     val sharedSuffixKey = rememberContainerTransformToken("group:${group.id}")
         ?: LocalSharedSuffixKey.current
     SearchResultItem(
         item = group,
         onClick = { onGroupClick(it, sharedSuffixKey) },
+        onLongClick = onGroupLongClick,
         modifier = Modifier.animateItem(),
+        enabled = enabled,
         leadingContent = {
             GroupIcon(
                 iconUrl = group.iconUrl,
@@ -346,35 +503,43 @@ fun LazyItemScope.renderGroupItem(
                     key = "${group.id}GroupIcon",
                     suffixKey = sharedSuffixKey,
                 ),
-                size = 48.dp
+                size = SearchResultLeadingSize
             )
         },
         headlineContent = {
-            Text(
+            AppText(
                 modifier = Modifier.sharedBoundsBy(
                     key = groupNameSharedKey(group.id),
                     suffixKey = sharedSuffixKey,
                     resizeMode = SharedTextBoundsResizeMode,
                 ),
                 text = group.name,
-                style = MaterialTheme.typography.titleMedium,
+                style = AppTheme.type.headline,
                 overflow = TextOverflow.Ellipsis,
                 maxLines = 1
             )
         },
         supportingContent = {
-            Text(
+            AppText(
                 text = group.description,
-                style = MaterialTheme.typography.bodyMedium,
+                style = AppTheme.type.subheadline,
                 overflow = TextOverflow.Ellipsis,
                 maxLines = 1
             )
         },
         trailingContent = {
+            if (selected != null) {
+                AppCheckbox(
+                    checked = selected,
+                    onCheckedChange = null,
+                    enabled = enabled,
+                )
+                return@SearchResultItem
+            }
             // 显示成员数量
-            Text(
+            AppText(
                 text = "${group.memberCount}",
-                style = MaterialTheme.typography.labelSmall,
+                style = AppTheme.type.caption2Emphasized,
                 maxLines = 1
             )
         }

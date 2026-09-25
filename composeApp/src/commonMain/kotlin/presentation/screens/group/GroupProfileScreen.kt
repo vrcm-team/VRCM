@@ -4,7 +4,11 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.ScrollableDefaults
+import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -16,6 +20,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.fillMaxSize
@@ -32,31 +37,16 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
-import androidx.compose.material3.TabRowDefaults
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -66,26 +56,58 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.zIndex
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonRole
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonStyle
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppCard
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppDivider
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppGroup
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIconButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSize
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSpacing
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSurface
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTab
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSheetAction
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSheetActionGroup
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTabRow
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppToggle
+import io.github.vrcmteam.vrcm.presentation.designsystem.LocalContentColor
+import io.github.vrcmteam.vrcm.presentation.designsystem.LocalGlassBackdrop
+import io.github.vrcmteam.vrcm.presentation.designsystem.LocalPopupBackdrop
+import io.github.vrcmteam.vrcm.presentation.designsystem.glassBackdropSource
+import io.github.vrcmteam.vrcm.presentation.designsystem.rememberAppSheetState
+import io.github.vrcmteam.vrcm.presentation.designsystem.rememberGlassBackdrop
 import io.github.vrcmteam.vrcm.presentation.navigation.AppDetailRoute
 import org.koin.compose.viewmodel.koinViewModel
+import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.groups.data.Gallery
 import io.github.vrcmteam.vrcm.network.api.groups.data.GroupGalleryImage
 import io.github.vrcmteam.vrcm.network.api.groups.data.GroupMember
 import io.github.vrcmteam.vrcm.network.api.groups.data.GroupPost
 import io.github.vrcmteam.vrcm.network.api.groups.data.Role
 import io.github.vrcmteam.vrcm.network.api.instances.data.InstanceData
-import io.github.vrcmteam.vrcm.network.api.attributes.IUser
-import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 import io.github.vrcmteam.vrcm.core.extensions.toLocalDateTime
+import io.github.vrcmteam.vrcm.presentation.compoments.ABottomSheet
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
+import io.github.vrcmteam.vrcm.presentation.compoments.ContentReportSheet
+import io.github.vrcmteam.vrcm.presentation.compoments.FullTextMenuBox
 import io.github.vrcmteam.vrcm.presentation.compoments.GroupIcon
 import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedTransitionDialogScope
 import io.github.vrcmteam.vrcm.presentation.compoments.LoadingButton
@@ -113,6 +135,9 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
+import io.github.vrcmteam.vrcm.service.data.ContentReportType
+import io.github.vrcmteam.vrcm.service.data.ReportTarget
+import kotlinx.coroutines.launch
 import presentation.compoments.TopMenuBar
 import kotlinx.serialization.Serializable
 
@@ -128,7 +153,7 @@ class GroupProfileScreen(
         val currentNavigator = currentNavigator
         val screenModel: GroupProfileScreenModel = koinViewModel()
         val groupState by screenModel.groupProfileState.collectAsState()
-        val members by screenModel.members.collectAsState()
+        val memberUsers by screenModel.memberUsers.collectAsState()
         val owner by screenModel.owner.collectAsState()
         val galleryImages by screenModel.galleryImages.collectAsState()
         val posts by screenModel.posts.collectAsState()
@@ -140,12 +165,20 @@ class GroupProfileScreen(
         val groupInstances by screenModel.groupInstances.collectAsState()
         val isLoading by screenModel.isLoading.collectAsState()
         val isActionLoading by screenModel.isActionLoading.collectAsState()
+        val isRepresentationUpdating by screenModel.isRepresentationUpdating.collectAsState()
+        val isNotificationPreferenceUpdating by
+            screenModel.isNotificationPreferenceUpdating.collectAsState()
+        val currentSession by SharedFlowCentre.currentSession.collectAsState()
 
         LaunchedEffect(groupProfileVo.groupId) {
             screenModel.loadGroupData(groupProfileVo)
         }
 
         val group = groupState ?: groupProfileVo
+        val representationUpdateFailedMessage = strings.groupRepresentationUpdateFailed
+        val representationSessionChangedMessage = strings.groupRepresentationSessionChanged
+        val notificationPreferenceUpdateFailedMessage = strings.groupNotificationsUpdateFailed
+        val notificationPreferenceSessionChangedMessage = strings.groupNotificationsSessionChanged
         val scrollState = rememberScrollState()
         var selectedTabIndex by rememberSaveable(groupProfileVo.groupId) { mutableStateOf(0) }
 
@@ -155,6 +188,43 @@ class GroupProfileScreen(
                     screenModel.loadMorePosts()
                 }
             }
+        }
+
+        // 更多操作目前只有举报，只对别人的群组显示
+        val canReport = group.ownerId != currentSession?.account?.userId
+        var actionSheetIsVisible by remember { mutableStateOf(false) }
+        val actionSheetState = rememberAppSheetState()
+        var showReportSheet by rememberSaveable(groupProfileVo.groupId) { mutableStateOf(false) }
+        val actionScope = rememberCoroutineScope()
+        ABottomSheet(
+            isVisible = actionSheetIsVisible && canReport,
+            sheetState = actionSheetState,
+            onDismissRequest = { actionSheetIsVisible = false },
+        ) {
+            AppSheetActionGroup {
+                AppSheetAction(
+                    role = AppButtonRole.Destructive,
+                    onClick = {
+                        actionScope.launch {
+                            actionSheetState.hide()
+                            if (!actionSheetState.isVisible) actionSheetIsVisible = false
+                            showReportSheet = true
+                        }
+                    },
+                ) {
+                    AppText(strings.report)
+                }
+            }
+        }
+        if (showReportSheet && canReport) {
+            ContentReportSheet(
+                target = ReportTarget(
+                    type = ContentReportType.Group,
+                    contentId = group.groupId,
+                    displayName = group.name,
+                ),
+                onDismiss = { showReportSheet = false },
+            )
         }
 
         CompositionLocalProvider(LocalSharedSuffixKey provides sharedSuffixKey) {
@@ -169,101 +239,139 @@ class GroupProfileScreen(
                 }
                 val topBarHeight = 64.dp
                 val sysTopPadding = getInsetPadding(WindowInsets::getTop)
+                // 收进顶栏的名字能用到的右边界：顶栏中间那格（返回钮与右侧按钮之间）的右缘，按页面坐标算
+                var pageCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+                var topBarTitleEndPx by remember { mutableFloatStateOf(Float.NaN) }
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.surface)
+                        .background(AppTheme.colors.groupedBackground)
+                        .onPlaced { pageCoordinates = it }
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(scrollState)
-                    ) {
-                        GroupBanner(
-                            group = group,
-                            bannerHeight = bannerHeight
-                        )
-                        GroupHeaderInfo(
-                            group = group,
-                            isActionLoading = isActionLoading,
-                            onJoin = { screenModel.joinGroup() },
-                            onLeave = { screenModel.leaveGroup() }
-                        )
-                        TabRow(
-                            selectedTabIndex = selectedTabIndex,
-                            modifier = Modifier.fillMaxWidth(),
-                            indicator = {
-                                TabRowDefaults.PrimaryIndicator(
-                                    modifier = Modifier.tabIndicatorOffset(it[selectedTabIndex]),
-                                    width = 28.dp,
-                                    shape = RoundedCornerShape(4.dp)
-                                )
-                            },
+                    // 页面内容是顶栏玻璃按钮的取样源
+                    val glassBackdrop = rememberGlassBackdrop()
+                    // 页面里弹出的菜单画在另开的弹层上，模糊的也是这一层内容（同 AppScaffold）
+                    CompositionLocalProvider(LocalPopupBackdrop provides glassBackdrop) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .glassBackdropSource(glassBackdrop)
+                                .verticalScroll(scrollState)
                         ) {
-                            val tabs = listOf(strings.groupTabDetails, strings.groupTabPosts, strings.groupTabMembers, strings.groupTabGallery)
-                            tabs.forEachIndexed { index, title ->
-                                Tab(
-                                    selected = selectedTabIndex == index,
-                                    onClick = { selectedTabIndex = index },
-                                    text = { Text(text = title, maxLines = 1) }
-                                )
-                            }
-                        }
-                        when (selectedTabIndex) {
-                            0 -> DetailsContent(group = group, owner = owner, instances = groupInstances)
-                            1 -> PostsContent(
-                                posts = posts,
-                                roles = group.roles,
-                                postAuthors = postAuthors,
-                                isLoading = postsLoading,
-                                isLoadingMore = postsLoadingMore,
-                                endReached = postsEndReached,
+                            GroupBanner(
+                                group = group,
+                                bannerHeight = bannerHeight
                             )
-                            2 -> MembersContent(members = members, isLoading = membersLoading)
-                            else -> GalleriesContent(group = group, galleryImages = galleryImages)
-                        }
-                        Spacer(modifier = Modifier.height(24.dp))
-                    }
-                    TopMenuBar(
-                        topBarHeight = topBarHeight,
-                        sysTopPadding = sysTopPadding,
-                        offsetDp = 0.dp,
-                        ratio = ratio,
-                        onReturn = { currentNavigator.pop() },
-                        onMenu = null,
-                        actions = { colors ->
-                            OfficialUrlShareButton(
-                                url = "https://vrchat.com/home/group/${group.groupId}",
-                                colors = colors,
-                            )
-                            IconButton(
-                                enabled = !isLoading,
-                                colors = colors,
-                                onClick = screenModel::refreshGroupData,
-                            ) {
-                                if (isLoading) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(22.dp),
-                                        color = LocalContentColor.current,
-                                        strokeWidth = 2.dp,
+                            GroupHeaderInfo(
+                                group = group,
+                                isLoading = isLoading,
+                                isActionLoading = isActionLoading,
+                                isRepresentationUpdating = isRepresentationUpdating,
+                                isNotificationPreferenceUpdating = isNotificationPreferenceUpdating,
+                                groupSettingsAvailable = currentSession?.token?.let(group::hasActiveMembership) == true,
+                                onJoin = { screenModel.joinGroup() },
+                                onLeave = { screenModel.leaveGroup() },
+                                onRepresentationChange = { isRepresenting ->
+                                    screenModel.updateRepresentation(
+                                        isRepresenting = isRepresenting,
+                                        failureMessage = representationUpdateFailedMessage,
+                                        sessionChangedMessage = representationSessionChangedMessage,
                                     )
-                                } else {
-                                    Icon(
-                                        imageVector = Icons.Default.Refresh,
-                                        contentDescription = "Refresh",
+                                },
+                                onNotificationPreferenceChange = { enabled ->
+                                    screenModel.updateNotificationPreference(
+                                        enabled = enabled,
+                                        failureMessage = notificationPreferenceUpdateFailedMessage,
+                                        sessionChangedMessage = notificationPreferenceSessionChangedMessage,
+                                    )
+                                },
+                            )
+                            AppTabRow(
+                                selectedTabIndex = selectedTabIndex,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                val tabs = listOf(strings.groupTabDetails, strings.groupTabPosts, strings.groupTabMembers, strings.groupTabGallery)
+                                tabs.forEachIndexed { index, title ->
+                                    AppTab(
+                                        selected = selectedTabIndex == index,
+                                        onClick = { selectedTabIndex = index },
+                                        text = { AppText(text = title, maxLines = 1) }
                                     )
                                 }
                             }
-                        },
-                    )
-                    CollapsingTitleRow(
-                        group = group,
-                        membershipStatus = group.membershipStatus,
-                        scrollPx = scrollState.value.toFloat(),
-                        bannerHeight = bannerHeight,
-                        topBarHeight = topBarHeight,
-                        sysTopPadding = sysTopPadding
-                    )
+                            when (selectedTabIndex) {
+                                0 -> DetailsContent(group = group, owner = owner, instances = groupInstances)
+                                1 -> PostsContent(
+                                    posts = posts,
+                                    roles = group.roles,
+                                    postAuthors = postAuthors,
+                                    isLoading = postsLoading,
+                                    isLoadingMore = postsLoadingMore,
+                                    endReached = postsEndReached,
+                                )
+                                2 -> MembersContent(users = memberUsers, isLoading = membersLoading)
+                                else -> GalleriesContent(group = group, galleryImages = galleryImages)
+                            }
+                            // 页面铺到屏幕底：末尾留出系统导航条的高度，最后一张卡片才不会被它压住
+                            Spacer(modifier = Modifier.height(24.dp + getInsetPadding(WindowInsets::getBottom)))
+                        }
+                        CompositionLocalProvider(LocalGlassBackdrop provides glassBackdrop) {
+                            TopMenuBar(
+                                topBarHeight = topBarHeight,
+                                sysTopPadding = sysTopPadding,
+                                offsetDp = 0.dp,
+                                ratio = ratio,
+                                onReturn = { currentNavigator.pop() },
+                                onMenu = if (canReport) {
+                                    { actionSheetIsVisible = true }
+                                } else null,
+                                menuContentDescription = strings.groupProfileMoreActions,
+                                centerContent = {
+                                    Spacer(
+                                        Modifier
+                                            .fillMaxSize()
+                                            .onGloballyPositioned { slot ->
+                                                pageCoordinates?.let {
+                                                    topBarTitleEndPx = it.localBoundingBoxOf(slot, clipBounds = false).right
+                                                }
+                                            },
+                                    )
+                                },
+                                actions = {
+                                    OfficialUrlShareButton(
+                                        url = "https://vrchat.com/home/group/${group.groupId}",
+                                    )
+                                    AppIconButton(
+                                        enabled = !isLoading &&
+                                            !isRepresentationUpdating &&
+                                            !isNotificationPreferenceUpdating,
+                                        onClick = screenModel::refreshGroupData,
+                                    ) {
+                                        if (isLoading) {
+                                            AppActivityIndicator(
+                                                modifier = Modifier.size(22.dp),
+                                                color = LocalContentColor.current,
+                                            )
+                                        } else {
+                                            AppIcon(
+                                                imageVector = AppIcons.Refresh,
+                                                contentDescription = "Refresh",
+                                            )
+                                        }
+                                    }
+                                },
+                            )
+                        }
+                        CollapsingTitleRow(
+                            group = group,
+                            membershipStatus = group.membershipStatus,
+                            scrollState = scrollState,
+                            bannerHeight = bannerHeight,
+                            topBarHeight = topBarHeight,
+                            sysTopPadding = sysTopPadding,
+                            topBarTitleEndPx = { topBarTitleEndPx },
+                        )
+                    }
 
                 }
             }
@@ -295,8 +403,8 @@ private fun GroupBanner(
                     .background(
                         Brush.verticalGradient(
                             listOf(
-                                MaterialTheme.colorScheme.surfaceVariant,
-                                MaterialTheme.colorScheme.surface
+                                AppTheme.colors.fill,
+                                AppTheme.colors.groupedBackground
                             )
                         )
                     )
@@ -307,7 +415,7 @@ private fun GroupBanner(
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        listOf(Color.Transparent, MaterialTheme.colorScheme.surface.copy(alpha = 0.9f))
+                        listOf(Color.Transparent, AppTheme.colors.groupedBackground.copy(alpha = 0.9f))
                     )
                 )
         )
@@ -317,9 +425,15 @@ private fun GroupBanner(
 @Composable
 private fun GroupHeaderInfo(
     group: GroupProfileVo,
+    isLoading: Boolean,
     isActionLoading: Boolean,
+    isRepresentationUpdating: Boolean,
+    isNotificationPreferenceUpdating: Boolean,
+    groupSettingsAvailable: Boolean,
     onJoin: () -> Unit,
     onLeave: () -> Unit,
+    onRepresentationChange: (Boolean) -> Unit,
+    onNotificationPreferenceChange: (Boolean) -> Unit,
 ) {
     val membershipStatus = group.membershipStatus.lowercase()
     val joinState = group.joinState.lowercase()
@@ -367,12 +481,88 @@ private fun GroupHeaderInfo(
                 }
             }
         }
+        if (groupSettingsAvailable) {
+            val settingsEnabled = !isLoading &&
+                !isActionLoading &&
+                !isRepresentationUpdating &&
+                !isNotificationPreferenceUpdating
+            AppGroup {
+                GroupSettingRow(
+                    title = strings.groupRepresentation,
+                    description = when {
+                        isRepresentationUpdating -> strings.groupRepresentationUpdating
+                        group.myMember?.isRepresenting == true -> strings.groupRepresentationEnabled
+                        else -> strings.groupRepresentationDisabled
+                    },
+                    checked = group.myMember?.isRepresenting == true,
+                    updating = isRepresentationUpdating,
+                    enabled = settingsEnabled,
+                    onCheckedChange = onRepresentationChange,
+                )
+                AppDivider(Modifier.padding(start = AppSpacing.row))
+                GroupSettingRow(
+                    title = strings.groupNotifications,
+                    description = when {
+                        isNotificationPreferenceUpdating -> strings.groupNotificationsUpdating
+                        group.myMember?.isSubscribedToAnnouncements == true ->
+                            strings.groupNotificationsEnabled
+                        else -> strings.groupNotificationsDisabled
+                    },
+                    checked = group.myMember?.isSubscribedToAnnouncements == true,
+                    updating = isNotificationPreferenceUpdating,
+                    enabled = settingsEnabled,
+                    onCheckedChange = onNotificationPreferenceChange,
+                )
+            }
+        }
         LoadingButton(
             modifier = Modifier.fillMaxWidth(),
             text = actionLabel,
-            enabled = actionEnabled,
+            enabled = actionEnabled &&
+                !isRepresentationUpdating &&
+                !isNotificationPreferenceUpdating,
             isLoading = isActionLoading,
+            // 退出是破坏性操作：灰底红字，不和"加入"一样用最醒目的主色
+            style = if (isMember) AppButtonStyle.Gray else AppButtonStyle.Prominent,
+            role = if (isMember) AppButtonRole.Destructive else AppButtonRole.Default,
             onClick = { if (isMember) onLeave() else onJoin() }
+        )
+    }
+}
+
+/** 群组设置的一行：标题 + 当前状态说明，尾部是开关；提交中在开关前转圈。 */
+@Composable
+private fun GroupSettingRow(
+    title: String,
+    description: String,
+    checked: Boolean,
+    updating: Boolean,
+    enabled: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = AppSize.rowMinHeight)
+            .padding(horizontal = AppSpacing.row, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            AppText(text = title, style = AppTheme.type.body)
+            AppText(
+                text = description,
+                style = AppTheme.type.footnote,
+                color = AppTheme.colors.secondaryLabel,
+            )
+        }
+        if (updating) {
+            AppActivityIndicator(modifier = Modifier.size(18.dp))
+        }
+        AppToggle(
+            checked = checked,
+            enabled = enabled,
+            onCheckedChange = onCheckedChange,
         )
     }
 }
@@ -382,12 +572,14 @@ private fun GroupHeaderInfo(
 private fun CollapsingTitleRow(
     group: GroupProfileVo,
     membershipStatus: String,
-    scrollPx: Float,
+    scrollState: ScrollState,
     bannerHeight: Dp,
     topBarHeight: Dp,
     sysTopPadding: Dp,
+    topBarTitleEndPx: () -> Float,
 ) {
     val density = LocalDensity.current
+    val scrollPx = scrollState.value.toFloat()
     val startIconSize = 64.dp
     val endIconSize = 28.dp
     val startYPx = with(density) { (bannerHeight - 16.dp - startIconSize).toPx() }
@@ -401,16 +593,44 @@ private fun CollapsingTitleRow(
     val yPx = (startYPx - scrollPx).coerceAtLeast(endYPx)
     val statusAlpha = 1f - progress
     val statusText = membershipStatus.lowercase()
+    // 这一行进入顶栏的高度范围后就会和右侧按钮同一高度：名字的右边界在那之前就要收到按钮左边
+    val topBarBottomPx = with(density) { (sysTopPadding + topBarHeight).toPx() }
+    val nameEndFraction = if (startYPx > topBarBottomPx) {
+        (scrollPx / (startYPx - topBarBottomPx)).coerceIn(0f, 1f)
+    } else {
+        1f
+    }
 
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
             .height(bannerHeight)
     ) {
-        val trailingActionsWidth = 112.dp * progress
-        val nameMaxWidth = (
-            maxWidth - 16.dp - xShift - iconSize - rowSpacing - trailingActionsWidth
-        ).coerceAtLeast(32.dp)
+        // 这一行和顶栏都铺满页面宽度、从页面左缘开始，顶栏量出的右边界可以直接用
+        val expandedNameEnd = maxWidth - 16.dp
+        val collapsedNameEnd = topBarTitleEndPx()
+            .takeUnless { it.isNaN() }
+            ?.let { with(density) { it.toDp() } - 8.dp }
+            ?.coerceAtMost(expandedNameEnd)
+            ?: expandedNameEnd
+        val nameEnd = lerp(expandedNameEnd, collapsedNameEnd, nameEndFraction)
+        val nameStart = 16.dp + xShift + iconSize + rowSpacing
+        // 名字以左缘为原点缩放：画出来的宽度 = 排版宽度 × nameScale
+        val nameMaxWidth = ((nameEnd - nameStart) / nameScale).coerceAtLeast(32.dp)
+        val name = group.name.ifBlank { strings.unknown }
+        val nameText = @Composable {
+            AppText(
+                modifier = Modifier.sharedBoundsBy(
+                    key = groupNameSharedKey(group.groupId),
+                    resizeMode = SharedTextBoundsResizeMode,
+                ).widthIn(max = nameMaxWidth),
+                text = name,
+                style = AppTheme.type.title2,
+                color = AppTheme.colors.label,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
         Row(
             modifier = Modifier
                 .padding(start = 16.dp)
@@ -433,20 +653,31 @@ private fun CollapsingTitleRow(
                 modifier = Modifier.graphicsLayer {
                     scaleX = nameScale
                     scaleY = nameScale
+                    // 贴着图标缩放：从中心缩的话名字越长，缩完离图标越远
+                    transformOrigin = TransformOrigin(0f, 0.5f)
                 },
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text(
-                    modifier = Modifier.sharedBoundsBy(
-                        key = groupNameSharedKey(group.groupId),
-                        resizeMode = SharedTextBoundsResizeMode,
-                    ).widthIn(max = nameMaxWidth),
-                    text = group.name.ifBlank { strings.unknown },
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                if (progress < 1f) {
+                    // 还没收进顶栏时，长按弹出菜单：完整名字 + 复制。
+                    // 这一行浮在页面上方，从它开始的拖动碰不到下面的页面，所以这里也接一份同一个滚动状态
+                    FullTextMenuBox(
+                        text = name,
+                        modifier = Modifier.scrollable(
+                            state = scrollState,
+                            orientation = Orientation.Vertical,
+                            reverseDirection = ScrollableDefaults.reverseDirection(
+                                LocalLayoutDirection.current,
+                                Orientation.Vertical,
+                                reverseScrolling = false,
+                            ),
+                        ),
+                    ) {
+                        nameText()
+                    }
+                } else {
+                    nameText()
+                }
                 if (statusAlpha == 0f) return@Row
                 Row(
                     modifier = Modifier.graphicsLayer { alpha = statusAlpha },
@@ -603,10 +834,10 @@ private fun GroupInstancesSection(instances: List<InstanceData>) {
 private fun GroupInstanceCard(instance: InstanceData) {
     val currentNavigator = currentNavigator
     val world = instance.world
-    Surface(
+    AppSurface(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
+            .clip(AppShapes.m)
             .enableIf(world.id.isNotBlank()) {
                 clickable {
                     currentNavigator push WorldProfileScreen(
@@ -621,8 +852,7 @@ private fun GroupInstanceCard(instance: InstanceData) {
                     )
                 }
             },
-        tonalElevation = (-1).dp,
-        shape = MaterialTheme.shapes.medium,
+        shape = AppShapes.m,
     ) {
         Row(
             modifier = Modifier
@@ -634,7 +864,7 @@ private fun GroupInstanceCard(instance: InstanceData) {
             AImage(
                 modifier = Modifier
                     .size(64.dp)
-                    .clip(RoundedCornerShape(12.dp)),
+                    .clip(AppShapes.m),
                 imageData = world.imageUrl,
                 contentDescription = "WorldImage"
             )
@@ -642,10 +872,10 @@ private fun GroupInstanceCard(instance: InstanceData) {
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
+                AppText(
                     text = world.name.ifBlank { strings.unknown },
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.primary,
+                    style = AppTheme.type.subheadlineEmphasized,
+                    color = AppTheme.colors.tint,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -657,21 +887,21 @@ private fun GroupInstanceCard(instance: InstanceData) {
                         size = 14.dp,
                         region = instance.region
                     )
-                    Text(
+                    AppText(
                         text = instance.accessType.displayName,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline
+                        style = AppTheme.type.caption2Emphasized,
+                        color = AppTheme.colors.tertiaryLabel
                     )
-                    Text(
+                    AppText(
                         text = "#${instance.name}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline
+                        style = AppTheme.type.caption2Emphasized,
+                        color = AppTheme.colors.tertiaryLabel
                     )
                 }
-                Text(
+                AppText(
                     text = "${instance.nUsers}/${instance.capacity}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = AppTheme.type.caption2Emphasized,
+                    color = AppTheme.colors.secondaryLabel
                 )
             }
         }
@@ -692,7 +922,7 @@ private fun PostsContent(
             modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
             contentAlignment = Alignment.Center
         ) {
-            CircularProgressIndicator()
+            AppActivityIndicator()
         }
         return
     }
@@ -718,7 +948,7 @@ private fun PostsContent(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                AppActivityIndicator(modifier = Modifier.size(24.dp))
             }
         }
     }
@@ -735,16 +965,16 @@ private fun PostCard(post: GroupPost, roles: List<Role>, authorName: String? = n
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = 200.dp)
-                    .clip(MaterialTheme.shapes.medium),
+                    .clip(AppShapes.m),
                 imageData = post.imageUrl,
                 contentDescription = "PostImage"
             )
         }
         if (post.text.isNotBlank()) {
             SelectionContainer {
-                Text(
+                AppText(
                     text = post.text,
-                    style = MaterialTheme.typography.bodyMedium
+                    style = AppTheme.type.subheadline
                 )
             }
         }
@@ -764,16 +994,16 @@ private fun PostCard(post: GroupPost, roles: List<Role>, authorName: String? = n
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             val displayAuthor = authorName ?: strings.unknown
-            Text(
+            AppText(
                 text = displayAuthor,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = AppTheme.type.caption2Emphasized,
+                color = AppTheme.colors.secondaryLabel
             )
             if (!post.createdAt.isNullOrBlank()) {
-                Text(
+                AppText(
                     text = formatLocalTime(post.createdAt) ?: "",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = AppTheme.type.caption2Emphasized,
+                    color = AppTheme.colors.secondaryLabel
                 )
             }
         }
@@ -781,16 +1011,15 @@ private fun PostCard(post: GroupPost, roles: List<Role>, authorName: String? = n
 }
 
 @Composable
-private fun MembersContent(members: List<GroupMember>, isLoading: Boolean = false) {
+private fun MembersContent(users: List<IUser>, isLoading: Boolean = false) {
     val currentNavigator = currentNavigator
-    val users = remember(members) { members.mapNotNull { it.user } }
 
     if (isLoading) {
         Box(
             modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
             contentAlignment = Alignment.Center
         ) {
-            CircularProgressIndicator()
+            AppActivityIndicator()
         }
         return
     }
@@ -807,10 +1036,11 @@ private fun MembersContent(members: List<GroupMember>, isLoading: Boolean = fals
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(max = 4000.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        contentPadding = PaddingValues(horizontal = AppSpacing.page),
     ) {
         renderUserItems(
             users = users,
+            grouped = true,
             onUserClick = { user, sharedSuffixKey ->
                 currentNavigator push UserProfileScreen(
                     userProfileVO = UserProfileVo(user),
@@ -859,10 +1089,10 @@ private fun GallerySection(
     val (dialogContent, setDialogContent) = LocationDialogContent.current
     SectionCard(title = gallery.name, modifier = modifier.fillMaxWidth()) {
         if (gallery.description.isNotBlank()) {
-            Text(
+            AppText(
                 text = gallery.description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = AppTheme.type.caption1,
+                color = AppTheme.colors.secondaryLabel
             )
         }
         if (gallery.membersOnly) {
@@ -884,7 +1114,7 @@ private fun GallerySection(
                             modifier = Modifier
                                 .width(180.dp)
                                 .height(110.dp)
-                                .clip(MaterialTheme.shapes.medium)
+                                .clip(AppShapes.m)
                                 .sharedBoundsBy(
                                     previewKey,
                                     sharedTransitionScope = LocalSharedTransitionDialogScope.current,
@@ -941,9 +1171,9 @@ private fun OwnerCard(
         ) {
             GroupIcon(iconUrl = owner.iconUrl, size = 48.dp)
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
+                AppText(
                     text = owner.displayName,
-                    style = MaterialTheme.typography.titleSmall,
+                    style = AppTheme.type.subheadlineEmphasized,
                     fontWeight = FontWeight.Medium
                 )
                 TextLabel(text = statusText)
@@ -971,7 +1201,7 @@ private fun MemberCard(member: GroupMember) {
         ?: member.user?.thumbnailUrl
         ?: member.user?.profilePicOverride
     val statusText = member.membershipStatus.formatStatus()
-    Card(
+    AppCard(
         modifier = Modifier
             .widthIn(min = 160.dp, max = 220.dp)
             .enableIf(userId.isNotBlank()) {
@@ -982,23 +1212,22 @@ private fun MemberCard(member: GroupMember) {
                     )
                 }
             },
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
-    ) {
+        color = AppTheme.colors.secondaryGroupedBackground) {
         Row(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             if (avatarUrl.isNullOrBlank()) {
-                Surface(
+                AppSurface(
                     modifier = Modifier.size(44.dp),
                     shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceVariant
+                    color = AppTheme.colors.fill
                 ) {
-                    Icon(
+                    AppIcon(
                         imageVector = AppIcons.Person,
                         contentDescription = "MemberIcon",
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = AppTheme.colors.tint,
                         modifier = Modifier.padding(10.dp)
                     )
                 }
@@ -1006,16 +1235,16 @@ private fun MemberCard(member: GroupMember) {
                 GroupIcon(iconUrl = avatarUrl, size = 44.dp)
             }
             Column(modifier = Modifier.weight(1f)) {
-                Text(
+                AppText(
                     text = displayName,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = AppTheme.type.subheadline,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Text(
+                AppText(
                     text = statusText,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = AppTheme.type.caption2Emphasized,
+                    color = AppTheme.colors.secondaryLabel
                 )
             }
             if (member.isRepresenting) {
@@ -1031,19 +1260,18 @@ private fun SectionCard(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Card(
+    AppCard(
         modifier = modifier,
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
-    ) {
+        shape = AppShapes.l,
+        color = AppTheme.colors.secondaryGroupedBackground) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text(
+            AppText(
                 text = title,
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary
+                style = AppTheme.type.headline,
+                color = AppTheme.colors.label
             )
             content()
         }
@@ -1058,9 +1286,9 @@ private fun TextSection(
 ) {
     SectionCard(title = title, modifier = modifier.fillMaxWidth()) {
         SelectionContainer {
-            Text(
+            AppText(
                 text = text,
-                style = MaterialTheme.typography.bodyMedium
+                style = AppTheme.type.subheadline
             )
         }
     }
@@ -1089,24 +1317,24 @@ private fun StatPill(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     text: String,
 ) {
-    Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLowest
+    AppSurface(
+        shape = AppShapes.m,
+        color = AppTheme.colors.secondaryGroupedBackground
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Icon(
+            AppIcon(
                 imageVector = icon,
                 contentDescription = text,
                 modifier = Modifier.size(14.dp),
-                tint = MaterialTheme.colorScheme.primary
+                tint = AppTheme.colors.tint
             )
-            Text(
+            AppText(
                 text = text,
-                style = MaterialTheme.typography.labelSmall
+                style = AppTheme.type.caption2Emphasized
             )
         }
     }
@@ -1120,15 +1348,15 @@ private fun KeyValueRow(label: String, value: String?) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
+        AppText(
             text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            style = AppTheme.type.caption1,
+            color = AppTheme.colors.secondaryLabel
         )
-        Text(
+        AppText(
             text = valueText,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface
+            style = AppTheme.type.caption1,
+            color = AppTheme.colors.label
         )
     }
 }
@@ -1140,24 +1368,24 @@ private fun KeyValueChip(
     modifier: Modifier = Modifier,
 ) {
     val valueText = value?.takeIf { it.isNotBlank() } ?: strings.unknown
-    Surface(
+    AppSurface(
         modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLowest
+        shape = AppShapes.m,
+        color = AppTheme.colors.secondaryGroupedBackground
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            Text(
+            AppText(
                 text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = AppTheme.type.caption2Emphasized,
+                color = AppTheme.colors.secondaryLabel
             )
-            Text(
+            AppText(
                 text = valueText,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface
+                style = AppTheme.type.caption1,
+                color = AppTheme.colors.label
             )
         }
     }
@@ -1174,10 +1402,10 @@ private fun EmptyState(
             .padding(vertical = 16.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(
+        AppText(
             text = message,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            style = AppTheme.type.subheadline,
+            color = AppTheme.colors.secondaryLabel
         )
     }
 }

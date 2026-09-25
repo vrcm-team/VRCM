@@ -3,13 +3,13 @@ package io.github.vrcmteam.vrcm.network.api.notification
 import io.github.vrcmteam.vrcm.network.api.attributes.*
 import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationData
 import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationDataV2
+import io.github.vrcmteam.vrcm.network.api.notification.data.RespondNotificationRequest
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationItemData
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.http.content.*
 
 class NotificationApi(
     private val client: HttpClient,
@@ -22,14 +22,15 @@ class NotificationApi(
 
 
     suspend fun responseNotification(id: String, response: NotificationItemData.ActionData): String =
-         client.post("$NOTIFICATIONS_API_PREFIX/$id/respond") {
+        client.post("$NOTIFICATIONS_API_PREFIX/$id/respond") {
+            contentType(ContentType.Application.Json)
             setBody(
-                TextContent(
-                    """{"responseData":"${response.data}","responseType":"${response.type}"}""",
-                    ContentType.Application.Json
-                )
+                RespondNotificationRequest(
+                    responseData = response.data,
+                    responseType = response.type,
+                ),
             )
-        }.checkSuccess{ bodyAsText() }
+        }.checkSuccess { bodyAsText() }
 
 
     suspend fun fetchNotificationsV2(
@@ -64,7 +65,15 @@ class NotificationApi(
 
 
 
-    suspend fun markNotificationAsRead(notificationId: String): VRChatResponse =
+    /** Marks a current Pipeline `/notifications` item as seen. */
+    suspend fun markPipelineNotificationAsRead(notificationId: String) {
+        client.post {
+            url { path(NOTIFICATIONS_API_PREFIX, notificationId, "see") }
+        }.checkSuccess<Unit>()
+    }
+
+    /** Marks a legacy `/auth/user/notifications` item as seen. */
+    suspend fun markLegacyNotificationAsRead(notificationId: String): VRChatResponse =
         client.put {
             url {
                 path(

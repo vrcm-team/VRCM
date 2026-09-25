@@ -1,10 +1,12 @@
 # Privacy Policy for VRCM
 
-**Last Updated:** August 13, 2026
+**Last Updated:** September 25, 2026
 
 ## 1. Overview
 
-VRCM is an open-source, third-party companion application for VRChat. VRCM's developers do not operate an analytics, advertising, telemetry, or user-data collection backend for the app.
+VRCM is an open-source, third-party companion application for VRChat. VRCM is an unofficial app: it is not affiliated with, endorsed by, or sponsored by VRChat Inc. VRChat is a trademark of VRChat Inc.
+
+VRCM's developers do not operate an analytics, advertising, telemetry, or user-data collection backend for the app.
 
 VRCM must communicate with third-party services to provide its features. This policy explains what remains on your device and what is sent to those services.
 
@@ -20,14 +22,18 @@ Depending on the features you use, VRCM may store the following locally:
 
 Authentication credentials use the platform's secure storage where available. Other application data is stored in VRCM's local app storage. Exported screenshots, gallery images, and meetup cards are written to a location you select or to the system photo gallery.
 
+On iOS, VRCM only asks for permission to add photos to your library when you save an image; it cannot read your existing photos. Images you choose to upload are picked through the system photo picker, which shares only the images you select.
+
 VRCM does not upload locally generated friend-activity statistics or friend-network data to a server operated by the VRCM developers.
 
 ## 3. Third-party network communication
 
 VRCM sends requests directly to services needed for the action you request:
 
-- **VRChat services:** authentication, profiles, friends, presence, worlds, instances, groups, notifications, avatars, inventory, and gallery operations. Information sent to VRChat is handled under VRChat's own privacy policy and terms.
-- **GitHub:** checking the VRCM repository's latest public release. GitHub may receive standard network information such as your IP address and user-agent information.
+- **VRChat services:** authentication, profiles, friends, presence, worlds, instances, groups, notifications, avatars, inventory, and gallery operations, plus any report you choose to submit (the reported content, the category and reason you pick, and optional details) for review by VRChat's moderation team. Requests identify the app by its name, version, and project page, as VRChat requires. Information sent to VRChat is handled under VRChat's own privacy policy and terms.
+- **GitHub:** builds distributed through GitHub Releases check the VRCM repository's latest public release. GitHub may receive standard network information such as your IP address and user-agent information.
+- **Apple App Store:** builds installed from the App Store look up VRCM's current App Store version, sending the app's bundle identifier and your device's region, so VRCM can tell you when an update is available. Apple may receive standard network information such as your IP address and user-agent information. These builds do not contact GitHub; updates are installed through the App Store.
+- **Google Play:** builds installed from Google Play ask the Google Play app on your device whether a newer version is available and open VRCM's Google Play page when you choose to update. These builds do not contact GitHub; updates are installed through Google Play.
 - **Media hosts referenced by VRChat:** downloading profile images, world images, avatar images, and profile decorations for display or local caching.
 
 When you explicitly upload a gallery image or avatar cover, the selected image is processed on your device and then sent to VRChat. VRCM does not proxy these requests through a VRCM-operated server.

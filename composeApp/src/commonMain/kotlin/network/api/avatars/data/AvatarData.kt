@@ -65,8 +65,22 @@ data class AvatarData(
     val updatedAt: String? = null,
     val version: Int? = null,
     val featured: Boolean = false,
+    val styles: AvatarStyles = AvatarStyles(),
     @Serializable(with = AvatarUnityPackagesSerializer::class)
     val unityPackages: List<AvatarUnityPackage> = emptyList(),
+)
+
+@Serializable
+data class AvatarStyles(
+    val primary: String? = null,
+    val secondary: String? = null,
+    val supplementary: List<String> = emptyList(),
+)
+
+@Serializable
+data class AvatarStyle(
+    val id: String,
+    val styleName: String,
 )
 
 @Serializable
@@ -74,4 +88,13 @@ data class AvatarUnityPackage(
     val platform: String? = null,
     val unityVersion: String? = null,
     val performanceRating: String? = null,
+    val impostorUrl: String? = null,
+    val impostorizerVersion: String? = null,
+    val variant: String? = null,
 )
+
+internal val AvatarData.hasImpostor: Boolean
+    get() = unityPackages.any { unityPackage ->
+        !unityPackage.impostorUrl.isNullOrBlank() ||
+            unityPackage.variant.equals("impostor", ignoreCase = true)
+    }

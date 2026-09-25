@@ -11,10 +11,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,6 +34,11 @@ import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
 import io.github.vrcmteam.vrcm.presentation.animations.NoClip
 import io.github.vrcmteam.vrcm.presentation.animations.TextBoundsTransform
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.extensions.drawSateCircle
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.navigation.rememberContainerTransformToken
@@ -45,10 +46,13 @@ import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 import io.github.vrcmteam.vrcm.service.AuthService
+import kotlin.math.ceil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
+
+private val FriendIconItemWidth = 60.dp
 
 @Composable
 fun UserStateIcon(
@@ -58,7 +62,7 @@ fun UserStateIcon(
     location: String? = null,
     cachedPlaceholderKey: String? = null,
 ) {
-    val isHollow = userStatus != UserStatus.Offline && location != null && LocationType.fromValue(location) == LocationType.Offline
+    val isHollow = isHollowUserStatus(userStatus, location)
     AImage(
         modifier = Modifier
             .then(modifier)
@@ -69,6 +73,36 @@ fun UserStateIcon(
         contentDescription = "UserStateIcon",
         cachedPlaceholderKey = cachedPlaceholderKey,
     )
+}
+
+private fun isHollowUserStatus(userStatus: UserStatus?, location: String?): Boolean =
+    userStatus != null &&
+        userStatus != UserStatus.Offline &&
+        location != null &&
+        LocationType.fromValue(location) == LocationType.Offline
+
+@Composable
+internal fun UserStatusIndicator(
+    modifier: Modifier = Modifier,
+    userStatus: UserStatus?,
+    location: String?,
+    backgroundColor: Color = AppTheme.colors.secondaryGroupedBackground,
+) {
+    val isHollow = isHollowUserStatus(userStatus, location)
+    Canvas(modifier = modifier) {
+        val statusColor = GameColor.Status.fromValue(userStatus)
+        if (isHollow) {
+            val strokeWidth = size.minDimension * 0.25f
+            drawCircle(backgroundColor, radius = size.minDimension / 2)
+            drawCircle(
+                color = statusColor,
+                radius = size.minDimension / 2 - strokeWidth / 2,
+                style = Stroke(strokeWidth),
+            )
+        } else {
+            drawCircle(statusColor)
+        }
+    }
 }
 
 @Composable
@@ -107,6 +141,49 @@ fun UserIconsRow(
     }
 }
 
+/** 好友头像网格在 [width] 宽度里能排的列数。 */
+fun userIconsGridColumns(width: Dp): Int = (width / FriendIconItemWidth).toInt().coerceAtLeast(1)
+
+/**
+ * 头像网格至少要几行才能铺满 [height]：每行按最矮算（只算正方形头像、不算名字）再加 [rowSpacing]，
+ * 估出来的行数只多不少。
+ */
+fun userIconsGridRowsToFill(height: Dp, rowSpacing: Dp): Int =
+    ceil(height / (FriendIconItemWidth + rowSpacing)).toInt().coerceAtLeast(1)
+
+/**
+ * 好友头像网格的一行。人多的名单在懒加载列表里按行拆成 item（列数用 [userIconsGridColumns] 算），
+ * 只组合看得见的行；每行都排满 [columns] 个列位，不足的补空位，各行的列位对齐。
+ */
+@Composable
+fun UserIconsGridRow(
+    modifier: Modifier = Modifier,
+    friends: List<State<FriendData>>,
+    columns: Int,
+    onClickUserIcon: (FriendData, String) -> Unit,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        friends.forEach { friendState ->
+            val friend = friendState.value
+            key(friend.id) {
+                LocationFriendContent(
+                    id = friend.id,
+                    iconUrl = friend.iconUrl,
+                    name = friend.displayName,
+                    userStatus = friend.status,
+                    location = friend.location,
+                ) { sharedSuffixKey -> onClickUserIcon(friend, sharedSuffixKey) }
+            }
+        }
+        repeat(columns - friends.size) {
+            Spacer(modifier = Modifier.width(FriendIconItemWidth))
+        }
+    }
+}
+
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun LazyItemScope.InviteSelf(
@@ -125,7 +202,7 @@ fun LazyItemScope.InviteSelf(
     }
     Column(
         modifier = Modifier.width(60.dp)
-            .clip(MaterialTheme.shapes.small)
+            .clip(AppShapes.s)
             .clickable(enabled = !isInvited){ onClickInvite() }
             .animateItem(),
         verticalArrangement = Arrangement.Center
@@ -135,22 +212,22 @@ fun LazyItemScope.InviteSelf(
                 .fillMaxWidth()
                 .aspectRatio(1f)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.secondary)
+                .background(AppTheme.colors.tintSoft)
         ) {
-            Icon(
+            AppIcon(
                 imageVector = if (isInvited) AppIcons.Check else AppIcons.Add,
                 modifier = Modifier.padding(4.dp).fillMaxSize(),
                 contentDescription = "InviteSelfIcon",
-                tint = MaterialTheme.colorScheme.onSecondary,
+                tint = AppTheme.colors.onTintSoft,
             )
         }
-        Text(
+        AppText(
             modifier = Modifier.fillMaxWidth(),
             text = strings.locationInviteMe,
             maxLines = 1,
             textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.outline
+            style = AppTheme.type.caption2Emphasized,
+            color = AppTheme.colors.tertiaryLabel
         )
     }
 }
@@ -166,12 +243,37 @@ fun LazyItemScope.LocationFriend(
     isTraveling: Boolean = false,
     onClickUserIcon: (String) -> Unit,
 ) {
+    LocationFriendContent(
+        modifier = Modifier.animateItem(),
+        id = id,
+        iconUrl = iconUrl,
+        name = name,
+        userStatus = userStatus,
+        location = location,
+        isTraveling = isTraveling,
+        onClickUserIcon = onClickUserIcon,
+    )
+}
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+private fun LocationFriendContent(
+    modifier: Modifier = Modifier,
+    id: String,
+    iconUrl: String,
+    name: String,
+    userStatus: UserStatus,
+    location: String? = null,
+    isTraveling: Boolean = false,
+    onClickUserIcon: (String) -> Unit,
+) {
     val sharedSuffixKey = rememberContainerTransformToken("location-user:$id")
         ?: LocalSharedSuffixKey.current
     Column(
-        modifier = Modifier.width(60.dp)
-            .clip(MaterialTheme.shapes.small)
-            .clickable { onClickUserIcon(sharedSuffixKey) }.animateItem(),
+        modifier = Modifier.width(FriendIconItemWidth)
+            .clip(AppShapes.s)
+            .clickable { onClickUserIcon(sharedSuffixKey) }
+            .then(modifier),
         verticalArrangement = Arrangement.Center
     ) {
         Box {
@@ -193,15 +295,14 @@ fun LazyItemScope.LocationFriend(
                         .background(Color.Black.copy(alpha = 0.55f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(
+                    AppActivityIndicator(
                         modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.5.dp,
                         color = Color.White,
                     )
                 }
             }
         }
-        Text(
+        AppText(
             modifier = Modifier.sharedBoundsBy(
                 key = "${id}UserName",
                 suffixKey = sharedSuffixKey,
@@ -212,8 +313,8 @@ fun LazyItemScope.LocationFriend(
             text = name,
             maxLines = 1,
             textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.outline
+            style = AppTheme.type.caption2Emphasized,
+            color = AppTheme.colors.tertiaryLabel
         )
     }
 }
@@ -225,14 +326,14 @@ fun UserInfoRow(
     canCopy: Boolean = false,
     spacedBy: Dp = 6.dp,
     iconSize: Dp = 24.dp,
-    style: TextStyle = MaterialTheme.typography.headlineSmall,
+    style: TextStyle = AppTheme.type.title2,
     user: IUser?,
     sharedUserId: String? = user?.id,
     sharedSuffixKey: String? = null,
     pronouns: String? = null,
 ) {
     val userNameText = @Composable {
-        Text(
+        AppText(
             modifier = Modifier.sharedBoundsBy(
                 key = "${sharedUserId}UserName",
                 suffixKey = sharedSuffixKey,
@@ -244,7 +345,7 @@ fun UserInfoRow(
             style = style,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            color = MaterialTheme.colorScheme.primary,
+            color = AppTheme.colors.tint,
         )
     }
 
@@ -253,7 +354,7 @@ fun UserInfoRow(
     Layout(
         modifier = modifier.offset(x = (-4).dp),
         content = {
-            Icon(
+            AppIcon(
                 modifier = Modifier
                     .size(iconSize),
                 imageVector = AppIcons.Shield,
@@ -261,34 +362,23 @@ fun UserInfoRow(
                 tint = GameColor.Rank.fromValue(user?.trustRank)
             )
             if (canCopy) {
-                SelectionContainer {
+                FullTextMenuBox(text = user?.displayName.orEmpty()) {
                     userNameText()
                 }
             } else {
                 userNameText()
             }
             if (hasPronouns) {
-                Text(
+                AppText(
                     text = pronouns.orEmpty(),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary,
+                    style = AppTheme.type.caption1,
+                    color = AppTheme.colors.secondaryLabel,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
             if (isSupporter) {
-                Canvas(modifier = Modifier.size(iconSize * 0.8f)) {
-                    drawOval(
-                        color = GameColor.Supporter,
-                        topLeft = Offset(size.width / 2f - (size.width * 0.2f / 2), size.height * 0.1f),
-                        size = Size(size.width * 0.2f, size.height * 0.8f)
-                    )
-                    drawOval(
-                        color = GameColor.Supporter,
-                        topLeft = Offset(size.width * 0.1f, size.height / 2f - (size.height * 0.2f / 2)),
-                        size = Size(size.width * 0.8f, size.height * 0.2f)
-                    )
-                }
+                VrcPlusIcon(modifier = Modifier.size(iconSize * 0.8f))
             }
         },
     ) { measurables, constraints ->
@@ -358,6 +448,22 @@ fun UserInfoRow(
     }
 }
 
+@Composable
+fun VrcPlusIcon(modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        drawOval(
+            color = GameColor.Supporter,
+            topLeft = Offset(size.width / 2f - (size.width * 0.2f / 2), size.height * 0.1f),
+            size = Size(size.width * 0.2f, size.height * 0.8f),
+        )
+        drawOval(
+            color = GameColor.Supporter,
+            topLeft = Offset(size.width * 0.1f, size.height / 2f - (size.height * 0.2f / 2)),
+            size = Size(size.width * 0.8f, size.height * 0.2f),
+        )
+    }
+}
+
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun UserStatusRow(
@@ -365,14 +471,14 @@ fun UserStatusRow(
     canCopy: Boolean = false,
     spacedBy: Dp = 6.dp,
     iconSize: Dp = 12.dp,
-    style: TextStyle = MaterialTheme.typography.labelLarge,
+    style: TextStyle = AppTheme.type.subheadlineEmphasized,
     user: IUser?,
     animatedVisibilityScope: AnimatedVisibilityScope? =  null,
     sharedUserId: String? = user?.id,
     sharedSuffixKey: String? = null,
 ) {
     val statusText = @Composable {
-        Text(
+        AppText(
             modifier = Modifier
                 .sharedBoundsBy(
                     key = "${sharedUserId}UserStatusRow",
@@ -390,7 +496,7 @@ fun UserStatusRow(
                 },
             text = user?.statusDescription?.ifBlank { user.status.value }.orEmpty(),
             style = style,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = AppTheme.colors.secondaryLabel,
             overflow = TextOverflow.Ellipsis,
             maxLines = 1
         )
@@ -401,9 +507,7 @@ fun UserStatusRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(spacedBy)
     ) {
-        val isHollow = user != null && user.status != UserStatus.Offline && LocationType.fromValue(user.location) == LocationType.Offline
-        val bgColor = MaterialTheme.colorScheme.surface
-        Canvas(
+        UserStatusIndicator(
             modifier = Modifier
                 .size(iconSize)
                 .enableIf(animatedVisibilityScope != null){
@@ -412,17 +516,10 @@ fun UserStatusRow(
                         sharedTransitionScope = LocalSharedTransitionDialogScope.current,
                         animatedVisibilityScope = animatedVisibilityScope!!
                     )
-                }
-        ) {
-            val statusColor = GameColor.Status.fromValue(user?.status)
-            if (isHollow) {
-                val strokeWidth = size.minDimension * 0.25f
-                drawCircle(bgColor, radius = size.minDimension / 2)
-                drawCircle(statusColor, radius = size.minDimension / 2 - strokeWidth / 2, style = Stroke(strokeWidth))
-            } else {
-                drawCircle(statusColor)
-            }
-        }
+                },
+            userStatus = user?.status,
+            location = user?.location,
+        )
         if (canCopy) {
             SelectionContainer {
                 statusText()

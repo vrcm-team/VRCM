@@ -1,6 +1,5 @@
 package io.github.vrcmteam.vrcm.presentation.compoments
 
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.awt.ComposeWindow
@@ -11,6 +10,7 @@ import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.window.FrameWindowScope
 import androidx.compose.ui.window.WindowState
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.settings.LocalSettingsState
 import io.github.vrcmteam.vrcm.presentation.settings.data.SettingsVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LanguageTag
@@ -42,7 +42,7 @@ class DesktopWindowTitleBarLocaleTest {
         try {
             setContent {
                 CompositionLocalProvider(LocalSettingsState provides settings) {
-                    MaterialTheme {
+                    AppTheme {
                         with(frameWindowScope) {
                             DesktopWindowTitleBar(
                                 windowState = windowState,

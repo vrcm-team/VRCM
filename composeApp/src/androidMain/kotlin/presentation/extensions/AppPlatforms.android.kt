@@ -1,6 +1,7 @@
 package io.github.vrcmteam.vrcm.presentation.extensions
 
 import android.app.Activity
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
@@ -33,8 +34,12 @@ actual fun AppPlatform.shareUrl(url: String): Boolean = runCatching {
     }
 }.isSuccess
 
-actual val AppPlatform.isSupportBlur: Boolean
-    get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+/** 复制时间只在剪贴板描述里（API 26+），读描述不会像 getPrimaryClip 那样触发 Android 12+ 的读取提示。 */
+actual fun AppPlatform.clipboardChangeToken(): Long? {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return null
+    val clipboard = (this as AndroidAppPlatform).context.getSystemService(ClipboardManager::class.java)
+    return clipboard?.primaryClipDescription?.timestamp
+}
 
 tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this

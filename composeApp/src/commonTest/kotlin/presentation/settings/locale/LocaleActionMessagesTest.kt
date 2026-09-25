@@ -1,11 +1,36 @@
 package io.github.vrcmteam.vrcm.presentation.settings.locale
 
+import io.github.vrcmteam.vrcm.presentation.screens.home.compoments.formatFavoriteGroupClearMessage
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class LocaleActionMessagesTest {
     @Test
-    fun boopInviteAndRetryMessagesArePresentInEveryLocale() {
+    fun notificationActionMessagesArePresentInEveryLocale() {
+        val locales = listOf(
+            LocaleStringsEn,
+            LocaleStringsJa,
+            LocaleStringsZhHans,
+            LocaleStringsZhHant,
+        )
+
+        locales.forEach { locale ->
+            val messages = listOf(
+                locale.notificationAccept,
+                locale.notificationReply,
+                locale.notificationDecline,
+                locale.notificationIgnore,
+                locale.notificationBlock,
+                locale.notificationUnsubscribe,
+                locale.notificationDelete,
+            )
+            assertTrue(messages.all { it.isNotBlank() })
+        }
+    }
+
+    @Test
+    fun profileActionMessagesArePresentInEveryLocale() {
         val locales = listOf(
             LocaleStringsEn,
             LocaleStringsJa,
@@ -20,6 +45,50 @@ class LocaleActionMessagesTest {
                 locale.profileBoopDisabled,
                 locale.profileInviteSent,
                 locale.profileInviteNotInInstance,
+                locale.profileChatboxModerationMute,
+                locale.profileChatboxModerationUnmute,
+                locale.profileChatboxModerationChecking,
+                locale.profileChatboxModerationRetry,
+                locale.profileChatboxModerationMuting,
+                locale.profileChatboxModerationUnmuting,
+                locale.profileChatboxModerationMuted,
+                locale.profileChatboxModerationUnmuted,
+                locale.profileChatboxModerationUpdateFailed,
+                locale.profileBlock,
+                locale.profileUnblock,
+                locale.profileBlockStatusChecking,
+                locale.profileBlockStatusRetry,
+                locale.profileBlockStatusUnavailable,
+                locale.profileBlockConfirmTitle,
+                locale.profileBlockConfirmMessage,
+                locale.profileUnblockConfirmTitle,
+                locale.profileUnblockConfirmMessage,
+                locale.profileBlockSuccess,
+                locale.profileUnblockSuccess,
+                locale.profileBlockFailed,
+                locale.profileUnblockFailed,
+                locale.profileBlockStatusLoadFailed,
+            )
+            assertTrue(messages.all { it.isNotBlank() })
+            assertTrue(locale.profileBlockConfirmMessage.contains("%name%"))
+            assertTrue(locale.profileUnblockConfirmMessage.contains("%name%"))
+        }
+    }
+
+    @Test
+    fun creditsBalanceMessagesArePresentInEveryLocale() {
+        val locales = listOf(
+            LocaleStringsEn,
+            LocaleStringsJa,
+            LocaleStringsZhHans,
+            LocaleStringsZhHant,
+        )
+
+        locales.forEach { locale ->
+            val messages = listOf(
+                locale.inventoryCreditsTitle,
+                locale.inventoryCreditsUnavailable,
+                locale.inventoryCreditsLoadFailed,
             )
             assertTrue(messages.all { it.isNotBlank() })
         }
@@ -65,4 +134,127 @@ class LocaleActionMessagesTest {
             assertTrue(locale.printEditorReadFailed.contains("%s"))
         }
     }
+
+    @Test
+    fun favoriteGroupClearConfirmationKeepsNameAndCountPlaceholdersInEveryLocale() {
+        val locales = listOf(
+            LocaleStringsEn,
+            LocaleStringsJa,
+            LocaleStringsZhHans,
+            LocaleStringsZhHant,
+        )
+
+        locales.forEach { locale ->
+            assertEquals(1, locale.favoriteGroupClearTitle.windowed(2).count { it == "%s" })
+            assertEquals(1, locale.favoriteGroupClearMessage.windowed(2).count { it == "%d" })
+            assertTrue(
+                listOf(
+                    locale.favoriteGroupClearAction,
+                    locale.favoriteGroupClearing,
+                    locale.favoriteGroupClearSuccess,
+                    locale.favoriteGroupClearFailed,
+                    locale.favoriteGroupClearSyncFailed,
+                ).all { it.isNotBlank() },
+            )
+            val message = formatFavoriteGroupClearMessage(locale.favoriteGroupClearMessage, 37)
+            assertTrue("37" in message)
+            assertTrue("%d" !in message)
+        }
+    }
+
+    @Test
+    fun playerInteractionMessagesArePresentInEveryLocale() {
+        val locales = listOf(
+            LocaleStringsEn,
+            LocaleStringsJa,
+            LocaleStringsZhHans,
+            LocaleStringsZhHant,
+        )
+
+        locales.forEach { locale ->
+            val messages = listOf(
+                locale.profileInteractionChecking,
+                locale.profileInteractionClose,
+                locale.profileInteractionRestore,
+                locale.profileInteractionClosing,
+                locale.profileInteractionRestoring,
+                locale.profileInteractionRetry,
+                locale.profileInteractionUnavailable,
+                locale.profileInteractionCloseConfirmTitle,
+                locale.profileInteractionRestoreConfirmTitle,
+                locale.profileInteractionClosedSuccess,
+                locale.profileInteractionRestoredSuccess,
+                locale.profileInteractionLoadFailed,
+                locale.profileInteractionUpdateFailed,
+            )
+            assertTrue(messages.all { it.isNotBlank() })
+            assertTrue(locale.profileInteractionCloseConfirmMessage.contains("%s"))
+            assertTrue(locale.profileInteractionRestoreConfirmMessage.contains("%s"))
+        }
+    }
+
+    @Test
+    fun friendRemovalMessagesKeepTheirCountPlaceholders() {
+        val locales = listOf(
+            LocaleStringsEn,
+            LocaleStringsJa,
+            LocaleStringsZhHans,
+            LocaleStringsZhHant,
+        )
+
+        locales.forEach { locale ->
+            val messages = listOf(
+                locale.friendDirectorySelect,
+                locale.friendDirectorySelectAll,
+                locale.friendDirectoryClearSelection,
+                locale.friendDirectoryRemoveSelected,
+                locale.friendDirectoryRemoveConfirmTitle,
+            )
+            assertTrue(messages.all { it.isNotBlank() })
+            assertTrue(locale.friendDirectorySelectedCount.countPlaceholderCount() == 1)
+            assertTrue(locale.friendDirectoryRemoveConfirmMessage.countPlaceholderCount() == 1)
+            assertTrue(locale.friendDirectoryRemovingProgress.countPlaceholderCount() == 2)
+            assertTrue(locale.friendDirectoryRemoveSuccess.countPlaceholderCount() == 1)
+            assertTrue(locale.friendDirectoryRemovePartialFailure.countPlaceholderCount() == 2)
+            assertTrue(locale.friendDirectoryRemoveFailed.countPlaceholderCount() == 1)
+        }
+    }
+
+    @Test
+    fun favoriteAndGroupRemovalMessagesKeepTheirCountPlaceholders() {
+        val locales = listOf(
+            LocaleStringsEn,
+            LocaleStringsJa,
+            LocaleStringsZhHans,
+            LocaleStringsZhHant,
+        )
+
+        locales.forEach { locale ->
+            assertTrue(
+                listOf(
+                    locale.favoriteSelectionAction,
+                    locale.favoriteSelectionSelectAll,
+                    locale.favoriteSelectionClearSelection,
+                    locale.favoriteSelectionRemoveSelected,
+                    locale.favoriteSelectionRemoveConfirmTitle,
+                    locale.groupSelectionAction,
+                    locale.groupSelectionLeaveSelected,
+                    locale.groupSelectionLeaveConfirmTitle,
+                ).all { it.isNotBlank() }
+            )
+            assertEquals(1, locale.favoriteSelectionSelectedCount.countPlaceholderCount())
+            assertEquals(1, locale.favoriteSelectionRemoveConfirmMessage.countPlaceholderCount())
+            assertEquals(2, locale.favoriteSelectionRemovingProgress.countPlaceholderCount())
+            assertEquals(1, locale.favoriteSelectionRemoveSuccess.countPlaceholderCount())
+            assertEquals(2, locale.favoriteSelectionRemovePartialFailure.countPlaceholderCount())
+            assertEquals(1, locale.favoriteSelectionRemoveFailed.countPlaceholderCount())
+            assertEquals(1, locale.groupSelectionLeaveConfirmMessage.countPlaceholderCount())
+            assertEquals(2, locale.groupSelectionLeavingProgress.countPlaceholderCount())
+            assertEquals(1, locale.groupSelectionLeaveSuccess.countPlaceholderCount())
+            assertEquals(2, locale.groupSelectionLeavePartialFailure.countPlaceholderCount())
+            assertEquals(1, locale.groupSelectionLeaveFailed.countPlaceholderCount())
+        }
+    }
 }
+
+private fun String.countPlaceholderCount(): Int = windowed(size = 2).count { it == "%d" }

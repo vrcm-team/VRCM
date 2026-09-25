@@ -48,7 +48,8 @@ internal data class FriendActivitySummaryEntity(
         )
     ],
     indices = [
-        Index("ownerUserId"),
+        Index(value = ["ownerUserId", "occurredAtMillis", "id"]),
+        Index(value = ["ownerUserId", "type", "occurredAtMillis", "id"]),
         Index(value = ["ownerUserId", "friendUserId", "occurredAtMillis"]),
     ],
 )

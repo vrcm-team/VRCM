@@ -73,21 +73,30 @@ class DefaultMeetupCardRemoteDataSource(
         }
     }
 
-    private suspend fun fetchRepresentedGroup(ownerId: String): MeetupRemoteGroup? = try {
-        usersApi.getUserGroups(ownerId)
-            .firstOrNull { it.isRepresenting }
-            ?.let { group ->
-                MeetupRemoteGroup(
-                    id = group.groupId.takeIf(String::isNotBlank) ?: group.id,
-                    name = group.name,
-                    bannerUrl = group.bannerUrl.orEmpty(),
-                    iconUrl = group.iconUrl.orEmpty(),
-                )
-            }
-    } catch (cancelled: CancellationException) {
-        throw cancelled
-    } catch (_: Exception) {
-        null
+    private suspend fun fetchRepresentedGroup(ownerId: String): MeetupRemoteGroup? {
+        val group = try {
+            usersApi.getRepresentedGroup(ownerId)
+                ?.takeIf { it.groupId.isNotBlank() }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            null
+        } ?: try {
+            usersApi.getUserGroups(ownerId).firstOrNull { it.isRepresenting }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            null
+        }
+
+        return group?.let { group ->
+            MeetupRemoteGroup(
+                id = group.groupId.takeIf(String::isNotBlank) ?: group.id,
+                name = group.name,
+                bannerUrl = group.bannerUrl.orEmpty(),
+                iconUrl = group.iconUrl.orEmpty(),
+            )
+        }
     }
 
     override suspend fun getAppearance(ownerId: String): MeetupRemoteAppearance =

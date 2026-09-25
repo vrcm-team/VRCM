@@ -59,7 +59,8 @@ jobs:
         run: chmod +x gradlew
         
       - name: Build Release APK with Gradle
-        run: ./gradlew assembleRelease --info
+        # GitHub Release 只发 github 渠道的 APK（带应用内更新）；play 渠道的 AAB 另行上传 Google Play
+        run: ./gradlew :composeApp:assembleGithubRelease --info
         
       - name: List APK files (for debugging)
         run: find . -name "*.apk"
@@ -79,7 +80,7 @@ jobs:
         run: |
           mkdir -p artifact
           APK_NAME="VRCM-v${APP_VERSION}.apk"
-          find . -name "*.apk" -exec cp {} artifact/${APK_NAME} \;
+          find composeApp/build/outputs/apk/github/release -name "*.apk" -exec cp {} artifact/${APK_NAME} \;
           
       - name: Create Release
         id: create_release

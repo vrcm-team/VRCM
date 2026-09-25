@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.VRCM" parent="android:Theme.Material.Light.NoActionBar"/>
+    <style name="Theme.VRCM" parent="android:Theme.Material.Light.NoActionBar">
+        <!-- 窗口底色即系统开屏底色（Android 12+ 单色时直接沿用），与 Compose 开屏首帧一致 -->
+        <item name="android:windowBackground">@color/launch_background</item>
+    </style>
 </resources>

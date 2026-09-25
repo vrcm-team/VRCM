@@ -1,8 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.compoments
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -10,6 +8,11 @@ import androidx.compose.ui.graphics.Color
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.supports.ApiNotice
 import io.github.vrcmteam.vrcm.network.supports.ApiNoticeCenter
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppBanner
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppBannerData
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppBannerHost
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppBannerHostState
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import org.koin.compose.koinInject
@@ -29,47 +32,31 @@ fun SnackBarToast(
     text: String,
     modifier: Modifier = Modifier,
     onEffect: () -> Unit,
-    containerColor: Color = MaterialTheme.colorScheme.onPrimary,
-    contentColor: Color = MaterialTheme.colorScheme.onSurface,
-    content: @Composable (SnackbarData) -> Unit = {
-        Text(text = it.visuals.message)
+    containerColor: Color = AppTheme.colors.elevated().secondarySystemBackground,
+    contentColor: Color = AppTheme.colors.label,
+    content: @Composable (AppBannerData) -> Unit = {
+        AppBanner(message = it.message, containerColor = containerColor, contentColor = contentColor)
     }
 ) {
-    val snackBarHostState = remember { SnackbarHostState() }
+    val bannerHostState = remember { AppBannerHostState() }
 
     LaunchedEffect(text) {
         if (text.isNotBlank()) {
-            snackBarHostState.showSnackbar(text)
+            bannerHostState.show(text)
             onEffect()
         }
     }
-    SnackbarHost(
+    AppBannerHost(
         modifier = modifier,
-        hostState = snackBarHostState
-    ) {
-        Snackbar(
-            containerColor = containerColor,
-            contentColor = contentColor,
-            shape = MaterialTheme.shapes.medium,
-            actionOnNewLine = true
-        ) {
-            content(it)
-        }
-    }
+        hostState = bannerHostState,
+        banner = content,
+    )
 }
 
 @Composable
 fun SnackBarToastBox(
     modifier: Modifier = Modifier,
     alignment: Alignment = Alignment.TopCenter,
-    toastContent: @Composable (SnackbarData) -> Unit = {
-        Box(modifier = Modifier.fillMaxWidth()){
-            Text(
-                modifier = Modifier.align(Alignment.Center),
-                text = it.visuals.message
-            )
-        }
-    },
     content: @Composable () -> Unit
 ) {
     val apiNoticeCenter: ApiNoticeCenter = koinInject()
@@ -93,11 +80,12 @@ fun SnackBarToastBox(
                 ToastText.Info(it.localizedMessage(locale))
             }
             val displayedToast = apiToast ?: sackBarToastText
+            val colors = AppTheme.colors
             val theme = when (displayedToast) {
-                is ToastText.Error -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
+                is ToastText.Error -> colors.destructiveSoft to colors.onDestructiveSoft
                 is ToastText.Success ,
                 is ToastText.Info ,
-                ToastText.Normal -> MaterialTheme.colorScheme.onPrimary to MaterialTheme.colorScheme.onSurface
+                ToastText.Normal -> colors.elevated().secondarySystemBackground to colors.label
             }
             SnackBarToast(
                 modifier = modifier.align(alignment),
@@ -108,7 +96,6 @@ fun SnackBarToastBox(
                 },
                 containerColor = theme.first,
                 contentColor = theme.second,
-                content = toastContent
             )
         }
     }

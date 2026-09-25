@@ -1,7 +1,8 @@
 package io.github.vrcmteam.vrcm.presentation.compoments
 
 import androidx.compose.animation.core.*
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -24,6 +25,7 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import coil3.size.Precision
 import coil3.size.Size
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import org.koin.compose.koinInject
 
 internal fun createAImageRequest(
@@ -51,8 +53,8 @@ internal fun createAImageRequest(
 @Composable
 fun Modifier.shimmerEffect(
     isLoading: Boolean = true,
-    shimmerColor: Color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-    backgroundColor: Color = MaterialTheme.colorScheme.surface.copy(alpha = 0.3f),
+    shimmerColor: Color = AppTheme.colors.fill,
+    backgroundColor: Color = AppTheme.colors.secondaryGroupedBackground.copy(alpha = 0.3f),
     shape: Shape = RectangleShape
 ): Modifier = composed {
     if (isLoading) {
@@ -95,7 +97,7 @@ fun Modifier.shimmerEffect(
 fun AImage(
     modifier: Modifier = Modifier,
     imageData: Any?,
-    color: Color = MaterialTheme.colorScheme.outlineVariant,
+    color: Color = AppTheme.colors.separator,
     contentDescription: String? = null,
     error: Painter? = remember(color) { ColorPainter(color) },
     placeholder: Painter? = remember(color) { ColorPainter(color) },
@@ -103,6 +105,22 @@ fun AImage(
     loadOriginalSize: Boolean = false,
     cachedPlaceholderKey: String? = null,
 ) {
+    // VRChat 用空串表示"没有图片"：交给 Coil 只会找不到能加载空地址的 fetcher 而报错，直接画兜底图。
+    // 调用方自己构造的 ImageRequest 也一样（例如资料页顶栏用头像缩略图地址建的请求）
+    val requestedUrl = when (imageData) {
+        is String -> imageData
+        is ImageRequest -> imageData.data as? String
+        else -> null
+    }
+    if (requestedUrl != null && requestedUrl.isBlank()) {
+        val fallback = error ?: placeholder
+        if (fallback != null) {
+            Image(painter = fallback, contentDescription = contentDescription, modifier = modifier, contentScale = contentScale)
+        } else {
+            Box(modifier)
+        }
+        return
+    }
     val imageLoader: ImageLoader = koinInject()
     val platformContext = koinInject<PlatformContext>()
     val isLoading = remember(imageData) { mutableStateOf(true) }
@@ -121,8 +139,8 @@ fun AImage(
         }
 
     // 选择合适的闪烁动画颜色
-    val background = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
-    val shimmer =  MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+    val background = AppTheme.colors.fill
+    val shimmer =  AppTheme.colors.secondaryGroupedBackground.copy(alpha = 0.5f)
     
     AsyncImage(
         modifier = modifier.shimmerEffect(
