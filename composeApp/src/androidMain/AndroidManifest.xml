@@ -4,9 +4,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <application
         android:name=".VRCMApplication"
         android:enableOnBackInvokedCallback="true"
@@ -52,7 +51,16 @@
                 <data android:pathPrefix="/home/avatar/" />
             </intent-filter>
         </activity>
-        <service android:name=".service.FriendActivityForegroundService" android:exported="false" android:foregroundServiceType="dataSync" />
+        <!-- 常驻连接不属于 dataSync 的有限传输用途，且 dataSync 在 Android 15+ 每天最多运行 6 小时；
+             VRChat 没有给第三方应用的推送服务，只能由用户开启的前台服务保持连接 -->
+        <service
+            android:name=".service.FriendActivityForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps the user-enabled connection to VRChat's real-time event stream open so friend activity notifications arrive immediately. VRChat offers no push notification service for third-party apps." />
+        </service>
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -62,12 +70,5 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
-        <receiver
-            android:name=".UpdateDownloadReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.DOWNLOAD_NOTIFICATION_CLICKED" />
-            </intent-filter>
-        </receiver>
     </application>
 </manifest>

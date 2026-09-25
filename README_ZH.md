@@ -105,7 +105,7 @@ VRCM 是以社交性和便捷性为核心的跨平台 VRChat 伴侣应用。它�
 - Kotlin Multiplatform 2.2.20 与 Compose Multiplatform 1.10.3
 - Ktor、kotlinx.serialization、Room 与 Coil
 - Koin、Lifecycle ViewModel、Navigation 3 与 Material 3 Adaptive
-- Android minSdk 24、targetSdk 35、compileSdk 36；Java 21
+- Android minSdk 24、targetSdk 36、compileSdk 36；Java 21
 
 ## 隐私与免责声明
 

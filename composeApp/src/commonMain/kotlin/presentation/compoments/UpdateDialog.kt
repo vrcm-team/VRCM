@@ -57,10 +57,12 @@ fun UpdateDialog(
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    AppText(
-                        text = "Ver.${version.tagName}",
-                        style = AppTheme.type.caption1Emphasized
-                    )
+                    version.versionName?.let { versionName ->
+                        AppText(
+                            text = "Ver.$versionName",
+                            style = AppTheme.type.caption1Emphasized
+                        )
+                    }
                     Box(
                         modifier = Modifier
                             .weight(1f, fill = false)

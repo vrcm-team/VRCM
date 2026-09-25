@@ -433,7 +433,8 @@ private fun AboutSection(platform: AppPlatform) {
                     it.htmlUrl,
                     it.body,
                     it.hasNewVersion,
-                    it.downloadUrl
+                    it.downloadUrl,
+                    it.versionName,
                 )
             }.onApiFailure("Setting") {
                 SharedFlowCentre.toastText.emit(ToastText.Error(it))

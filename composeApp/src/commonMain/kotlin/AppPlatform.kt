@@ -47,6 +47,18 @@ sealed interface AppUpdateSource {
      * @param region 设备地区（ISO 3166-1 两位码），优先查询该地区的商店
      */
     data class AppStore(val bundleId: String, val region: String?) : AppUpdateSource
+
+    /**
+     * Google Play 分发的安装包：通过 Play 应用内更新接口查询商店上的新版本，更新只跳转 Play 商品页。
+     * Play 只提供可更新到的 versionCode，不提供版本名和更新说明。
+     *
+     * @param packageName 应用包名，用来拼 Play 商品页地址
+     * @param availableVersionCode 查询 Play 上可更新到的 versionCode，没有新版本时为 null
+     */
+    class GooglePlay(
+        val packageName: String,
+        val availableVersionCode: suspend () -> Result<Int?>,
+    ) : AppUpdateSource
 }
 
 enum class BackgroundFriendMonitoringResult { Started, Stopped, PermissionRequired, Unsupported }

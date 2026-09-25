@@ -93,6 +93,7 @@ fun VersionDialog() {
                         body = it.body,
                         hasNewVersion = true,
                         downloadUrl = it.downloadUrl,
+                        versionName = it.versionName,
                     )
                 }
             }

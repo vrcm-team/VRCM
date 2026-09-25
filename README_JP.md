@@ -105,7 +105,7 @@ VRCM は、交流と使いやすさを中心に設計されたクロスプラッ
 - Kotlin Multiplatform 2.2.20 / Compose Multiplatform 1.10.3
 - Ktor、kotlinx.serialization、Room、Coil
 - Koin、Lifecycle ViewModel、Navigation 3、Material 3 Adaptive
-- Android minSdk 24、targetSdk 35、compileSdk 36、Java 21
+- Android minSdk 24、targetSdk 36、compileSdk 36、Java 21
 
 ## プライバシーと免責事項
 

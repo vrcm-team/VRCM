@@ -15,6 +15,9 @@ class AndroidAppPlatform(val context: Context, private val logger: Logger) : App
     override val name = "Android"
     override val version = Build.VERSION.SDK_INT.toString()
     override val type = AppPlatformType.Android
+
+    // 更新方式由分发渠道（Gradle flavor）决定：github 版查 GitHub 并在应用内安装 APK，play 版查 Google Play 并跳转商品页
+    override val updateSource: AppUpdateSource? get() = distributionUpdateSource()
     override val supportsFriendActivityNotifications = true
     override val supportsBackgroundFriendMonitoring = true
 
@@ -80,5 +83,5 @@ class AndroidAppPlatform(val context: Context, private val logger: Logger) : App
         tagName: String,
         downloadUrls: List<String>,
         onProgress: (Float?) -> Unit,
-    ): Result<Unit> = downloadAndInstallAppUpdate(context, tagName, downloadUrls, onProgress)
+    ): Result<Unit> = installDistributionUpdate(tagName, downloadUrls, onProgress)
 }

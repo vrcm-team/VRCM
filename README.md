@@ -105,7 +105,7 @@ VRCM is a cross-platform VRChat companion focused on social connection and conve
 - Kotlin Multiplatform 2.2.20 and Compose Multiplatform 1.10.3
 - Ktor, kotlinx.serialization, Room, and Coil
 - Koin, Lifecycle ViewModel, Navigation 3, and Material 3 Adaptive
-- Android minSdk 24, targetSdk 35, compileSdk 36; Java 21
+- Android minSdk 24, targetSdk 36, compileSdk 36; Java 21
 
 ## Privacy and disclaimer
 

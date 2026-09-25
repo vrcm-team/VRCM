@@ -9,7 +9,7 @@ VRCM 是使用 Kotlin Multiplatform 与 Compose Multiplatform 开发的 VRChat �
 - Kotlin：2.2.20
 - Compose Multiplatform：1.10.3
 - 包名：`io.github.vrcmteam.vrcm`
-- Android：minSdk 24、targetSdk 35、compileSdk 36
+- Android：minSdk 24、targetSdk 36、compileSdk 36；分发渠道 flavor：`github`（GitHub Release APK，带应用内更新）、`play`（Google Play AAB，查 Play 新版本并跳商品页，不带自更新）
 - 主要技术：Navigation 3、Lifecycle ViewModel、Material 3 Adaptive、Koin、Ktor、Multiplatform Settings、Coil、Kotlin Coroutines
 
 具体版本以 `gradle/libs.versions.toml` 为准。
@@ -105,8 +105,9 @@ VRCM 是使用 Kotlin Multiplatform 与 Compose Multiplatform 开发的 VRChat �
 ./gradlew :composeApp:desktopTest                 # Desktop 测试套件
 ./gradlew :composeApp:allTests                    # KMP 聚合测试
 ./gradlew :composeApp:check                       # 模块完整检查
-./gradlew :composeApp:assembleDebug               # Android Debug APK
-./gradlew :composeApp:installDebug                # 安装 Android Debug
+./gradlew :composeApp:assembleDebug               # Android Debug APK（github、play 两个渠道）
+./gradlew :composeApp:installGithubDebug          # 安装 Android Debug（GitHub 渠道）
+./gradlew :composeApp:bundlePlayRelease           # Google Play 上传用 AAB
 ./gradlew :composeApp:createReleaseDistributable  # Desktop 发布包
 ./gradlew :composeApp:linkDebugFrameworkIosArm64  # iOS 调试 Framework
 ```

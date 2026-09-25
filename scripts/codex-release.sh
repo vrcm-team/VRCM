@@ -167,8 +167,9 @@ copy_latest_matching() {
 }
 
 build_android() {
-  run_gradle :composeApp:assembleRelease
-  copy_latest_matching "$ROOT_DIR/composeApp/build/outputs/apk/release" '*.apk' "$ARTIFACT_DIR/VRCM-v$VERSION.apk"
+  # GitHub Release 只发 github 渠道的 APK；play 渠道用 :composeApp:bundlePlayRelease 打 AAB 上传 Google Play
+  run_gradle :composeApp:assembleGithubRelease
+  copy_latest_matching "$ROOT_DIR/composeApp/build/outputs/apk/github/release" '*.apk' "$ARTIFACT_DIR/VRCM-v$VERSION.apk"
 }
 
 find_iscc() {

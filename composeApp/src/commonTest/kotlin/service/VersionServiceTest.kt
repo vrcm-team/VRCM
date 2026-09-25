@@ -17,6 +17,7 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class VersionServiceTest {
@@ -82,6 +83,35 @@ class VersionServiceTest {
 
         assertEquals(listOf("JP", null), requestedCountries)
         assertFalse(result.getOrThrow().hasNewVersion)
+        client.close()
+    }
+
+    @Test
+    fun googlePlayCheckIgnoresOnlyTheRememberedVersionCode() = runBlocking {
+        var availableVersionCode: Int? = 9
+        val client = HttpClient(MockEngine) {
+            engine { addHandler { error("Google Play checks must not use the HTTP client") } }
+        }
+        val service = versionService(client)
+        val source = AppUpdateSource.GooglePlay(packageName = "io.github.vrcmteam.vrcm") {
+            Result.success(availableVersionCode)
+        }
+
+        val update = service.checkVersion(source, checkRemember = true).getOrThrow()
+        assertTrue(update.hasNewVersion)
+        assertEquals("https://play.google.com/store/apps/details?id=io.github.vrcmteam.vrcm", update.htmlUrl)
+        // Play 不提供版本名，弹窗不能把 versionCode 当成版本号显示
+        assertNull(update.versionName)
+
+        // "不再提示此版本"只挡住启动时的同一个 versionCode，手动检查和更新的 versionCode 照常提示
+        service.rememberVersion(update.tagName)
+        assertFalse(service.checkVersion(source, checkRemember = true).getOrThrow().hasNewVersion)
+        assertTrue(service.checkVersion(source, checkRemember = false).getOrThrow().hasNewVersion)
+        availableVersionCode = 10
+        assertTrue(service.checkVersion(source, checkRemember = true).getOrThrow().hasNewVersion)
+
+        availableVersionCode = null
+        assertFalse(service.checkVersion(source, checkRemember = false).getOrThrow().hasNewVersion)
         client.close()
     }
 

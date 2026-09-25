@@ -23,6 +23,7 @@ class VersionService(
         when (source) {
             AppUpdateSource.GitHub -> latestGitHubRelease(checkRemember)
             is AppUpdateSource.AppStore -> latestAppStoreRelease(source, checkRemember)
+            is AppUpdateSource.GooglePlay -> latestGooglePlayRelease(source, checkRemember)
         }
 
     fun rememberVersion(version: String?) {
@@ -78,6 +79,29 @@ class VersionService(
                 ?.let { return Result.success(it) }
         }
         return appStoreApi.lookup(source.bundleId, country = null).map { it.results.firstOrNull() }
+    }
+
+    /**
+     * Play 只在商店版本的 versionCode 比已安装的大时才报告有更新，所以不用再比较版本号；
+     * 它不提供版本名和更新说明，"不再提示"按 versionCode 记，更新内容由商品页展示。
+     */
+    private suspend fun latestGooglePlayRelease(
+        source: AppUpdateSource.GooglePlay,
+        checkRemember: Boolean,
+    ): Result<VersionDto> = source.availableVersionCode().map { versionCode ->
+        if (versionCode == null) {
+            VersionDto(tagName = AppConst.APP_VERSION, htmlUrl = "", body = "", hasNewVersion = false)
+        } else {
+            val versionTag = versionCode.toString()
+            VersionDto(
+                tagName = versionTag,
+                // 用 https 商品页而不是 market://：装了 Play 商店会直接打开商店，没有商店的设备也不会因为无处理方而崩溃
+                htmlUrl = "https://play.google.com/store/apps/details?id=${source.packageName}",
+                body = "",
+                hasNewVersion = !checkRemember || settingsDao.rememberVersion != versionTag,
+                versionName = null,
+            )
+        }
     }
 
     /** 只提示比当前更新的版本：开发版、TestFlight 版可能比已发布的版本还新。 */
