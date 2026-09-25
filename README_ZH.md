@@ -18,7 +18,7 @@
 ## 把 VRChat 社交带到手机上
 
 <div align="center">
-  <img src="image/MultiPlatformPreview.png" width="720" alt="VRCM 跨平台 VRChat 社交伴侣界面预览"/>
+  <img src="image/MultiPlatformPreview.png" width="720" alt="桌面端、Android 和 iPhone 上的 VRCM 首页；桌面窗口是宽屏布局：左侧竖排标签栏，列表和详情左右分栏"/>
 </div>
 
 VRCM 是以社交性和便捷性为核心的跨平台 VRChat 伴侣应用。它不只展示谁在线，还帮助你理解社交圈、回顾和好友一起玩过的经历，并把分享链接、加入房间、戳一戳和线下聚会等操作接到手机上的真实使用场景里。
@@ -26,7 +26,7 @@ VRCM 是以社交性和便捷性为核心的跨平台 VRChat 伴侣应用。它�
 > VRCM 与 VRCX 的产品方向不同：VRCX 更重视桌面端的日志与信息管理，VRCM 则把移动社交、便捷互动和随时可用放在首位。
 > Desktop 版本仍会保持基础支持和必要维护，但近期不会作为重点深入开发，也不会追求与 VRCX 相同的桌面功能深度。
 
-[下载最新版本](https://github.com/vrcm-team/VRCM/releases/latest) · [查看 1.1.3 新功能详解](docs/releases/1.1.3_ZH.md)
+[下载最新版本](https://github.com/vrcm-team/VRCM/releases/latest) · [产品主页](https://vrcm-team.github.io/VRCM/?lang=zh) · [查看 1.1.3 新功能详解](docs/releases/1.1.3_ZH.md)
 
 </div>
 
@@ -40,7 +40,7 @@ VRCM 是以社交性和便捷性为核心的跨平台 VRChat 伴侣应用。它�
 - **共同好友与共同群组**：从用户资料继续探索彼此的社交联系。
 
 <div align="center">
-  <img src="image/Feature-Friend-Network.png" width="300" alt="脱敏后的好友关系网实机图"/>
+  <img src="image/Feature-Friend-Network.png" width="300" alt="Android 实机的好友关系网“以我为中心”视图，好友均已打码"/>
 </div>
 
 > 活动与共同游玩数据来自 VRCM 在运行期间观察到的状态；Android 开启后台监测后可在应用退到后台时继续记录。它不是 VRChat 账户的完整历史。
@@ -60,7 +60,7 @@ VRCM 是以社交性和便捷性为核心的跨平台 VRChat 伴侣应用。它�
 - **移动端照片管理**：浏览、缩放、下载和批量删除 Gallery 内容；非 VRC+ 用户也可查看 Print。
 
 <div align="center">
-  <img src="image/Feature-Gallery-Mobile.png" width="360" alt="展示照片分类与上传入口的 Android 实机 Gallery 画面"/>
+  <img src="image/Feature-Gallery-Mobile.png" width="300" alt="展示照片分类与上传入口的 Android 实机 Gallery 画面"/>
 </div>
 
 ### Android 实时提醒
@@ -82,7 +82,7 @@ VRCM 是以社交性和便捷性为核心的跨平台 VRChat 伴侣应用。它�
 - 可加入 VRChat 个人主页与资料社交链接二维码，最多同时展示 4 个，并可保存到系统图库。
 
 <div align="center">
-  <img src="image/Feature-Meetup-Card.png" width="300" alt="线下聚会身份铭牌实机图"/>
+  <img src="image/Feature-Meetup-Card.png" width="300" alt="资料栏模板的全屏身份铭牌：照片、名字、语言旗帜和个人主页二维码"/>
 </div>
 
 ## 更多能力
