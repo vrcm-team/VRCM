@@ -13,12 +13,7 @@ import kotlinx.coroutines.CancellationException
 internal fun AndroidAppPlatform.distributionUpdateSource(): AppUpdateSource =
     AppUpdateSource.GooglePlay(packageName = context.packageName) { availablePlayVersionCode(context) }
 
-@Suppress("UNUSED_PARAMETER")
-internal suspend fun AndroidAppPlatform.installDistributionUpdate(
-    tagName: String,
-    downloadUrls: List<String>,
-    onProgress: (Float?) -> Unit,
-): Result<Unit> = Result.failure(UnsupportedOperationException("Google Play builds are updated through Google Play"))
+internal fun AndroidAppPlatform.distributionUpdateInstaller(): AppUpdateInstaller? = null
 
 /**
  * Play 上有可更新的版本时返回它的 versionCode。

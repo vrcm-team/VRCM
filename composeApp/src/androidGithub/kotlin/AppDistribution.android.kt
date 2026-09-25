@@ -4,8 +4,4 @@ package io.github.vrcmteam.vrcm
 
 internal fun AndroidAppPlatform.distributionUpdateSource(): AppUpdateSource = AppUpdateSource.GitHub
 
-internal suspend fun AndroidAppPlatform.installDistributionUpdate(
-    tagName: String,
-    downloadUrls: List<String>,
-    onProgress: (Float?) -> Unit,
-): Result<Unit> = downloadAndInstallAppUpdate(context, tagName, downloadUrls, onProgress)
+internal fun AndroidAppPlatform.distributionUpdateInstaller(): AppUpdateInstaller? = ApkUpdateInstaller(context)
