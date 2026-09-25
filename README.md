@@ -48,7 +48,7 @@ VRCM is a cross-platform VRChat companion focused on social connection and conve
 ### Mobile shortcuts and in-game interaction
 
 - **Clipboard recognition**: copy a VRChat user, world, group, or avatar URL/ID, return to VRCM, confirm, and jump directly to it.
-- **Open web links in VRCM**: Android can hand supported `vrchat.com` links directly to the app.
+- **Open web links in VRCM**: Android can open supported `vrchat.com` links in VRCM. On Android 12 and later, first check `vrchat.com` and `www.vrchat.com` under VRCM's app info → **Open by default** → **Add link**; otherwise these links keep opening in the browser.
 - **Native sharing**: share public profile links through the Android/iOS share sheet; Desktop falls back to copying the URL.
 - **Act immediately**: inspect a friend's instance, invite yourself, send several kinds of Boop, and handle friend requests or invitations.
 
