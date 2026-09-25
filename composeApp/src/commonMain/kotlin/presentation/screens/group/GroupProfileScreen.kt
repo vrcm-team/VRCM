@@ -4,7 +4,11 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.ScrollableDefaults
+import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -39,6 +43,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -51,7 +56,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -79,6 +89,7 @@ import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppToggle
 import io.github.vrcmteam.vrcm.presentation.designsystem.LocalContentColor
 import io.github.vrcmteam.vrcm.presentation.designsystem.LocalGlassBackdrop
+import io.github.vrcmteam.vrcm.presentation.designsystem.LocalPopupBackdrop
 import io.github.vrcmteam.vrcm.presentation.designsystem.glassBackdropSource
 import io.github.vrcmteam.vrcm.presentation.designsystem.rememberAppSheetState
 import io.github.vrcmteam.vrcm.presentation.designsystem.rememberGlassBackdrop
@@ -96,6 +107,7 @@ import io.github.vrcmteam.vrcm.core.extensions.toLocalDateTime
 import io.github.vrcmteam.vrcm.presentation.compoments.ABottomSheet
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
 import io.github.vrcmteam.vrcm.presentation.compoments.ContentReportSheet
+import io.github.vrcmteam.vrcm.presentation.compoments.FullTextMenuBox
 import io.github.vrcmteam.vrcm.presentation.compoments.GroupIcon
 import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedTransitionDialogScope
 import io.github.vrcmteam.vrcm.presentation.compoments.LoadingButton
@@ -227,120 +239,139 @@ class GroupProfileScreen(
                 }
                 val topBarHeight = 64.dp
                 val sysTopPadding = getInsetPadding(WindowInsets::getTop)
+                // 收进顶栏的名字能用到的右边界：顶栏中间那格（返回钮与右侧按钮之间）的右缘，按页面坐标算
+                var pageCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+                var topBarTitleEndPx by remember { mutableFloatStateOf(Float.NaN) }
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(AppTheme.colors.groupedBackground)
+                        .onPlaced { pageCoordinates = it }
                 ) {
                     // 页面内容是顶栏玻璃按钮的取样源
                     val glassBackdrop = rememberGlassBackdrop()
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .glassBackdropSource(glassBackdrop)
-                            .verticalScroll(scrollState)
-                    ) {
-                        GroupBanner(
-                            group = group,
-                            bannerHeight = bannerHeight
-                        )
-                        GroupHeaderInfo(
-                            group = group,
-                            isLoading = isLoading,
-                            isActionLoading = isActionLoading,
-                            isRepresentationUpdating = isRepresentationUpdating,
-                            isNotificationPreferenceUpdating = isNotificationPreferenceUpdating,
-                            groupSettingsAvailable = currentSession?.token?.let(group::hasActiveMembership) == true,
-                            onJoin = { screenModel.joinGroup() },
-                            onLeave = { screenModel.leaveGroup() },
-                            onRepresentationChange = { isRepresenting ->
-                                screenModel.updateRepresentation(
-                                    isRepresenting = isRepresenting,
-                                    failureMessage = representationUpdateFailedMessage,
-                                    sessionChangedMessage = representationSessionChangedMessage,
-                                )
-                            },
-                            onNotificationPreferenceChange = { enabled ->
-                                screenModel.updateNotificationPreference(
-                                    enabled = enabled,
-                                    failureMessage = notificationPreferenceUpdateFailedMessage,
-                                    sessionChangedMessage = notificationPreferenceSessionChangedMessage,
-                                )
-                            },
-                        )
-                        AppTabRow(
-                            selectedTabIndex = selectedTabIndex,
-                            modifier = Modifier.fillMaxWidth(),
+                    // 页面里弹出的菜单画在另开的弹层上，模糊的也是这一层内容（同 AppScaffold）
+                    CompositionLocalProvider(LocalPopupBackdrop provides glassBackdrop) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .glassBackdropSource(glassBackdrop)
+                                .verticalScroll(scrollState)
                         ) {
-                            val tabs = listOf(strings.groupTabDetails, strings.groupTabPosts, strings.groupTabMembers, strings.groupTabGallery)
-                            tabs.forEachIndexed { index, title ->
-                                AppTab(
-                                    selected = selectedTabIndex == index,
-                                    onClick = { selectedTabIndex = index },
-                                    text = { AppText(text = title, maxLines = 1) }
-                                )
-                            }
-                        }
-                        when (selectedTabIndex) {
-                            0 -> DetailsContent(group = group, owner = owner, instances = groupInstances)
-                            1 -> PostsContent(
-                                posts = posts,
-                                roles = group.roles,
-                                postAuthors = postAuthors,
-                                isLoading = postsLoading,
-                                isLoadingMore = postsLoadingMore,
-                                endReached = postsEndReached,
+                            GroupBanner(
+                                group = group,
+                                bannerHeight = bannerHeight
                             )
-                            2 -> MembersContent(users = memberUsers, isLoading = membersLoading)
-                            else -> GalleriesContent(group = group, galleryImages = galleryImages)
+                            GroupHeaderInfo(
+                                group = group,
+                                isLoading = isLoading,
+                                isActionLoading = isActionLoading,
+                                isRepresentationUpdating = isRepresentationUpdating,
+                                isNotificationPreferenceUpdating = isNotificationPreferenceUpdating,
+                                groupSettingsAvailable = currentSession?.token?.let(group::hasActiveMembership) == true,
+                                onJoin = { screenModel.joinGroup() },
+                                onLeave = { screenModel.leaveGroup() },
+                                onRepresentationChange = { isRepresenting ->
+                                    screenModel.updateRepresentation(
+                                        isRepresenting = isRepresenting,
+                                        failureMessage = representationUpdateFailedMessage,
+                                        sessionChangedMessage = representationSessionChangedMessage,
+                                    )
+                                },
+                                onNotificationPreferenceChange = { enabled ->
+                                    screenModel.updateNotificationPreference(
+                                        enabled = enabled,
+                                        failureMessage = notificationPreferenceUpdateFailedMessage,
+                                        sessionChangedMessage = notificationPreferenceSessionChangedMessage,
+                                    )
+                                },
+                            )
+                            AppTabRow(
+                                selectedTabIndex = selectedTabIndex,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                val tabs = listOf(strings.groupTabDetails, strings.groupTabPosts, strings.groupTabMembers, strings.groupTabGallery)
+                                tabs.forEachIndexed { index, title ->
+                                    AppTab(
+                                        selected = selectedTabIndex == index,
+                                        onClick = { selectedTabIndex = index },
+                                        text = { AppText(text = title, maxLines = 1) }
+                                    )
+                                }
+                            }
+                            when (selectedTabIndex) {
+                                0 -> DetailsContent(group = group, owner = owner, instances = groupInstances)
+                                1 -> PostsContent(
+                                    posts = posts,
+                                    roles = group.roles,
+                                    postAuthors = postAuthors,
+                                    isLoading = postsLoading,
+                                    isLoadingMore = postsLoadingMore,
+                                    endReached = postsEndReached,
+                                )
+                                2 -> MembersContent(users = memberUsers, isLoading = membersLoading)
+                                else -> GalleriesContent(group = group, galleryImages = galleryImages)
+                            }
+                            // 页面铺到屏幕底：末尾留出系统导航条的高度，最后一张卡片才不会被它压住
+                            Spacer(modifier = Modifier.height(24.dp + getInsetPadding(WindowInsets::getBottom)))
                         }
-                        // 页面铺到屏幕底：末尾留出系统导航条的高度，最后一张卡片才不会被它压住
-                        Spacer(modifier = Modifier.height(24.dp + getInsetPadding(WindowInsets::getBottom)))
-                    }
-                    CompositionLocalProvider(LocalGlassBackdrop provides glassBackdrop) {
-                        TopMenuBar(
+                        CompositionLocalProvider(LocalGlassBackdrop provides glassBackdrop) {
+                            TopMenuBar(
+                                topBarHeight = topBarHeight,
+                                sysTopPadding = sysTopPadding,
+                                offsetDp = 0.dp,
+                                ratio = ratio,
+                                onReturn = { currentNavigator.pop() },
+                                onMenu = if (canReport) {
+                                    { actionSheetIsVisible = true }
+                                } else null,
+                                menuContentDescription = strings.groupProfileMoreActions,
+                                centerContent = {
+                                    Spacer(
+                                        Modifier
+                                            .fillMaxSize()
+                                            .onGloballyPositioned { slot ->
+                                                pageCoordinates?.let {
+                                                    topBarTitleEndPx = it.localBoundingBoxOf(slot, clipBounds = false).right
+                                                }
+                                            },
+                                    )
+                                },
+                                actions = {
+                                    OfficialUrlShareButton(
+                                        url = "https://vrchat.com/home/group/${group.groupId}",
+                                    )
+                                    AppIconButton(
+                                        enabled = !isLoading &&
+                                            !isRepresentationUpdating &&
+                                            !isNotificationPreferenceUpdating,
+                                        onClick = screenModel::refreshGroupData,
+                                    ) {
+                                        if (isLoading) {
+                                            AppActivityIndicator(
+                                                modifier = Modifier.size(22.dp),
+                                                color = LocalContentColor.current,
+                                            )
+                                        } else {
+                                            AppIcon(
+                                                imageVector = AppIcons.Refresh,
+                                                contentDescription = "Refresh",
+                                            )
+                                        }
+                                    }
+                                },
+                            )
+                        }
+                        CollapsingTitleRow(
+                            group = group,
+                            membershipStatus = group.membershipStatus,
+                            scrollState = scrollState,
+                            bannerHeight = bannerHeight,
                             topBarHeight = topBarHeight,
                             sysTopPadding = sysTopPadding,
-                            offsetDp = 0.dp,
-                            ratio = ratio,
-                            onReturn = { currentNavigator.pop() },
-                            onMenu = if (canReport) {
-                                { actionSheetIsVisible = true }
-                            } else null,
-                            menuContentDescription = strings.groupProfileMoreActions,
-                            actions = {
-                                OfficialUrlShareButton(
-                                    url = "https://vrchat.com/home/group/${group.groupId}",
-                                )
-                                AppIconButton(
-                                    enabled = !isLoading &&
-                                        !isRepresentationUpdating &&
-                                        !isNotificationPreferenceUpdating,
-                                    onClick = screenModel::refreshGroupData,
-                                ) {
-                                    if (isLoading) {
-                                        AppActivityIndicator(
-                                            modifier = Modifier.size(22.dp),
-                                            color = LocalContentColor.current,
-                                        )
-                                    } else {
-                                        AppIcon(
-                                            imageVector = AppIcons.Refresh,
-                                            contentDescription = "Refresh",
-                                        )
-                                    }
-                                }
-                            },
+                            topBarTitleEndPx = { topBarTitleEndPx },
                         )
                     }
-                    CollapsingTitleRow(
-                        group = group,
-                        membershipStatus = group.membershipStatus,
-                        scrollPx = scrollState.value.toFloat(),
-                        bannerHeight = bannerHeight,
-                        topBarHeight = topBarHeight,
-                        sysTopPadding = sysTopPadding
-                    )
 
                 }
             }
@@ -541,12 +572,14 @@ private fun GroupSettingRow(
 private fun CollapsingTitleRow(
     group: GroupProfileVo,
     membershipStatus: String,
-    scrollPx: Float,
+    scrollState: ScrollState,
     bannerHeight: Dp,
     topBarHeight: Dp,
     sysTopPadding: Dp,
+    topBarTitleEndPx: () -> Float,
 ) {
     val density = LocalDensity.current
+    val scrollPx = scrollState.value.toFloat()
     val startIconSize = 64.dp
     val endIconSize = 28.dp
     val startYPx = with(density) { (bannerHeight - 16.dp - startIconSize).toPx() }
@@ -560,16 +593,44 @@ private fun CollapsingTitleRow(
     val yPx = (startYPx - scrollPx).coerceAtLeast(endYPx)
     val statusAlpha = 1f - progress
     val statusText = membershipStatus.lowercase()
+    // 这一行进入顶栏的高度范围后就会和右侧按钮同一高度：名字的右边界在那之前就要收到按钮左边
+    val topBarBottomPx = with(density) { (sysTopPadding + topBarHeight).toPx() }
+    val nameEndFraction = if (startYPx > topBarBottomPx) {
+        (scrollPx / (startYPx - topBarBottomPx)).coerceIn(0f, 1f)
+    } else {
+        1f
+    }
 
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
             .height(bannerHeight)
     ) {
-        val trailingActionsWidth = 112.dp * progress
-        val nameMaxWidth = (
-            maxWidth - 16.dp - xShift - iconSize - rowSpacing - trailingActionsWidth
-        ).coerceAtLeast(32.dp)
+        // 这一行和顶栏都铺满页面宽度、从页面左缘开始，顶栏量出的右边界可以直接用
+        val expandedNameEnd = maxWidth - 16.dp
+        val collapsedNameEnd = topBarTitleEndPx()
+            .takeUnless { it.isNaN() }
+            ?.let { with(density) { it.toDp() } - 8.dp }
+            ?.coerceAtMost(expandedNameEnd)
+            ?: expandedNameEnd
+        val nameEnd = lerp(expandedNameEnd, collapsedNameEnd, nameEndFraction)
+        val nameStart = 16.dp + xShift + iconSize + rowSpacing
+        // 名字以左缘为原点缩放：画出来的宽度 = 排版宽度 × nameScale
+        val nameMaxWidth = ((nameEnd - nameStart) / nameScale).coerceAtLeast(32.dp)
+        val name = group.name.ifBlank { strings.unknown }
+        val nameText = @Composable {
+            AppText(
+                modifier = Modifier.sharedBoundsBy(
+                    key = groupNameSharedKey(group.groupId),
+                    resizeMode = SharedTextBoundsResizeMode,
+                ).widthIn(max = nameMaxWidth),
+                text = name,
+                style = AppTheme.type.title2,
+                color = AppTheme.colors.label,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
         Row(
             modifier = Modifier
                 .padding(start = 16.dp)
@@ -592,20 +653,31 @@ private fun CollapsingTitleRow(
                 modifier = Modifier.graphicsLayer {
                     scaleX = nameScale
                     scaleY = nameScale
+                    // 贴着图标缩放：从中心缩的话名字越长，缩完离图标越远
+                    transformOrigin = TransformOrigin(0f, 0.5f)
                 },
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                AppText(
-                    modifier = Modifier.sharedBoundsBy(
-                        key = groupNameSharedKey(group.groupId),
-                        resizeMode = SharedTextBoundsResizeMode,
-                    ).widthIn(max = nameMaxWidth),
-                    text = group.name.ifBlank { strings.unknown },
-                    style = AppTheme.type.title2,
-                    color = AppTheme.colors.label,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                if (progress < 1f) {
+                    // 还没收进顶栏时，长按弹出菜单：完整名字 + 复制。
+                    // 这一行浮在页面上方，从它开始的拖动碰不到下面的页面，所以这里也接一份同一个滚动状态
+                    FullTextMenuBox(
+                        text = name,
+                        modifier = Modifier.scrollable(
+                            state = scrollState,
+                            orientation = Orientation.Vertical,
+                            reverseDirection = ScrollableDefaults.reverseDirection(
+                                LocalLayoutDirection.current,
+                                Orientation.Vertical,
+                                reverseScrolling = false,
+                            ),
+                        ),
+                    ) {
+                        nameText()
+                    }
+                } else {
+                    nameText()
+                }
                 if (statusAlpha == 0f) return@Row
                 Row(
                     modifier = Modifier.graphicsLayer { alpha = statusAlpha },

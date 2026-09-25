@@ -214,6 +214,8 @@ sealed class LocaleStrings {
     open val profileFriendRequestAccepted: String = "Friend Request Accepted"
     open val profileUnfriended: String = "Friend is Unfriended"
     open val profileUnfriend: String = "Unfriend"
+    open val copy: String = "Copy"
+    open val copied: String = "Copied"
     open val report: String = "Report"
     open val reportCategoryHeader: String = "What are you reporting?"
     open val reportReasonHeader: String = "Reason"

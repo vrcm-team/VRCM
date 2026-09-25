@@ -199,6 +199,8 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val profileFriendRequestAccepted = "フレンドリクエストを承認しました"
     override val profileUnfriended = "フレンド解除しました"
     override val profileUnfriend = "フレンド解除"
+    override val copy = "コピー"
+    override val copied = "コピーしました"
     override val report = "報告"
     override val reportCategoryHeader = "報告する内容"
     override val reportReasonHeader = "報告の理由"

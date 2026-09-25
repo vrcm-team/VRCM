@@ -362,7 +362,7 @@ fun UserInfoRow(
                 tint = GameColor.Rank.fromValue(user?.trustRank)
             )
             if (canCopy) {
-                SelectionContainer {
+                FullTextMenuBox(text = user?.displayName.orEmpty()) {
                     userNameText()
                 }
             } else {

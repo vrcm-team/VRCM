@@ -160,68 +160,71 @@ fun ProfileScaffold(
             thresholdNestedScrollConnection({ scrollState.value < scrollState.maxValue }) {
                 scope.launch { scrollState.scrollTo((scrollState.value + -it).roundToInt()) }
             }
-        AppSurface(
-            Modifier
-                .verticalScroll(
-                    state = scrollState,
-                    enabled = innerScrollState.value == 0,
-                )
-                .height(imageHeight + maxHeight)
-                .fillMaxWidth(),
-            color = AppTheme.colors.groupedBackground,
-        ) {
-            // 头图与信息卡片是内容层：顶栏的玻璃按钮取样它做模糊
-            Box(Modifier.fillMaxSize().glassBackdropSource(glassBackdrop), propagateMinConstraints = true) {
-                // 用户Image
-                ProfileImage(
-                    imageModifier,
-                    imageHeight,
-                    isHidden,
-                    offsetDp,
-                    ratio,
-                    blurDp,
-                    profileImageUrl,
-                    sharedImageCacheKey,
-                )
-                // 底部信息卡片
-                BottomCard(
-                    imageHeight,
-                    scaffoldHeight,
-                    ratio,
-                    topBarHeight,
-                    sysTopPadding,
-                    nestedScrollConnection,
-                    innerScrollState,
-                    content
-                )
-            }
-            // 顶部导航栏
-            CompositionLocalProvider(LocalGlassBackdrop provides glassBackdrop) {
-                TopMenuBar(
-                    topBarHeight,
-                    sysTopPadding,
-                    offsetDp,
-                    ratio,
-                    onReturn = onReturn,
-                    onMenu = onMenu,
-                    menuContentDescription = menuContentDescription,
-                    actions = topBarActions,
-                )
-            }
-            // 用户icon
-            ProfileIcon(
-                imageModifier,
-                isHidden,
-                lastIconPadding,
-                offsetDp,
-                imageHeight,
-                topIconRatio,
-                iconUrl,
+        // 页面里弹出的菜单画在另开的弹层上，模糊的也是这一层内容（同 AppScaffold）
+        CompositionLocalProvider(LocalPopupBackdrop provides glassBackdrop) {
+            AppSurface(
+                Modifier
+                    .verticalScroll(
+                        state = scrollState,
+                        enabled = innerScrollState.value == 0,
+                    )
+                    .height(imageHeight + maxHeight)
+                    .fillMaxWidth(),
+                color = AppTheme.colors.groupedBackground,
             ) {
-                scrollToTopController.scrollToTop(
-                    innerScrollState = innerScrollState,
-                    outerScrollState = scrollState,
-                )
+                // 头图与信息卡片是内容层：顶栏的玻璃按钮取样它做模糊
+                Box(Modifier.fillMaxSize().glassBackdropSource(glassBackdrop), propagateMinConstraints = true) {
+                    // 用户Image
+                    ProfileImage(
+                        imageModifier,
+                        imageHeight,
+                        isHidden,
+                        offsetDp,
+                        ratio,
+                        blurDp,
+                        profileImageUrl,
+                        sharedImageCacheKey,
+                    )
+                    // 底部信息卡片
+                    BottomCard(
+                        imageHeight,
+                        scaffoldHeight,
+                        ratio,
+                        topBarHeight,
+                        sysTopPadding,
+                        nestedScrollConnection,
+                        innerScrollState,
+                        content
+                    )
+                }
+                // 顶部导航栏
+                CompositionLocalProvider(LocalGlassBackdrop provides glassBackdrop) {
+                    TopMenuBar(
+                        topBarHeight,
+                        sysTopPadding,
+                        offsetDp,
+                        ratio,
+                        onReturn = onReturn,
+                        onMenu = onMenu,
+                        menuContentDescription = menuContentDescription,
+                        actions = topBarActions,
+                    )
+                }
+                // 用户icon
+                ProfileIcon(
+                    imageModifier,
+                    isHidden,
+                    lastIconPadding,
+                    offsetDp,
+                    imageHeight,
+                    topIconRatio,
+                    iconUrl,
+                ) {
+                    scrollToTopController.scrollToTop(
+                        innerScrollState = innerScrollState,
+                        outerScrollState = scrollState,
+                    )
+                }
             }
         }
     }

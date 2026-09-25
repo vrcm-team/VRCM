@@ -36,6 +36,7 @@ import io.github.vrcmteam.vrcm.network.api.files.FileApi
 import io.github.vrcmteam.vrcm.presentation.compoments.ABottomSheet
 import io.github.vrcmteam.vrcm.presentation.compoments.ATooltipBox
 import io.github.vrcmteam.vrcm.presentation.compoments.ContentReportSheet
+import io.github.vrcmteam.vrcm.presentation.compoments.FullTextMenuBox
 import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedSuffixKey
 import io.github.vrcmteam.vrcm.presentation.compoments.OfficialUrlShareButton
 import io.github.vrcmteam.vrcm.presentation.compoments.ProfileScaffold
@@ -443,7 +444,7 @@ private fun AvatarProfileContent(
     val navigator = currentNavigator
 
     // 名称
-    SelectionContainer {
+    FullTextMenuBox(text = avatarProfileVo.avatarName) {
         AppText(
             text = avatarProfileVo.avatarName,
             color = AppTheme.colors.label,

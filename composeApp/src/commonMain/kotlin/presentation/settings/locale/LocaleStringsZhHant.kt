@@ -197,6 +197,8 @@ internal object LocaleStringsZhHant : LocaleStrings() {
     override val profileFriendRequestAccepted = "已接受好友請求"
     override val profileUnfriended = "已刪除好友"
     override val profileUnfriend = "刪除好友"
+    override val copy = "複製"
+    override val copied = "已複製"
     override val report = "檢舉"
     override val reportCategoryHeader = "檢舉內容"
     override val reportReasonHeader = "檢舉原因"

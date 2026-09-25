@@ -19,7 +19,6 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -581,90 +580,93 @@ class WorldProfileScreen(
 
             // 背景图、信息区和底部面板是内容层：顶栏的玻璃按钮取样它做模糊
             val glassBackdrop = rememberGlassBackdrop()
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .glassBackdropSource(glassBackdrop)
-                    .background(AppTheme.colors.groupedBackground)
-            ) {
-                // ========== 渲染背景图像 ==========
-                RenderBackgroundImage(
-                    worldId = location ?: worldProfileVo.worldId,
-                    imageUrl = worldProfileVo.worldImageUrl ?: "",
-                    hazeState = hazeState,
-                    imageHeight = sizes.imageHigh * 2,
-                    sharedKeyPrefix = sharedKeyPrefix,
-                    sharedImageCacheKey = sharedImageCacheKey,
-                )
+            // 页面里弹出的菜单画在另开的弹层上，模糊的也是这一层内容（同 AppScaffold）
+            CompositionLocalProvider(LocalPopupBackdrop provides glassBackdrop) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .glassBackdropSource(glassBackdrop)
+                        .background(AppTheme.colors.groupedBackground)
+                ) {
+                    // ========== 渲染背景图像 ==========
+                    RenderBackgroundImage(
+                        worldId = location ?: worldProfileVo.worldId,
+                        imageUrl = worldProfileVo.worldImageUrl ?: "",
+                        hazeState = hazeState,
+                        imageHeight = sizes.imageHigh * 2,
+                        sharedKeyPrefix = sharedKeyPrefix,
+                        sharedImageCacheKey = sharedImageCacheKey,
+                    )
 
-                // ========== 应用模糊效果 ==========
-                ApplyBlurEffect(
-                    hazeState = hazeState,
-                    blurRadius = bottomSheetState.blurRadius.dp,
-                    overlayAlpha = bottomSheetState.overlayAlpha
-                )
+                    // ========== 应用模糊效果 ==========
+                    ApplyBlurEffect(
+                        hazeState = hazeState,
+                        blurRadius = bottomSheetState.blurRadius.dp,
+                        overlayAlpha = bottomSheetState.overlayAlpha
+                    )
 
-                // ========== 主内容区域 ==========
-                RenderMainContent(
-                    worldProfileVo = worldProfileVo,
-                    sizes = sizes,
-                    collapsedAlphaVariant = 1 - bottomSheetState.collapsedAlpha,
-                )
+                    // ========== 主内容区域 ==========
+                    RenderMainContent(
+                        worldProfileVo = worldProfileVo,
+                        sizes = sizes,
+                        collapsedAlphaVariant = 1 - bottomSheetState.collapsedAlpha,
+                    )
 
-                // ========== BottomSheet ==========
-                RenderBottomSheet(
-                    worldProfileVo = worldProfileVo,
-                    activeInstances = activeInstances,
-                    favoriteEntryState = favoriteEntryState,
-                    bottomSheetState = bottomSheetState,
-                    sizes = sizes,
-                    onExpanded = { sheetState = SheetState.EXPANDED },
-                    onDragDelta = { delta -> dragOffset += -delta },
-                    onDragStopped = { velocity ->
-                        // 决定最终状态并重置拖动偏移
-                        sheetState = determineSheetState(
-                            currentHeightValue = bottomSheetState.targetHeight.value + dragOffset,
-                            velocity = velocity,
-                            currentState = sheetState,
-                            sizes = sizes
-                        )
-                        dragOffset = 0f
-                    },
-                    onCreateRoom = createRoom,
-                    onFavoriteWorld = favoriteWorld,
-                    onOpenRoom = openRoom,
-                )
-            }
+                    // ========== BottomSheet ==========
+                    RenderBottomSheet(
+                        worldProfileVo = worldProfileVo,
+                        activeInstances = activeInstances,
+                        favoriteEntryState = favoriteEntryState,
+                        bottomSheetState = bottomSheetState,
+                        sizes = sizes,
+                        onExpanded = { sheetState = SheetState.EXPANDED },
+                        onDragDelta = { delta -> dragOffset += -delta },
+                        onDragStopped = { velocity ->
+                            // 决定最终状态并重置拖动偏移
+                            sheetState = determineSheetState(
+                                currentHeightValue = bottomSheetState.targetHeight.value + dragOffset,
+                                velocity = velocity,
+                                currentState = sheetState,
+                                sizes = sizes
+                            )
+                            dragOffset = 0f
+                        },
+                        onCreateRoom = createRoom,
+                        onFavoriteWorld = favoriteWorld,
+                        onOpenRoom = openRoom,
+                    )
+                }
 
-            // ========== 顶部菜单栏 ==========
-            CompositionLocalProvider(LocalGlassBackdrop provides glassBackdrop) {
-                WorldProfileTopBar(
-                    worldId = worldProfileVo.worldId,
-                    worldName = worldProfileVo.worldName,
-                    blurProgress = bottomSheetState.blurProgress,
-                    topBarHeight = sizes.topBarHeight,
-                    sysTopPadding = sizes.sysTopPadding,
-                    onReturn = handleReturn,
-                    onCollapse = { sheetState = SheetState.COLLAPSED },
-                    onManagePersistence = { showWorldPersistenceDialog = true },
-                    isRefreshing = isRefreshing,
-                    onRefresh = onRefresh,
-                    publicationState = publicationState,
-                    onPublicationAction = { publicationConfirmation = it },
-                    showDelete = isDeleteAvailable && !isDeleted,
-                    deleteEnabled = canDeleteNow,
-                    isDeleting = isDeleting,
-                    isDeleted = isDeleted,
-                    onDelete = { showDeleteConfirmation = true },
-                    homeWorldActionState = homeWorldActionState,
-                    onHomeWorldClick = onHomeWorldClick,
-                    canEditImage = canEditImage,
-                    onEditImage = onEditImage,
-                    canEditMetadata = canEditMetadata,
-                    onEditMetadata = onEditMetadata,
-                    showReport = canReport,
-                    onReport = { showReportSheet = true },
-                )
+                // ========== 顶部菜单栏 ==========
+                CompositionLocalProvider(LocalGlassBackdrop provides glassBackdrop) {
+                    WorldProfileTopBar(
+                        worldId = worldProfileVo.worldId,
+                        worldName = worldProfileVo.worldName,
+                        blurProgress = bottomSheetState.blurProgress,
+                        topBarHeight = sizes.topBarHeight,
+                        sysTopPadding = sizes.sysTopPadding,
+                        onReturn = handleReturn,
+                        onCollapse = { sheetState = SheetState.COLLAPSED },
+                        onManagePersistence = { showWorldPersistenceDialog = true },
+                        isRefreshing = isRefreshing,
+                        onRefresh = onRefresh,
+                        publicationState = publicationState,
+                        onPublicationAction = { publicationConfirmation = it },
+                        showDelete = isDeleteAvailable && !isDeleted,
+                        deleteEnabled = canDeleteNow,
+                        isDeleting = isDeleting,
+                        isDeleted = isDeleted,
+                        onDelete = { showDeleteConfirmation = true },
+                        homeWorldActionState = homeWorldActionState,
+                        onHomeWorldClick = onHomeWorldClick,
+                        canEditImage = canEditImage,
+                        onEditImage = onEditImage,
+                        canEditMetadata = canEditMetadata,
+                        onEditMetadata = onEditMetadata,
+                        showReport = canReport,
+                        onReport = { showReportSheet = true },
+                    )
+                }
             }
         }
     }
@@ -948,21 +950,15 @@ private fun RenderMainContent(
             verticalArrangement = Arrangement.spacedBy(2.dp),
             horizontalAlignment = Alignment.Start
         ) {
-            ATooltipBox(
-                tooltip = {
-                    AppText(text = worldProfileVo.worldName)
-                },
-            ) {
-                SelectionContainer {
-                    AppText(
-                        text = worldProfileVo.worldName,
-                        color = AppTheme.colors.label,
-                        style = AppTheme.type.title1,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
+            FullTextMenuBox(text = worldProfileVo.worldName) {
+                AppText(
+                    text = worldProfileVo.worldName,
+                    color = AppTheme.colors.label,
+                    style = AppTheme.type.title1,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
             Box(
                 modifier = Modifier.enableIf(worldProfileVo.authorName != null){
