@@ -33,6 +33,65 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class GroupProfileRepresentationUpdateTest : MainDispatcherTest() {
     @Test
+    fun groupProfileUsesTheRepresentedGroupEndpointForRepresentationState() = runBlocking {
+        val account = AccountDto(REPRESENTATION_USER_ID, username = "representation-source")
+        SharedFlowCentre.emitAuthenticated(account)
+        val fixture = createFixture(SimpleGroupProfileCacheStore()) { request ->
+            when {
+                request.url.encodedPath == "/groups/$REPRESENTATION_GROUP_ID" ->
+                    respondJson(representationGroupJson(isRepresenting = false))
+
+                request.url.encodedPath == "/users/$REPRESENTATION_USER_ID/groups/represented" ->
+                    respondJson(
+                        """{"groupId":"$REPRESENTATION_GROUP_ID","isRepresenting":true}"""
+                    )
+
+                else -> error("Unexpected request: ${request.method} ${request.url}")
+            }
+        }
+        try {
+            fixture.model.loadGroupData(representationProfile(isRepresenting = false))
+            awaitUntil {
+                fixture.model.groupProfileState.value?.myMember?.isRepresenting == true
+            }
+        } finally {
+            fixture.close()
+            SharedFlowCentre.emitLogout()
+        }
+    }
+
+    @Test
+    fun existingGroupProfileFollowsRepresentationChangesFromAnotherGroup() = runBlocking {
+        val account = AccountDto(REPRESENTATION_USER_ID, username = "representation-broadcast")
+        SharedFlowCentre.emitAuthenticated(account)
+        val cache = BlockingGroupProfileCacheStore()
+        val fixture = createFixture(cache) { request ->
+            error("Unexpected request: ${request.method} ${request.url}")
+        }
+        val sessionToken = checkNotNull(SharedFlowCentre.currentSession.value).token
+        try {
+            fixture.model.loadGroupData(representationProfile(isRepresenting = true))
+            cache.loadStarted.await()
+            awaitUntil { fixture.model.groupProfileState.value?.myMember?.isRepresenting == true }
+
+            SharedFlowCentre.emitGroupRepresentationChanged(
+                sessionToken = sessionToken,
+                representedGroupId = "another-group",
+            )
+            awaitUntil { fixture.model.groupProfileState.value?.myMember?.isRepresenting == false }
+
+            SharedFlowCentre.emitGroupRepresentationChanged(
+                sessionToken = sessionToken,
+                representedGroupId = REPRESENTATION_GROUP_ID,
+            )
+            awaitUntil { fixture.model.groupProfileState.value?.myMember?.isRepresenting == true }
+        } finally {
+            fixture.close()
+            SharedFlowCentre.emitLogout()
+        }
+    }
+
+    @Test
     fun notificationPreferenceUpdatePublishesAndCachesTheAuthoritativeState() = runBlocking {
         val account = AccountDto(REPRESENTATION_USER_ID, username = "notification-state")
         SharedFlowCentre.emitAuthenticated(account)
@@ -197,7 +256,7 @@ class GroupProfileRepresentationUpdateTest : MainDispatcherTest() {
     }
 
     private fun createFixture(
-        cache: BlockingGroupProfileCacheStore,
+        cache: GroupProfileCacheStore,
         handler: MockRequestHandler,
     ): RepresentationModelFixture {
         val client = HttpClient(MockEngine) {
@@ -255,6 +314,13 @@ private class BlockingGroupProfileCacheStore(
         deletedGroupIds += groupId
     }
 
+    override suspend fun clearAll() = Unit
+}
+
+private class SimpleGroupProfileCacheStore : GroupProfileCacheStore {
+    override suspend fun load(groupId: String): GroupProfileCache? = null
+    override suspend fun save(cache: GroupProfileCache) = Unit
+    override suspend fun delete(groupId: String) = Unit
     override suspend fun clearAll() = Unit
 }
 

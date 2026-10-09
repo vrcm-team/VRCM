@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.vrcmteam.vrcm.core.extensions.pretty
 import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
+import io.github.vrcmteam.vrcm.core.shared.GroupRepresentationState
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.BlueprintType
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
@@ -676,6 +677,8 @@ class UserProfileScreenModel internal constructor(
     private val _userGroups = mutableStateOf<List<LimitedUserGroup>>(emptyList())
     val userGroups by _userGroups
 
+    private var representationState: GroupRepresentationState? = null
+
     private val _mutualGroups = mutableStateOf<List<LimitedUserGroup>>(emptyList())
     val mutualGroups by _mutualGroups
 
@@ -794,6 +797,34 @@ class UserProfileScreenModel internal constructor(
             }
         }
         viewModelScope.launch {
+            SharedFlowCentre.groupRepresentationState.collect { state ->
+                if (state == null) {
+                    representationState = null
+                    return@collect
+                }
+                if (
+                    profileTargetUserId != cacheOwnerUserId ||
+                    state.sessionToken.userId != profileTargetUserId ||
+                    !SharedFlowCentre.isCurrentSession(state.sessionToken)
+                ) {
+                    return@collect
+                }
+                representationState = state
+                val groups = applyRepresentationChange(_userGroups.value, state.representedGroupId)
+                val mutual = applyRepresentationChange(_mutualGroups.value, state.representedGroupId)
+                val groupsChanged = _userGroups.value != groups
+                val mutualChanged = _mutualGroups.value != mutual
+                if (groupsChanged) _userGroups.value = groups
+                if (mutualChanged) _mutualGroups.value = mutual
+                if (groupsChanged || mutualChanged) {
+                    viewModelScope.launch(Dispatchers.IO) {
+                        runCatching { saveCache() }
+                            .onFailure { logger.error("GroupRepresentationCache: ${it.message.orEmpty()}") }
+                    }
+                }
+            }
+        }
+        viewModelScope.launch {
             authService.currentUserState.collect { currentUser ->
                 _isBoopAllowed.value = currentUser?.isBoopingEnabled != false
             }
@@ -897,18 +928,36 @@ class UserProfileScreenModel internal constructor(
         _userState.value = profile
         computeFriendLocation(profile.location)
         val cachedVisibleGroups = visibleUserGroups(cache.groups, profile.isSelf)
-        _userGroups.value = prioritizeRepresentedGroup(
-            groups = cachedVisibleGroups,
-            representedGroup = cachedVisibleGroups.firstOrNull { it.isRepresenting },
+        _userGroups.value = applyCurrentRepresentationState(
+            prioritizeRepresentedGroup(
+                groups = cachedVisibleGroups,
+                representedGroup = cachedVisibleGroups.firstOrNull { it.isRepresenting },
+            )
         )
-        _mutualGroups.value = prioritizeRepresentedGroup(
-            groups = cache.mutualGroups,
-            representedGroup = cache.mutualGroups.firstOrNull { it.isRepresenting },
+        _mutualGroups.value = applyCurrentRepresentationState(
+            prioritizeRepresentedGroup(
+                groups = cache.mutualGroups,
+                representedGroup = cache.mutualGroups.firstOrNull { it.isRepresenting },
+            )
         )
         _createdWorlds.value = cache.createdWorlds
         createdWorldDetailRevisions = cache.createdWorldDetailRevisions
         _createdAvatars.value = cache.createdAvatars
         setFavoritedWorldGroups(cache.favoritedWorlds)
+    }
+
+    private fun applyCurrentRepresentationState(
+        groups: List<LimitedUserGroup>,
+    ): List<LimitedUserGroup> {
+        val state = representationState ?: return groups
+        if (
+            profileTargetUserId != cacheOwnerUserId ||
+            state.sessionToken.userId != profileTargetUserId ||
+            !SharedFlowCentre.isCurrentSession(state.sessionToken)
+        ) {
+            return groups
+        }
+        return applyRepresentationChange(groups, state.representedGroupId)
     }
 
     private suspend fun restoreSelfFavoriteWorldCache(profileCache: UserProfileCache?): Boolean {
@@ -1447,10 +1496,10 @@ class UserProfileScreenModel internal constructor(
             logger.error("Loading represented group failed: ${it.message}")
         }
 
-        val mergedGroups = prioritizeRepresentedGroup(
+        val mergedGroups = applyCurrentRepresentationState(prioritizeRepresentedGroup(
             groups = groups,
             representedGroup = representedResult.getOrNull(),
-        )
+        ))
         val visibleGroups = visibleUserGroups(mergedGroups, userState.isSelf)
         val mutual = mergedGroups.filter { it.mutualGroup }
         if (_userGroups.value != visibleGroups) _userGroups.value = visibleGroups
@@ -1870,6 +1919,18 @@ internal fun visibleUserGroups(
     groups: List<LimitedUserGroup>,
     isSelf: Boolean,
 ): List<LimitedUserGroup> = if (isSelf) groups else groups.filterNot { it.mutualGroup }
+
+internal fun applyRepresentationChange(
+    groups: List<LimitedUserGroup>,
+    representedGroupId: String?,
+): List<LimitedUserGroup> {
+    val normalizedId = representedGroupId?.takeIf { it.isNotBlank() }
+    val markedGroups = groups.map { group ->
+        group.copy(isRepresenting = normalizedId != null && group.stableGroupId() == normalizedId)
+    }
+    val represented = markedGroups.firstOrNull { it.isRepresenting }
+    return if (represented == null) markedGroups else prioritizeRepresentedGroup(markedGroups, represented)
+}
 
 internal fun prioritizeRepresentedGroup(
     groups: List<LimitedUserGroup>,
