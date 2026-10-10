@@ -28,6 +28,12 @@ data class AccountWebSocketEvent(
     val event: WebSocketEvent,
 )
 
+/** 当前登录会话代表的群组；群组代表切换后供各页面同步本地状态。 */
+data class GroupRepresentationState(
+    val sessionToken: AccountSessionToken,
+    val representedGroupId: String?,
+)
+
 internal class AuthenticationSessionRegistry {
     private val lock = SynchronizedObject()
     private var generation = 0L
@@ -71,6 +77,10 @@ object SharedFlowCentre {
     private val _logout = MutableSharedFlow<Unit>()
     val logout: SharedFlow<Unit> = _logout.asSharedFlow()
 
+    private val _groupRepresentationState = MutableStateFlow<GroupRepresentationState?>(null)
+    val groupRepresentationState: StateFlow<GroupRepresentationState?> =
+        _groupRepresentationState.asStateFlow()
+
     val toastText = MutableSharedFlow<ToastText>()
 
     val toPagerTop = MutableSharedFlow<Unit>()
@@ -82,7 +92,10 @@ object SharedFlowCentre {
     val refreshRequest = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
     suspend fun emitAuthenticated(account: AccountDto) {
-        _authed.emit(sessionRegistry.authenticate(account))
+        sessionRegistry.authenticate(account).also {
+            _groupRepresentationState.value = null
+            _authed.emit(it)
+        }
     }
 
     suspend fun emitWebSocket(event: AccountWebSocketEvent) {
@@ -91,7 +104,20 @@ object SharedFlowCentre {
 
     suspend fun emitLogout() {
         sessionRegistry.invalidate()
+        _groupRepresentationState.value = null
         _logout.emit(Unit)
+    }
+
+    suspend fun emitGroupRepresentationChanged(
+        sessionToken: AccountSessionToken,
+        representedGroupId: String?,
+    ) {
+        if (sessionRegistry.isCurrent(sessionToken)) {
+            _groupRepresentationState.value = GroupRepresentationState(
+                sessionToken = sessionToken,
+                representedGroupId = representedGroupId,
+            )
+        }
     }
 
     fun isCurrentSession(token: AccountSessionToken): Boolean =

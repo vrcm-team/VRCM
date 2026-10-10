@@ -66,7 +66,7 @@ class GroupRepresentationCoordinatorTest {
     }
 
     @Test
-    fun refreshedStateMustMatchTheRequestedState() = runTest {
+    fun staleRepresentationDetailDoesNotTurnASuccessfulMutationIntoAFailure() = runTest {
         val coordinator = coordinator { token, _, _ ->
             successfulResponse(token, isRepresenting = false)
         }
@@ -77,7 +77,7 @@ class GroupRepresentationCoordinatorTest {
             sessionToken = SESSION_TOKEN,
         )
 
-        assertIs<GroupRepresentationUpdateResult.Failed>(result)
+        assertIs<GroupRepresentationUpdateResult.Updated>(result)
     }
 
     @Test

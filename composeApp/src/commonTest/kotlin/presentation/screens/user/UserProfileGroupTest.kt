@@ -96,4 +96,29 @@ class UserProfileGroupTest {
         assertEquals(listOf("current", "stale"), result.map { it.groupId })
         assertEquals(listOf(true, false), result.map { it.isRepresenting })
     }
+
+    @Test
+    fun representationChangeLeavesOnlyTheCurrentGroupMarked() {
+        val stale = LimitedUserGroup(
+            id = "membership-stale",
+            groupId = "stale",
+            isRepresenting = true,
+        )
+        val current = LimitedUserGroup(
+            id = "membership-current",
+            groupId = "current",
+        )
+
+        val result = applyRepresentationChange(
+            groups = listOf(stale, current),
+            representedGroupId = "current",
+        )
+
+        assertEquals(listOf("current", "stale"), result.map { it.groupId })
+        assertEquals(listOf(true, false), result.map { it.isRepresenting })
+        assertEquals(
+            listOf(false, false),
+            applyRepresentationChange(result, representedGroupId = null).map { it.isRepresenting },
+        )
+    }
 }

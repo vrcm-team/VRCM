@@ -94,9 +94,7 @@ internal class GroupRepresentationCoordinator(
             }
             response.result.fold(
                 onSuccess = { refreshedGroup ->
-                    if (refreshedGroup.hasActiveMembership(group.groupId, sessionToken.userId) &&
-                        refreshedGroup.myMember?.isRepresenting == isRepresenting
-                    ) {
+                    if (refreshedGroup.hasActiveMembership(group.groupId, sessionToken.userId)) {
                         GroupRepresentationUpdateResult.Updated(
                             group = refreshedGroup,
                             sessionToken = response.sessionToken,
@@ -104,7 +102,7 @@ internal class GroupRepresentationCoordinator(
                     } else {
                         GroupRepresentationUpdateResult.Failed(
                             error = IllegalStateException(
-                                "Refreshed group representation does not match the request"
+                                "Refreshed group membership does not match the representation request"
                             ),
                             sessionToken = response.sessionToken,
                         )

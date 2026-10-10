@@ -3,6 +3,7 @@ package io.github.vrcmteam.vrcm.presentation.screens.group
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
+import io.github.vrcmteam.vrcm.core.shared.GroupRepresentationState
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
@@ -149,6 +150,11 @@ class GroupProfileScreenModel(
                 representationSessionUserId = nextUserId
             }
         }
+        viewModelScope.launch {
+            SharedFlowCentre.groupRepresentationState.collect { state ->
+                applyRepresentationState(state)
+            }
+        }
     }
 
     fun loadGroupData(groupProfileVo: GroupProfileVo) {
@@ -164,11 +170,15 @@ class GroupProfileScreenModel(
         }
         viewModelScope.launch {
             initialLoadGate.runIfNeeded(groupId) {
-                _groupProfileState.value = groupProfileVo
+                _groupProfileState.value = groupProfileVo.withRepresentationState(
+                    SharedFlowCentre.groupRepresentationState.value,
+                )
 
                 val cached = groupProfileCacheStore.load(groupId)
                 if (cached != null) {
-                    _groupProfileState.value = GroupProfileVo(cached.group)
+                    _groupProfileState.value = GroupProfileVo(cached.group).withRepresentationState(
+                        SharedFlowCentre.groupRepresentationState.value,
+                    )
                 }
                 refreshGroupData(
                     refreshProfile = cached == null || cached.isExpired(nowMilliseconds()),
@@ -218,7 +228,10 @@ class GroupProfileScreenModel(
                 if (refreshProfile) {
                     authService.reTryAuthCatching {
                         groupsApi.fetchGroup(groupId, includeRoles = true)
-                    }.onSuccess { groupData ->
+                    }.onSuccess { fetchedGroup ->
+                        val groupData = fetchedGroup
+                            .withCurrentUserRepresentation()
+                            .withRepresentationState(SharedFlowCentre.groupRepresentationState.value)
                         groupProfileCacheStore.save(
                             GroupProfileCache(
                                 group = groupData,
@@ -256,6 +269,66 @@ class GroupProfileScreenModel(
     }
 
     private fun nowMilliseconds(): Long = Clock.System.now().toEpochMilliseconds()
+
+    /**
+     * 群组详情接口的 myMember.isRepresenting 可能仍是旧值；代表群组接口是个人资料使用的权威来源。
+     */
+    private suspend fun GroupData.withCurrentUserRepresentation(
+        fallbackRepresentation: Boolean? = null,
+    ): GroupData {
+        val sessionToken = SharedFlowCentre.currentSession.value?.token ?: return this
+        val representation = runCatching {
+            usersApi.getRepresentedGroup(sessionToken.userId)?.groupId
+        }.fold(
+            onSuccess = { representedGroupId ->
+                when {
+                    representedGroupId == null -> false
+                    representedGroupId.isBlank() -> fallbackRepresentation ?: return this
+                    else -> representedGroupId == id
+                }
+            },
+            onFailure = { fallbackRepresentation ?: return this },
+        )
+        return myMember?.let { member ->
+            copy(myMember = member.copy(isRepresenting = representation))
+        } ?: this
+    }
+
+    private fun applyRepresentationState(state: GroupRepresentationState?) {
+        val group = _groupProfileState.value ?: return
+        val token = state?.sessionToken ?: return
+        if (!SharedFlowCentre.isCurrentSession(token)) return
+        val updated = group.withRepresentationState(state)
+        if (updated != group) _groupProfileState.value = updated
+    }
+
+    private fun GroupProfileVo.withRepresentationState(
+        state: GroupRepresentationState?,
+    ): GroupProfileVo {
+        val token = state?.sessionToken ?: return this
+        if (!SharedFlowCentre.isCurrentSession(token)) return this
+        return withRepresentation(state.representedGroupId == groupId)
+    }
+
+    private fun GroupData.withRepresentationState(
+        state: GroupRepresentationState?,
+    ): GroupData {
+        val token = state?.sessionToken ?: return this
+        if (!SharedFlowCentre.isCurrentSession(token)) return this
+        return withRepresentation(state.representedGroupId == id)
+    }
+
+    private fun GroupProfileVo.withRepresentation(isRepresenting: Boolean): GroupProfileVo {
+        val member = myMember ?: return this
+        return if (member.isRepresenting == isRepresenting) {
+            this
+        } else {
+            copy(myMember = member.copy(isRepresenting = isRepresenting))
+        }
+    }
+
+    private fun GroupData.withRepresentation(isRepresenting: Boolean): GroupData =
+        myMember?.let { copy(myMember = it.copy(isRepresenting = isRepresenting)) } ?: this
 
     fun joinGroup() {
         val groupId = _groupProfileState.value?.groupId ?: return
@@ -331,12 +404,19 @@ class GroupProfileScreenModel(
                 ) {
                     is GroupRepresentationUpdateResult.Updated -> {
                         if (acceptsRepresentationResult(groupId, generation, result.sessionToken)) {
-                            _groupProfileState.value = GroupProfileVo(result.group)
+                            val group = result.group
+                                .withCurrentUserRepresentation(fallbackRepresentation = isRepresenting)
+                                .withRepresentation(isRepresenting)
+                            _groupProfileState.value = GroupProfileVo(group)
+                            SharedFlowCentre.emitGroupRepresentationChanged(
+                                sessionToken = result.sessionToken,
+                                representedGroupId = groupId.takeIf { isRepresenting },
+                            )
                             saveRepresentationCache(
                                 groupId = groupId,
                                 generation = generation,
                                 sessionToken = result.sessionToken,
-                                group = result.group,
+                                group = group,
                             )
                         }
                     }
