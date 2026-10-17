@@ -1,21 +1,28 @@
 name: Android Build CI
 
-# 触发条件：推送代码到 main 分支或从 main 分支发起 pull request 或者手动触发
+# 在面向 main 的 PR 合并前检查；保留手动触发。
 on:
-  push:
+  pull_request:
     branches:
       - main
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest # 在最新的 Ubuntu 环境下运行
 
     steps:
-      - uses: actions/checkout@v3 # 检出代码仓库
+      - uses: actions/checkout@v6 # 检出代码仓库
 
       - name: Set up JDK 17 # 设置 JDK 版本为 17
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v5
         with:
           java-version: '17'
           distribution: 'temurin'
@@ -39,25 +46,15 @@ jobs:
           echo "key_alias=androiddebugkey" >> local.properties
           echo "key_pass=android" >> local.properties
 
-      - name: Create gradle.properties file # 创建 gradle.properties 文件，设置 Gradle 和 Kotlin 编译选项
-        run: |
-          echo "#Kotlin" > gradle.properties
-          echo "kotlin.code.style=official" >> gradle.properties
-          echo "kotlin.daemon.jvmargs=-Xmx2048M" >> gradle.properties
-          echo "" >> gradle.properties
-          echo "#Gradle" >> gradle.properties
-          echo "org.gradle.jvmargs=-Xmx8192M -Dfile.encoding=UTF-8 -Dkotlin.daemon.jvm.options=\"-Xmx8192M\"" >> gradle.properties
-          echo "systemProp.https.protocols=TLSv1,TLSv1.1,TLSv1.2,TLSv1.3" >> gradle.properties
-          echo "" >> gradle.properties
-          echo "#Android" >> gradle.properties
-          echo "android.nonTransitiveRClass=true" >> gradle.properties
-          echo "android.useAndroidX=true" >> gradle.properties
-
       - name: Grant execute permission for gradlew # 给 gradlew 脚本添加执行权限
         run: chmod +x gradlew
 
       - name: Build Debug APK with Gradle # 使用 Gradle 构建 Debug APK
-        run: ./gradlew assembleDebug --info
+        # Gradle 使用 2GB、Kotlin 编译进程使用 4GB，单 worker 避免两个渠道同时编译争用内存。
+        run: |
+          ./gradlew :composeApp:assembleDebug --stacktrace --max-workers=1 \
+            -Dorg.gradle.jvmargs="-Xmx2048M -Dfile.encoding=UTF-8" \
+            -Pkotlin.daemon.jvmargs=-Xmx4096M
 
       - name: List APK files (for debugging) # 列出所有生成的 APK 文件（用于调试）
         run: find . -name "*.apk"
