@@ -21,6 +21,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -29,6 +30,28 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class FavoriteServiceSessionTest {
+    @Test
+    fun unauthenticatedServiceInitializationDoesNotRequestFavoriteLimits() = runBlocking {
+        SharedFlowCentre.emitLogout()
+        val requestStarted = CompletableDeferred<Unit>()
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler {
+                    requestStarted.complete(Unit)
+                    respond("missing credentials", HttpStatusCode.Unauthorized)
+                }
+            }
+        }
+        val service = favoriteService(client)
+        try {
+            assertEquals(null, withTimeoutOrNull(1_000) { requestStarted.await() })
+        } finally {
+            service.dispose()
+            client.close()
+            SharedFlowCentre.emitLogout()
+        }
+    }
+
     @Test
     fun unauthenticatedLoadReturnsFailureWithoutCallingFavoritesApi() = runBlocking {
         SharedFlowCentre.emitLogout()
