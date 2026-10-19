@@ -93,8 +93,14 @@ data class AvatarUnityPackage(
     val variant: String? = null,
 )
 
+internal val AvatarUnityPackage.isImpostorVariant: Boolean
+    get() = variant.equals("impostor", ignoreCase = true)
+
+internal val AvatarData.playableUnityPackages: List<AvatarUnityPackage>
+    get() = unityPackages.filterNot { it.isImpostorVariant }
+
 internal val AvatarData.hasImpostor: Boolean
     get() = unityPackages.any { unityPackage ->
         !unityPackage.impostorUrl.isNullOrBlank() ||
-            unityPackage.variant.equals("impostor", ignoreCase = true)
+            unityPackage.isImpostorVariant
     }
