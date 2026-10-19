@@ -9,6 +9,7 @@ import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarImpostorQueueStats
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarImpostorServiceStatus
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarUnityPackage
+import io.github.vrcmteam.vrcm.network.api.avatars.data.playableUnityPackages
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteData
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteGroupData
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
@@ -114,7 +115,14 @@ class AvatarImpostorBuildTest : MainDispatcherTest() {
 
     @Test
     fun impostorPackageUsesRebuildStateAndIsNotShownAsAPlayablePlatform() = runBlocking {
-        val data = avatar(hasImpostor = true)
+        val data = avatar(hasImpostor = false).copy(
+            unityPackages = listOf(
+                AvatarUnityPackage(platform = "standalonewindows"),
+                AvatarUnityPackage(platform = "standalonewindows", variant = "impostor"),
+                AvatarUnityPackage(platform = "android", variant = "impostor"),
+                AvatarUnityPackage(platform = "ios", variant = "impostor"),
+            )
+        )
         val profile = AvatarProfileVo(data)
         val linkedProfile = AvatarProfileVo(
             avatar(hasImpostor = false).copy(
@@ -129,6 +137,10 @@ class AvatarImpostorBuildTest : MainDispatcherTest() {
 
         assertTrue(profile.hasImpostor)
         assertTrue(linkedProfile.hasImpostor)
+        assertEquals(
+            listOf("standalonewindows"),
+            data.playableUnityPackages.map { it.platform },
+        )
         assertEquals(listOf("standalonewindows"), profile.platformInfos.map { it.platform })
     }
 

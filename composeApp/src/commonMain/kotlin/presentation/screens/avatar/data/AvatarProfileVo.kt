@@ -2,6 +2,7 @@ package io.github.vrcmteam.vrcm.presentation.screens.avatar.data
 
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.network.api.avatars.data.hasImpostor
+import io.github.vrcmteam.vrcm.network.api.avatars.data.playableUnityPackages
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -40,9 +41,7 @@ data class AvatarProfileVo(
         createdAt = avatar.createdAt,
         updatedAt = avatar.updatedAt,
         version = avatar.version,
-        platformInfos = avatar.unityPackages.filterNot { pkg ->
-            pkg.variant.equals("impostor", ignoreCase = true)
-        }.map { pkg ->
+        platformInfos = avatar.playableUnityPackages.map { pkg ->
             AvatarPlatformInfo(
                 platform = pkg.platform ?: "unknown",
                 unityVersion = pkg.unityVersion,

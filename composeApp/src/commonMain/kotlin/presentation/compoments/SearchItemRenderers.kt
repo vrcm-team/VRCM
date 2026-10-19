@@ -22,6 +22,7 @@ import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.attributes.lastSeenAt
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
+import io.github.vrcmteam.vrcm.network.api.avatars.data.playableUnityPackages
 import io.github.vrcmteam.vrcm.network.api.files.data.PlatformType.*
 import io.github.vrcmteam.vrcm.network.api.groups.data.LimitedGroup
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
@@ -418,7 +419,7 @@ fun LazyItemScope.renderAvatarItem(
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 remember(avatar.unityPackages) {
-                    avatar.unityPackages.mapNotNull { pkg ->
+                    avatar.playableUnityPackages.mapNotNull { pkg ->
                         when (pkg.platform?.lowercase()) {
                             "android" -> Android
                             "ios" -> Ios
