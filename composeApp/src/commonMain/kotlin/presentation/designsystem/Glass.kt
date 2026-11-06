@@ -76,6 +76,9 @@ data class GlassSpec(
 /** 平台能不能做背景模糊：iOS / 桌面恒可以，Android 需要 API 31+ 的 RenderEffect。 */
 fun platformSupportsBackdropBlur(): Boolean = HazeDefaults.blurEnabled()
 
+/** Windows 的 Direct3D 渐进模糊可能卡住渲染线程，由各平台决定是否启用。 */
+internal expect fun supportsProgressiveBackdropBlur(): Boolean
+
 @Composable
 fun rememberGlassSpec(style: GlassStyle = GlassStyle.Regular, backdropAvailable: Boolean = true): GlassSpec {
     val colors = AppTheme.colors
@@ -218,7 +221,8 @@ private const val GlassBarTintAlpha = 0.72f
 
 /**
  * 滚动边缘效果（iOS 26 的 scroll edge effect）：透明的顶栏背后，内容从下面滚过时自上而下渐进模糊并淡入页面底色，
- * 既不挡内容也保证栏上的标题 / 按钮可读。拿不到内容层或不能模糊时退化为页面底色到透明的渐变。
+ * 既不挡内容也保证栏上的标题 / 按钮可读。Windows 为避开 Direct3D 渲染卡死，改用普通背景模糊；
+ * 拿不到内容层或不能模糊时退化为页面底色到透明的渐变。
  */
 @Composable
 fun Modifier.scrollEdgeEffect(
@@ -236,7 +240,9 @@ fun Modifier.scrollEdgeEffect(
             )
         }
         return this.hazeEffect(backdrop.hazeState, style = hazeStyle) {
-            progressive = HazeProgressive.verticalGradient(startIntensity = 1f, endIntensity = 0f, preferPerformance = true)
+            if (supportsProgressiveBackdropBlur()) {
+                progressive = HazeProgressive.verticalGradient(startIntensity = 1f, endIntensity = 0f, preferPerformance = true)
+            }
         }
     }
     return this.drawBehind {
