@@ -37,6 +37,7 @@ kotlin {
     sourceSets {
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)
+            implementation(libs.zxing.embedded)
             implementation(libs.androidx.core)
             implementation(libs.androidx.exifinterface)
             implementation(libs.androidx.sqlite.framework)
@@ -150,7 +151,13 @@ android {
     namespace = "io.github.vrcmteam.vrcm"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+
     sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
+    // Keep literal shortcut components: some OEM launchers do not resolve targetPackage resources.
+    sourceSets["debug"].res.srcDir("src/androidDebug/res")
 
     defaultConfig {
         applicationId = libs.versions.app.packageName.get()

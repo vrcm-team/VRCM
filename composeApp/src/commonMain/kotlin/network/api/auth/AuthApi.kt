@@ -16,10 +16,20 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.http.content.*
+import kotlinx.serialization.Serializable
 
 class AuthApi(
     private val client: HttpClient,
 ) {
+
+    /** Approves a scanned login code using the current authenticated cookie. */
+    suspend fun approveDevice(userCode: String) {
+        val response = client.post("$AUTH_API_PREFIX/device/approve") {
+            contentType(ContentType.Application.Json)
+            setBody(ApproveDeviceRequest(userCode))
+        }.checkSuccess<ApproveDeviceResponse>()
+        check(response.success) { "Device approval was not accepted" }
+    }
 
     suspend fun currentUser(): CurrentUserData = userRes().checkSuccess()
 
@@ -88,6 +98,12 @@ class AuthApi(
     }
 
 }
+
+@Serializable
+private data class ApproveDeviceRequest(val userCode: String)
+
+@Serializable
+private data class ApproveDeviceResponse(val success: Boolean)
 
 
 

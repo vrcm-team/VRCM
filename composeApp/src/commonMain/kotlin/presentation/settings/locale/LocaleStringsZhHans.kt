@@ -1,6 +1,20 @@
 package io.github.vrcmteam.vrcm.presentation.settings.locale
 
 internal object LocaleStringsZhHans : LocaleStrings() {
+    override val scanQrCode = "扫一扫"
+    override val scanQrHint = "请对准需要识别的 VRChat 二维码"
+    override val scanCameraFailed = "无法使用相机，请在系统设置中允许相机权限后重试。"
+    override val scanUnsupportedCode = "此二维码不是支持的 VRChat 链接。"
+    override val scanAgain = "重新扫描"
+    override val deviceAuthTitle = "批准设备登录"
+    override val deviceAuthMessage = "批准后，该设备将登录你当前的 VRChat 账号。请确认二维码来自你正在登录的设备。"
+    override val deviceAuthCode = "设备码：%s"
+    override val deviceAuthApprove = "批准登录"
+    override val deviceAuthApproved = "已批准设备登录。"
+    override val deviceAuthFailed = "无法确认批准结果，请先检查设备是否已登录，再尝试重试。"
+    override val deviceAuthExpired = "设备码已过期或不存在，请重新扫描新的二维码。"
+    override val deviceAuthSessionChanged = "当前账号会话已变化，请重新扫码确认。"
+
     override val startupDialogTitle = "新版本可用"
     override val startupDialogUpdate = "更新"
     override val startupDialogIgnore = "忽略"

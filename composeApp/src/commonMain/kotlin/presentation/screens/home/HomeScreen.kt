@@ -77,6 +77,8 @@ import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import io.github.vrcmteam.vrcm.presentation.screens.scan.QrScannerScreen
+import io.github.vrcmteam.vrcm.presentation.screens.scan.qrScanningSupported
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
@@ -223,8 +225,17 @@ object HomeScreen : AppListRoute {
                                     .glassBar(pageColor),
                             ) {
                                 Column(Modifier.fadeOutWith(barsState)) {
-                                    // 平时身份栏右侧没有按钮：刷新靠下拉，搜索在标签栏旁的圆钮；只有收藏页批量选择期间才出现动作
+                                    // 首页身份栏右侧保留扫码入口，收藏页使用批量操作按钮。
                                     HomeIdentityTopBar(model = model) {
+                                        if (selectedDestination == HomeDestination.Home && qrScanningSupported) {
+                                            AppIconButton(
+                                                onClick = { navigator push QrScannerScreen },
+                                                size = AppSize.touchTarget,
+                                                containerColor = Color.Transparent,
+                                            ) {
+                                                AppIcon(AppIcons.QrCodeScanner, strings.scanQrCode)
+                                            }
+                                        }
                                         if (selectedDestination == HomeDestination.Favorites) {
                                             FavoritesHubSelectionActions(
                                                 selectedTab = selectedFavoritesTab,

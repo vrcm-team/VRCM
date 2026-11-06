@@ -1,2 +1,5 @@
 /* Photo library add-only permission, requested when the user saves an image. */
 "NSPhotoLibraryAddUsageDescription" = "保存を選んだ画像（VRChat のギャラリー写真、プリント、ネームプレートなど）を写真ライブラリに追加します。";
+
+"NSCameraUsageDescription" = "VRCM はカメラを使って VRChat のログインやコンテンツの QR コードを読み取ります。";
+"scan_qr_code" = "QR コードをスキャン";

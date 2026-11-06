@@ -25,6 +25,19 @@ import kotlin.math.sin
  */
 object AppIcons {
 
+    /** Simple viewfinder corners and a scan line, also exported for the launcher shortcut. */
+    val QrCodeScanner: ImageVector by lazy {
+        symbol("qrcode.viewfinder") {
+            stroke {
+                polyline(8f, 4f, 4f, 4f, 4f, 8f)
+                polyline(16f, 4f, 20f, 4f, 20f, 8f)
+                polyline(4f, 16f, 4f, 20f, 8f, 20f)
+                polyline(16f, 20f, 20f, 20f, 20f, 16f)
+                line(7f, 12f, 17f, 12f)
+            }
+        }
+    }
+
     // ---------- 导航与通用动作 ----------
 
     /** chevron.left：返回。 */
