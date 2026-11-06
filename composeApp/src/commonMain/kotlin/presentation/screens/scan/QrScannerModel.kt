@@ -12,9 +12,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 
 internal sealed interface QrScanState {
     data object Scanning : QrScanState
+    data object ChoosingImage : QrScanState
+    data object ReadingImage : QrScanState
+    data object ViewingMyCode : QrScanState
     data class ContentLink(val url: String) : QrScanState
     data class DeviceConfirmation(val code: String, val session: AccountSessionToken) : QrScanState
     data class Approving(val confirmation: DeviceConfirmation) : QrScanState
@@ -22,17 +26,22 @@ internal sealed interface QrScanState {
     data class Failure(val reason: ScanFailure, val confirmation: DeviceConfirmation? = null) : QrScanState
 }
 
-internal enum class ScanFailure { Camera, UnsupportedCode, Approval, Expired, SessionChanged }
+internal enum class ScanFailure { Camera, ImageRead, ImageNoCode, UnsupportedCode, Approval, Expired, SessionChanged }
 
 internal class QrScannerModel(
     private val approver: DeviceAuthApprover,
     private val sessions: StateFlow<AuthenticatedAccount?>,
+    private val imageDecoder: QrImageDecoder,
 ) : ViewModel() {
     private val _state = MutableStateFlow<QrScanState>(QrScanState.Scanning)
     val state = _state.asStateFlow()
 
     fun onScanned(value: String) {
         if (_state.value != QrScanState.Scanning) return
+        resolveCode(value)
+    }
+
+    private fun resolveCode(value: String) {
         val code = parseDeviceAuthCode(value)
         _state.value = when {
             code != null -> sessions.value?.token?.let {
@@ -43,6 +52,47 @@ internal class QrScannerModel(
         }
     }
 
+    fun chooseImage() {
+        if (_state.value == QrScanState.Scanning || _state.value == QrScanState.Failure(ScanFailure.Camera)) {
+            _state.value = QrScanState.ChoosingImage
+        }
+    }
+
+    fun imageSelectionCancelled() {
+        if (_state.value == QrScanState.ChoosingImage) _state.value = QrScanState.Scanning
+    }
+
+    /** Selection and decoding have exclusive ownership of scan results until they finish. */
+    fun readImage(read: suspend () -> ByteArray) {
+        if (_state.value != QrScanState.ChoosingImage) return
+        _state.value = QrScanState.ReadingImage
+        viewModelScope.launch {
+            try {
+                val value = imageDecoder.decode(read())
+                if (value == null) _state.value = QrScanState.Failure(ScanFailure.ImageNoCode)
+                else resolveCode(value)
+            } catch (cause: CancellationException) {
+                throw cause
+            } catch (_: Exception) {
+                _state.value = QrScanState.Failure(ScanFailure.ImageRead)
+            }
+        }
+    }
+
+    fun showMyCode(): String? {
+        if (_state.value != QrScanState.Scanning) return null
+        val userId = sessions.value?.token?.userId ?: run {
+            _state.value = QrScanState.Failure(ScanFailure.SessionChanged)
+            return null
+        }
+        _state.value = QrScanState.ViewingMyCode
+        return userId
+    }
+
+    fun resumeFromMyCode() {
+        if (_state.value == QrScanState.ViewingMyCode) _state.value = QrScanState.Scanning
+    }
+
     fun cameraFailed() {
         if (_state.value == QrScanState.Scanning) {
             _state.value = QrScanState.Failure(ScanFailure.Camera)
@@ -50,7 +100,10 @@ internal class QrScannerModel(
     }
 
     fun scanAgain() {
-        if (_state.value !is QrScanState.Approving) _state.value = QrScanState.Scanning
+        when (_state.value) {
+            is QrScanState.Approving, QrScanState.ChoosingImage, QrScanState.ReadingImage -> Unit
+            else -> _state.value = QrScanState.Scanning
+        }
     }
 
     fun approve() {

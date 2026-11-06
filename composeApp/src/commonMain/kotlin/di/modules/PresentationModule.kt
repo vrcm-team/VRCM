@@ -109,7 +109,7 @@ val presentationModule: Module = module {
     viewModelOf(::AuthScreenModel)
     viewModel { FriendActivityTimelineModel(get<FriendActivityService>()) }
     viewModelOf(::HomeScreenModel)
-    viewModel { QrScannerModel(get(), io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre.currentSession) }
+    viewModel { QrScannerModel(get(), io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre.currentSession, get()) }
     viewModel {
         InventoryScreenModel(
             authService = get<AuthService>(),

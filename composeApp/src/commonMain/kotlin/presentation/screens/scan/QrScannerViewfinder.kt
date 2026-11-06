@@ -11,6 +11,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -29,6 +30,9 @@ internal fun QrScannerViewfinder(
     scanning: Boolean,
     canGoBack: Boolean,
     onBack: () -> Unit,
+    onMyCode: () -> Unit,
+    onAlbum: () -> Unit,
+    readingImage: Boolean,
     camera: @Composable () -> Unit,
 ) {
     val colors = AppColors.dark(LocalSettingsState.current.value.themeColor.accent)
@@ -57,25 +61,53 @@ internal fun QrScannerViewfinder(
                 }
                 Box(Modifier.fillMaxWidth().weight(1f)) {
                     if (scanning) ScannerSweep(Modifier.fillMaxSize(), animate)
-                    AppText(
-                        locale.scanQrHint,
-                        modifier = Modifier.align(Alignment.BottomCenter)
-                            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
-                            .padding(horizontal = 24.dp, vertical = 36.dp),
-                        style = AppTheme.type.subheadline,
-                        textAlign = TextAlign.Center,
-                    )
+                    if (readingImage) {
+                        Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(AppSpacing.m)) {
+                            AppActivityIndicator()
+                            AppText(locale.scanImageReading)
+                        }
+                    }
+                    if (scanning) {
+                        AppText(
+                            locale.scanQrHint,
+                            modifier = Modifier.align(Alignment.BottomCenter)
+                                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
+                                .padding(horizontal = 24.dp, vertical = 36.dp),
+                            style = AppTheme.type.subheadline,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
                 }
-                Box(
+                Row(
                     Modifier.fillMaxWidth().background(colors.systemBackground)
                         .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal))
-                        .padding(horizontal = AppSpacing.page, vertical = 24.dp),
-                    contentAlignment = Alignment.Center,
+                        .padding(horizontal = AppSpacing.m, vertical = AppSpacing.l),
+                    horizontalArrangement = Arrangement.spacedBy(AppSpacing.s),
+                    verticalAlignment = Alignment.Top,
                 ) {
-                    AppText(locale.scanQrCode, style = AppTheme.type.headline, color = colors.tint)
+                    ScannerAction(locale.scanMyQrCode, AppIcons.QrCode, scanning, onMyCode, Modifier.weight(1f))
+                    // Align the mode label with the 48 dp icons while allowing large text to grow.
+                    Box(Modifier.weight(1.3f).heightIn(min = 48.dp), contentAlignment = Alignment.Center) {
+                        AppText(locale.scanMode, style = AppTheme.type.headline,
+                            color = colors.tint, textAlign = TextAlign.Center)
+                    }
+                    ScannerAction(locale.scanAlbum, AppIcons.Gallery, scanning, onAlbum, Modifier.weight(1f))
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ScannerAction(label: String, icon: ImageVector, enabled: Boolean, onClick: () -> Unit, modifier: Modifier) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(AppSpacing.s)) {
+        // The 48 dp circle is a stable touch target; the label below can wrap with system font size.
+        AppIconButton(onClick = onClick, enabled = enabled, size = 48.dp,
+            containerColor = AppTheme.colors.fill, contentColor = AppTheme.colors.label) {
+            AppIcon(icon, label)
+        }
+        AppText(label, style = AppTheme.type.footnote, color = AppTheme.colors.secondaryLabel, textAlign = TextAlign.Center)
     }
 }
 

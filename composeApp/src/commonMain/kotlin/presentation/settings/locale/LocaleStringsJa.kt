@@ -2,6 +2,12 @@ package io.github.vrcmteam.vrcm.presentation.settings.locale
 
 internal object LocaleStringsJa : LocaleStrings() {
     override val scanQrCode = "QR コードをスキャン"
+    override val scanMode = "スキャン"
+    override val scanMyQrCode = "マイ QR コード"
+    override val scanAlbum = "写真"
+    override val scanImageReading = "QR コードを読み取り中…"
+    override val scanImageFailed = "画像を読み取れませんでした。20 MB 未満の有効な画像を選択してください。"
+    override val scanImageNoCode = "画像に QR コードが見つかりません。より鮮明な画像をお試しください。"
     override val scanQrHint = "VRChat の QR コードにカメラを向けてください"
     override val scanCameraFailed = "カメラを使用できません。システム設定でカメラを許可して、もう一度お試しください。"
     override val scanUnsupportedCode = "この QR コードは対応する VRChat リンクではありません。"

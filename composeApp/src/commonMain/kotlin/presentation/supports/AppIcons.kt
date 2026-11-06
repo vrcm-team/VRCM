@@ -25,6 +25,20 @@ import kotlin.math.sin
  */
 object AppIcons {
 
+    /** Three finder squares and data modules for a personal QR code. */
+    val QrCode: ImageVector by lazy {
+        symbol("qrcode") {
+            stroke {
+                roundRect(3.5f, 3.5f, 6f, 6f, 1.2f)
+                roundRect(14.5f, 3.5f, 6f, 6f, 1.2f)
+                roundRect(3.5f, 14.5f, 6f, 6f, 1.2f)
+                polyline(14.5f, 14.5f, 17.5f, 14.5f, 17.5f, 17.5f, 20.5f, 17.5f, 20.5f, 20.5f)
+                line(14.5f, 19.5f, 14.5f, 20.5f)
+                line(20.5f, 14.5f, 20.5f, 14.5f)
+            }
+        }
+    }
+
     /** Simple viewfinder corners and a scan line, also exported for the launcher shortcut. */
     val QrCodeScanner: ImageVector by lazy {
         symbol("qrcode.viewfinder") {

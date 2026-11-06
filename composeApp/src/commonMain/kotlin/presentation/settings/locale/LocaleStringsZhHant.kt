@@ -2,6 +2,12 @@ package io.github.vrcmteam.vrcm.presentation.settings.locale
 
 internal object LocaleStringsZhHant : LocaleStrings() {
     override val scanQrCode = "掃描 QR 碼"
+    override val scanMode = "掃一掃"
+    override val scanMyQrCode = "我的 QR 碼"
+    override val scanAlbum = "相簿"
+    override val scanImageReading = "正在辨識 QR 碼…"
+    override val scanImageFailed = "無法讀取這張圖片，請選擇小於 20 MB 的有效圖片。"
+    override val scanImageNoCode = "圖片中找不到 QR 碼，請嘗試更清晰的圖片。"
     override val scanQrHint = "請對準需要辨識的 VRChat QR 碼"
     override val scanCameraFailed = "無法使用相機，請在系統設定中允許相機權限後重試。"
     override val scanUnsupportedCode = "此 QR 碼不是支援的 VRChat 連結。"

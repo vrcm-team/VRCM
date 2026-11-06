@@ -44,7 +44,8 @@ internal actual fun QrScannerAppearance() {
 }
 
 @Composable
-internal actual fun QrCamera(modifier: Modifier, onScanned: (String) -> Unit, onFailure: () -> Unit) {
+internal actual fun QrCamera(modifier: Modifier, onScanned: (String) -> Unit, onFailure: () -> Unit,
+    onMyCode: () -> Unit, onAlbum: () -> Unit) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val resultCallback by rememberUpdatedState(onScanned)

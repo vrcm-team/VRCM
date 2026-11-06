@@ -10,6 +10,7 @@ internal actual val qrScanningSupported = false
 internal actual fun QrScannerAppearance() = Unit
 
 @Composable
-internal actual fun QrCamera(modifier: Modifier, onScanned: (String) -> Unit, onFailure: () -> Unit) {
+internal actual fun QrCamera(modifier: Modifier, onScanned: (String) -> Unit, onFailure: () -> Unit,
+    onMyCode: () -> Unit, onAlbum: () -> Unit) {
     LaunchedEffect(Unit) { onFailure() }
 }

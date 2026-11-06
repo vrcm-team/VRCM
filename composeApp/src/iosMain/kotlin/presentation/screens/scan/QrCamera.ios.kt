@@ -8,7 +8,8 @@ import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 
 /** The iOS shell owns AVFoundation and presents its camera above the Compose controller. */
 interface QrScannerPresenter {
-    fun start(title: String, hint: String, backLabel: String, tintArgb: Long, onScanned: (String) -> Unit, onDismiss: () -> Unit, onFailure: () -> Unit)
+    fun start(title: String, hint: String, backLabel: String, myCodeLabel: String, albumLabel: String, tintArgb: Long,
+        onScanned: (String) -> Unit, onMyCode: () -> Unit, onAlbum: () -> Unit, onDismiss: () -> Unit, onFailure: () -> Unit)
     fun stop()
 }
 
@@ -22,17 +23,23 @@ internal actual val qrScanningSupported = true
 internal actual fun QrScannerAppearance() = Unit
 
 @Composable
-internal actual fun QrCamera(modifier: Modifier, onScanned: (String) -> Unit, onFailure: () -> Unit) {
+internal actual fun QrCamera(modifier: Modifier, onScanned: (String) -> Unit, onFailure: () -> Unit,
+    onMyCode: () -> Unit, onAlbum: () -> Unit) {
     val navigator = io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
-    val title = strings.scanQrCode
+    val title = strings.scanMode
     val hint = strings.scanQrHint
     val backLabel = strings.back
+    val myCodeLabel = strings.scanMyQrCode
+    val albumLabel = strings.scanAlbum
     val tintArgb = AppTheme.colors.tint.toArgb().toLong()
     val scanned by rememberUpdatedState(onScanned)
     val failure by rememberUpdatedState(onFailure)
+    val myCode by rememberUpdatedState(onMyCode)
+    val album by rememberUpdatedState(onAlbum)
     DisposableEffect(Unit) {
         val presenter = QrScannerBridge.presenter
-        if (presenter == null) failure() else presenter.start(title, hint, backLabel, tintArgb, { scanned(it) }, { navigator.pop() }, { failure() })
+        if (presenter == null) failure() else presenter.start(title, hint, backLabel, myCodeLabel, albumLabel, tintArgb,
+            { scanned(it) }, { myCode() }, { album() }, { navigator.pop() }, { failure() })
         onDispose { presenter?.stop() }
     }
 }

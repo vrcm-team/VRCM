@@ -11,4 +11,5 @@ internal expect fun QrScannerAppearance()
 
 /** Owns camera permission and preview resources for the lifetime of this composition. */
 @Composable
-internal expect fun QrCamera(modifier: Modifier, onScanned: (String) -> Unit, onFailure: () -> Unit)
+internal expect fun QrCamera(modifier: Modifier, onScanned: (String) -> Unit, onFailure: () -> Unit,
+    onMyCode: () -> Unit, onAlbum: () -> Unit)

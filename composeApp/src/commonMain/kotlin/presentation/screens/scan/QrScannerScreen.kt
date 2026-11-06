@@ -17,6 +17,14 @@ import io.github.vrcmteam.vrcm.service.OfficialLinkInbox
 import io.github.vrcmteam.vrcm.service.ScanLaunchInbox
 import kotlinx.serialization.Serializable
 import org.koin.compose.viewmodel.koinViewModel
+import org.koin.compose.koinInject
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
+import io.github.vinceglb.filekit.dialogs.FileKitType
+import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.readBoundedBytes
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.startRoute
+import io.github.vrcmteam.vrcm.service.meetup.MeetupCardRepository
 
 internal val LocalScannedLinkHandler = staticCompositionLocalOf<(String) -> Unit> { {} }
 
@@ -46,8 +54,20 @@ object QrScannerScreen : AppRoute {
         val locale = strings
         val openLink = LocalScannedLinkHandler.current
         val busy = state is QrScanState.Approving
+        val cards = koinInject<MeetupCardRepository>()
+        val imagePicker = rememberFilePickerLauncher(type = FileKitType.Image) { file ->
+            if (file == null) model.imageSelectionCancelled()
+            else model.readImage { file.readBoundedBytes(QR_IMAGE_MAX_BYTES) }
+        }
+        val showMyCode: () -> Unit = {
+            model.showMyCode()?.let { navigator push cards.startRoute(it) }
+        }
         QrScannerAppearance()
         HandleBackNavigation(busy) { }
+        LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { model.resumeFromMyCode() }
+        LaunchedEffect(state) {
+            if (state == QrScanState.ChoosingImage) imagePicker.launch()
+        }
 
         LaunchedEffect(state) {
             (state as? QrScanState.ContentLink)?.let {
@@ -59,13 +79,18 @@ object QrScannerScreen : AppRoute {
             scanning = state == QrScanState.Scanning,
             canGoBack = !busy,
             onBack = { navigator.pop() },
+            onMyCode = showMyCode,
+            onAlbum = model::chooseImage,
+            readingImage = state == QrScanState.ReadingImage,
         ) {
             if (state == QrScanState.Scanning && qrScanningSupported) {
-                QrCamera(Modifier.fillMaxSize(), model::onScanned, model::cameraFailed)
+                QrCamera(Modifier.fillMaxSize(), model::onScanned, model::cameraFailed, showMyCode, model::chooseImage)
             }
         }
 
-        if (state != QrScanState.Scanning && state !is QrScanState.ContentLink) {
+        if (state is QrScanState.DeviceConfirmation || state is QrScanState.Approving ||
+            state is QrScanState.Failure || state == QrScanState.Approved
+        ) {
             val confirmation = when (val current = state) {
                 is QrScanState.DeviceConfirmation -> current
                 is QrScanState.Approving -> current.confirmation
@@ -89,6 +114,8 @@ object QrScannerScreen : AppRoute {
                             AppText(
                                 when (it.reason) {
                                     ScanFailure.Camera -> locale.scanCameraFailed
+                                    ScanFailure.ImageRead -> locale.scanImageFailed
+                                    ScanFailure.ImageNoCode -> locale.scanImageNoCode
                                     ScanFailure.UnsupportedCode -> locale.scanUnsupportedCode
                                     ScanFailure.Approval -> locale.deviceAuthFailed
                                     ScanFailure.Expired -> locale.deviceAuthExpired
@@ -106,6 +133,7 @@ object QrScannerScreen : AppRoute {
                         onClick = {
                             when {
                                 confirmation != null -> model.approve()
+                                failure?.reason == ScanFailure.Camera -> model.chooseImage()
                                 state == QrScanState.Approved -> navigator.pop()
                                 else -> model.scanAgain()
                             }
@@ -114,6 +142,7 @@ object QrScannerScreen : AppRoute {
                         AppText(when {
                             busy -> locale.loading
                             confirmation != null -> if (failure != null) locale.retry else locale.deviceAuthApprove
+                            failure?.reason == ScanFailure.Camera -> locale.scanAlbum
                             state == QrScanState.Approved -> locale.confirm
                             else -> locale.scanAgain
                         })

@@ -13,6 +13,12 @@ import io.github.vrcmteam.vrcm.presentation.settings.LocalSettingsState
 @Stable
 sealed class LocaleStrings {
     open val scanQrCode: String = "Scan QR Code"
+    open val scanMode: String = "Scan"
+    open val scanMyQrCode: String = "My QR Code"
+    open val scanAlbum: String = "Photos"
+    open val scanImageReading: String = "Reading QR code…"
+    open val scanImageFailed: String = "Could not read this image. Choose a readable image smaller than 20 MB."
+    open val scanImageNoCode: String = "No QR code was found in this image. Try a clearer image."
     open val scanQrHint: String = "Point your camera at a VRChat QR code"
     open val scanCameraFailed: String = "Camera unavailable. Allow camera access in system settings and try again."
     open val scanUnsupportedCode: String = "This QR code is not a supported VRChat link."

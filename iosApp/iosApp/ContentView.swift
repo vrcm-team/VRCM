@@ -29,7 +29,9 @@ final class NativeQrScannerPresenter: NSObject, QrScannerPresenter {
 
     init(root: UIViewController) { self.root = root }
 
-    func start(title: String, hint: String, backLabel: String, tintArgb: Int64, onScanned: @escaping (String) -> KotlinUnit,
+    func start(title: String, hint: String, backLabel: String, myCodeLabel: String, albumLabel: String,
+               tintArgb: Int64, onScanned: @escaping (String) -> KotlinUnit,
+               onMyCode: @escaping () -> KotlinUnit, onAlbum: @escaping () -> KotlinUnit,
                onDismiss: @escaping () -> KotlinUnit, onFailure: @escaping () -> KotlinUnit) {
         let request = UUID()
         generation = request
@@ -42,6 +44,10 @@ final class NativeQrScannerPresenter: NSObject, QrScannerPresenter {
                 scanner.title = title
                 scanner.hint = hint
                 scanner.backLabel = backLabel
+                scanner.myCodeLabel = myCodeLabel
+                scanner.albumLabel = albumLabel
+                scanner.onMyCode = { _ = onMyCode() }
+                scanner.onAlbum = { _ = onAlbum() }
                 let argb = UInt32(truncatingIfNeeded: tintArgb)
                 scanner.scanTint = UIColor(
                     red: CGFloat((argb >> 16) & 0xff) / 255,
@@ -77,6 +83,10 @@ final class QrCaptureController: UIViewController, AVCaptureMetadataOutputObject
     var complete: ((String?, Bool) -> Void)?
     var hint = ""
     var backLabel = ""
+    var myCodeLabel = ""
+    var albumLabel = ""
+    var onMyCode: (() -> Void)?
+    var onAlbum: (() -> Void)?
     var scanTint = UIColor.systemBlue
     private let session = AVCaptureSession()
     private let cameraQueue = DispatchQueue(label: "io.github.vrcmteam.vrcm.qr-camera")
@@ -164,12 +174,19 @@ final class QrCaptureController: UIViewController, AVCaptureMetadataOutputObject
         modeLabel.numberOfLines = 0
         modeLabel.textAlignment = .center
         modeLabel.textColor = scanTint
+        let myCode = footerAction(title: myCodeLabel, symbol: "qrcode", action: #selector(showMyCode))
+        let album = footerAction(title: albumLabel, symbol: "photo", action: #selector(chooseImage))
+        let menu = UIStackView(arrangedSubviews: [myCode, modeLabel, album])
+        menu.axis = .horizontal
+        menu.distribution = .fill
+        menu.alignment = .top
+        menu.spacing = 8
         [backButton, hintLabel, footer].forEach {
             $0.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview($0)
         }
-        modeLabel.translatesAutoresizingMaskIntoConstraints = false
-        footer.addSubview(modeLabel)
+        menu.translatesAutoresizingMaskIntoConstraints = false
+        footer.addSubview(menu)
         let safe = view.safeAreaLayoutGuide
         NSLayoutConstraint.activate([
             backButton.leadingAnchor.constraint(equalTo: safe.leadingAnchor, constant: 8),
@@ -180,15 +197,54 @@ final class QrCaptureController: UIViewController, AVCaptureMetadataOutputObject
             footer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             footer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             footer.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            modeLabel.topAnchor.constraint(equalTo: footer.topAnchor, constant: 24),
-            modeLabel.leadingAnchor.constraint(equalTo: safe.leadingAnchor, constant: 20),
-            modeLabel.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -20),
-            modeLabel.bottomAnchor.constraint(equalTo: safe.bottomAnchor, constant: -24),
+            menu.topAnchor.constraint(equalTo: footer.topAnchor, constant: 20),
+            menu.leadingAnchor.constraint(equalTo: safe.leadingAnchor, constant: 16),
+            menu.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -16),
+            menu.bottomAnchor.constraint(equalTo: safe.bottomAnchor, constant: -20),
+            myCode.widthAnchor.constraint(equalTo: album.widthAnchor),
+            modeLabel.widthAnchor.constraint(equalTo: myCode.widthAnchor, multiplier: 1.3),
+            modeLabel.heightAnchor.constraint(greaterThanOrEqualToConstant: 48),
             hintLabel.leadingAnchor.constraint(equalTo: safe.leadingAnchor, constant: 24),
             hintLabel.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -24),
             hintLabel.bottomAnchor.constraint(equalTo: footer.topAnchor, constant: -36),
             hintLabel.topAnchor.constraint(greaterThanOrEqualTo: backButton.bottomAnchor, constant: 12),
         ])
+    }
+
+    private func footerAction(title: String, symbol: String, action: Selector) -> UIView {
+        let button = UIButton(type: .system)
+        button.setImage(UIImage(systemName: symbol, withConfiguration: UIImage.SymbolConfiguration(pointSize: 24)), for: .normal)
+        button.tintColor = .label
+        button.backgroundColor = .secondarySystemBackground
+        button.layer.cornerRadius = 24
+        button.accessibilityLabel = title
+        button.addTarget(self, action: action, for: .touchUpInside)
+        let label = UILabel()
+        label.text = title
+        label.textColor = .secondaryLabel
+        label.font = .preferredFont(forTextStyle: .footnote)
+        label.adjustsFontForContentSizeCategory = true
+        label.textAlignment = .center
+        label.numberOfLines = 0
+        label.isAccessibilityElement = false
+        let column = UIStackView(arrangedSubviews: [button, label])
+        column.axis = .vertical
+        column.alignment = .center
+        column.spacing = 8
+        // Match the shared footer's 48 pt circular action and let its label grow freely.
+        button.widthAnchor.constraint(equalToConstant: 48).isActive = true
+        button.heightAnchor.constraint(equalToConstant: 48).isActive = true
+        label.widthAnchor.constraint(equalTo: column.widthAnchor).isActive = true
+        return column
+    }
+
+    @objc private func showMyCode() { finishAction(onMyCode) }
+    @objc private func chooseImage() { finishAction(onAlbum) }
+
+    private func finishAction(_ action: (() -> Void)?) {
+        guard !finished else { return }
+        complete = nil
+        finishScanner(action)
     }
 
     override func viewDidLayoutSubviews() {
@@ -269,12 +325,18 @@ final class QrCaptureController: UIViewController, AVCaptureMetadataOutputObject
     }
 
     private func finish(_ value: String?, failed: Bool) {
+        let callback = complete
+        finishScanner { callback?(value, failed) }
+    }
+
+    private func finishScanner(_ callback: (() -> Void)?) {
         guard !finished else { return }
         finished = true
         background()
-        let callback = complete
         complete = nil
-        dismiss(animated: true) { callback?(value, failed) }
+        onMyCode = nil
+        onAlbum = nil
+        dismiss(animated: true, completion: callback)
     }
 
     func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject],
