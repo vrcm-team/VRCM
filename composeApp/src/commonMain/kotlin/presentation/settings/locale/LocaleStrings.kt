@@ -12,6 +12,26 @@ import io.github.vrcmteam.vrcm.presentation.settings.LocalSettingsState
  */
 @Stable
 sealed class LocaleStrings {
+    open val scanQrCode: String = "Scan QR Code"
+    open val scanMode: String = "Scan"
+    open val scanMyQrCode: String = "My QR Code"
+    open val scanAlbum: String = "Photos"
+    open val scanImageReading: String = "Reading QR code…"
+    open val scanImageFailed: String = "Could not read this image. Choose a readable image smaller than 20 MB."
+    open val scanImageNoCode: String = "No QR code was found in this image. Try a clearer image."
+    open val scanQrHint: String = "Point your camera at a VRChat QR code"
+    open val scanCameraFailed: String = "Camera unavailable. Allow camera access in system settings and try again."
+    open val scanUnsupportedCode: String = "This QR code is not a supported VRChat link."
+    open val scanAgain: String = "Scan Again"
+    open val deviceAuthTitle: String = "Approve Device Login"
+    open val deviceAuthMessage: String = "Approving signs this device into your current VRChat account. Only approve a code shown on a device you are signing into."
+    open val deviceAuthCode: String = "Device code: %s"
+    open val deviceAuthApprove: String = "Approve Login"
+    open val deviceAuthApproved: String = "Device login approved."
+    open val deviceAuthFailed: String = "Could not confirm approval. Check the device login status before retrying."
+    open val deviceAuthExpired: String = "The device code has expired or was not found. Scan a new code."
+    open val deviceAuthSessionChanged: String = "Your account session changed. Scan the code again."
+
     open val startupDialogTitle: String = "New version available"
     open val startupDialogUpdate: String = "Update"
     open val startupDialogIgnore: String = "Ignore"

@@ -25,8 +25,11 @@ import org.koin.core.module.dsl.onClose
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.bind
 import org.koin.dsl.module
+import io.github.vrcmteam.vrcm.presentation.screens.scan.DefaultQrImageDecoder
+import io.github.vrcmteam.vrcm.presentation.screens.scan.QrImageDecoder
 
 val serviceModule: Module = module {
+    singleOf(::DefaultQrImageDecoder) bind QrImageDecoder::class
     singleOf(::VersionService)
     singleOf(::AuthService) {
         onClose { it?.close() }
@@ -50,6 +53,7 @@ val serviceModule: Module = module {
     singleOf(::InstanceCreationService)
     singleOf(::WorldPlatformService)
     singleOf(::OfficialLinkService)
+    singleOf(::DeviceAuthService) bind DeviceAuthApprover::class
     singleOf(::ContentReportService)
     singleOf(::AuthenticatedPlayerModerationCleanupSource) bind PlayerModerationCleanupSource::class
     singleOf(::HttpMeetupRemoteBytesLoader) bind MeetupRemoteBytesLoader::class

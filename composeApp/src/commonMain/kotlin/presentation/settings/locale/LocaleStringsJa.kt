@@ -1,6 +1,26 @@
 package io.github.vrcmteam.vrcm.presentation.settings.locale
 
 internal object LocaleStringsJa : LocaleStrings() {
+    override val scanQrCode = "QR コードをスキャン"
+    override val scanMode = "スキャン"
+    override val scanMyQrCode = "マイ QR コード"
+    override val scanAlbum = "写真"
+    override val scanImageReading = "QR コードを読み取り中…"
+    override val scanImageFailed = "画像を読み取れませんでした。20 MB 未満の有効な画像を選択してください。"
+    override val scanImageNoCode = "画像に QR コードが見つかりません。より鮮明な画像をお試しください。"
+    override val scanQrHint = "VRChat の QR コードにカメラを向けてください"
+    override val scanCameraFailed = "カメラを使用できません。システム設定でカメラを許可して、もう一度お試しください。"
+    override val scanUnsupportedCode = "この QR コードは対応する VRChat リンクではありません。"
+    override val scanAgain = "再スキャン"
+    override val deviceAuthTitle = "デバイスのログインを承認"
+    override val deviceAuthMessage = "承認すると、このデバイスが現在の VRChat アカウントにログインします。ご自身がログインしようとしているデバイスのコードか確認してください。"
+    override val deviceAuthCode = "デバイスコード：%s"
+    override val deviceAuthApprove = "ログインを承認"
+    override val deviceAuthApproved = "デバイスのログインを承認しました。"
+    override val deviceAuthFailed = "承認結果を確認できません。再試行する前にデバイスのログイン状態を確認してください。"
+    override val deviceAuthExpired = "コードが期限切れか、見つかりません。新しいコードをスキャンしてください。"
+    override val deviceAuthSessionChanged = "アカウントのセッションが変更されました。再スキャンしてください。"
+
     override val startupDialogTitle = "新バージョンが利用可能"
     override val startupDialogUpdate = "アップデート"
     override val startupDialogIgnore = "無視"

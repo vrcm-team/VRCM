@@ -61,6 +61,7 @@ internal val LocalOfficialLinkInspectionMarker = staticCompositionLocalOf<(Strin
 internal fun OfficialLinkPrompt(
     navigator: AppNavigator,
     inbox: OfficialLinkInbox,
+    suppressClipboardInspection: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val clipboard = LocalClipboardManager.current
@@ -84,6 +85,7 @@ internal fun OfficialLinkPrompt(
 
     SideEffect {
         controller.updateAuthentication(isAuthenticated)
+        if (suppressClipboardInspection) controller.pause()
     }
 
     LaunchedEffect(
@@ -92,12 +94,13 @@ internal fun OfficialLinkPrompt(
         isAuthenticated,
         incomingRequest?.id,
         clipboardReadingEnabled,
+        suppressClipboardInspection,
     ) {
         if (
             !clipboardInspectionGate.shouldInspect(
                 foregroundGeneration = foregroundGeneration,
                 isAuthenticated = isAuthenticated,
-                hasExternalRequest = incomingRequest != null,
+                hasExternalRequest = incomingRequest != null || suppressClipboardInspection,
                 clipboardReadingEnabled = clipboardReadingEnabled,
             )
         ) {
@@ -111,9 +114,9 @@ internal fun OfficialLinkPrompt(
         if (clipboardText != null) controller.inspectClipboard(clipboardText)
     }
 
-    LaunchedEffect(controller, incomingRequest?.id, isAuthenticated) {
+    LaunchedEffect(controller, incomingRequest?.id, isAuthenticated, suppressClipboardInspection) {
         val request = incomingRequest ?: return@LaunchedEffect
-        if (!isAuthenticated) return@LaunchedEffect
+        if (!isAuthenticated || suppressClipboardInspection) return@LaunchedEffect
         controller.openExternal(request)
     }
 
@@ -122,7 +125,7 @@ internal fun OfficialLinkPrompt(
         content = content,
     )
 
-    when (val state = promptState) {
+    when (val state = if (suppressClipboardInspection) OfficialLinkPromptState.Idle else promptState) {
         OfficialLinkPromptState.Idle -> Unit
         is OfficialLinkPromptState.ClipboardConfirmation -> ClipboardConfirmationDialog(
             targetType = state.operation.target.type,
