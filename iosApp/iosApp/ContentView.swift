@@ -30,15 +30,15 @@ final class NativeQrScannerPresenter: NSObject, QrScannerPresenter {
     init(root: UIViewController) { self.root = root }
 
     func start(title: String, hint: String, backLabel: String, myCodeLabel: String, albumLabel: String,
-               tintArgb: Int64, onScanned: @escaping (String) -> KotlinUnit,
-               onMyCode: @escaping () -> KotlinUnit, onAlbum: @escaping () -> KotlinUnit,
-               onDismiss: @escaping () -> KotlinUnit, onFailure: @escaping () -> KotlinUnit) {
+               tintArgb: Int64, onScanned: @escaping (String) -> Void,
+               onMyCode: @escaping () -> Void, onAlbum: @escaping () -> Void,
+               onDismiss: @escaping () -> Void, onFailure: @escaping () -> Void) {
         let request = UUID()
         generation = request
         let present: (Bool) -> Void = { [weak self] allowed in
             DispatchQueue.main.async {
                 guard let self = self, self.generation == request else { return }
-                guard allowed, var presenter = self.root else { _ = onFailure(); return }
+                guard allowed, var presenter = self.root else { onFailure(); return }
                 while let presented = presenter.presentedViewController { presenter = presented }
                 let scanner = QrCaptureController()
                 scanner.title = title
@@ -46,8 +46,8 @@ final class NativeQrScannerPresenter: NSObject, QrScannerPresenter {
                 scanner.backLabel = backLabel
                 scanner.myCodeLabel = myCodeLabel
                 scanner.albumLabel = albumLabel
-                scanner.onMyCode = { _ = onMyCode() }
-                scanner.onAlbum = { _ = onAlbum() }
+                scanner.onMyCode = { onMyCode() }
+                scanner.onAlbum = { onAlbum() }
                 let argb = UInt32(truncatingIfNeeded: tintArgb)
                 scanner.scanTint = UIColor(
                     red: CGFloat((argb >> 16) & 0xff) / 255,
@@ -56,9 +56,9 @@ final class NativeQrScannerPresenter: NSObject, QrScannerPresenter {
                     alpha: 1
                 )
                 scanner.complete = { value, failed in
-                    if failed { _ = onFailure() }
-                    else if let value = value { _ = onScanned(value) }
-                    else { _ = onDismiss() }
+                    if failed { onFailure() }
+                    else if let value = value { onScanned(value) }
+                    else { onDismiss() }
                 }
                 scanner.modalPresentationStyle = .fullScreen
                 self.scanner = scanner
