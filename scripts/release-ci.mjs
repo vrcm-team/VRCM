@@ -50,6 +50,11 @@ export function readMetadata(root, tag) {
     const pattern = new RegExp(`<key>${key}</key>\\s*<string>\\$\\(${setting}\\)</string>`);
     if (!pattern.test(files.plist)) throw new Error(`${key} must reference the Xcode build setting ${setting}.`);
   }
+  const detailsPath = `docs/releases/${tag}.md`;
+  const details = spawnSync('git', ['show', `${sha}:${detailsPath}`], { cwd: root, encoding: 'utf8' });
+  if (details.status !== 0 || !details.stdout.trim()) {
+    throw new Error(`Missing or empty release details: ${detailsPath}. Prepare the document before tagging.`);
+  }
   return { tag, version: tag, code, sha, assets: [
     `VRCM-v${tag}.apk`, `VRCM-v${tag}-setup.exe`, `VRCM-v${tag}.dmg`, `VRCM-v${tag}.ipa`,
   ] };
@@ -69,7 +74,7 @@ export function verifyArtifacts(directory, metadata) {
 export function validateGeneratedNotes(notes) {
   if (!notes || Object.keys(notes).length !== FIELDS.length) throw new Error('Unexpected AI release-notes structure.');
   for (const field of FIELDS) {
-    if (!Array.isArray(notes[field]) || notes[field].length > 12 || notes[field].some(item => typeof item !== 'string' || !item.trim() || item.includes('\n'))) {
+    if (!Array.isArray(notes[field]) || notes[field].length > 12 || notes[field].some(item => typeof item !== 'string' || !item.trim() || /[\r\n]/.test(item))) {
       throw new Error(`Invalid AI release-notes field: ${field}`);
     }
   }
@@ -82,8 +87,21 @@ export function validateGeneratedNotes(notes) {
   return notes;
 }
 
-function renderNotes(notes) {
-  return FIELDS.map((field, index) => `${index === 3 ? '****************\n\n' : ''}## ${HEADINGS[index]}\n\n${notes[field].map(item => `- ${item.trim()}`).join('\n')}`).join('\n\n');
+function renderNotes(notes, details) {
+  return `${FIELDS.map((field, index) => `${index === 3 ? '****************\n\n' : ''}## ${HEADINGS[index]}\n\n${notes[field].map(item => `- ${item.trim()}`).join('\n')}`).join('\n\n')}\n\n${details}\n`;
+}
+
+function parseManualNotes(body, details) {
+  const escape = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const sections = HEADINGS.map((heading, index) => `${index === 3 ? '\\*{16}\\n+' : ''}## ${heading}\\n+([\\s\\S]*?)`).join('\\n+');
+  const match = new RegExp(`^${sections}\\n+${escape(details)}$`).exec(body.replace(/\r\n/g, '\n').trim());
+  if (!match) throw new Error('Manual notes must follow the historical six-section format and Details link.');
+  const notes = Object.fromEntries(FIELDS.map((field, index) => {
+    const lines = match[index + 1].split('\n').filter(line => line.trim());
+    if (lines.some(line => !/^- \S/.test(line))) throw new Error('Manual notes may only contain single-line bullets within each section.');
+    return [field, lines.map(line => line.slice(2))];
+  }));
+  return validateGeneratedNotes(notes);
 }
 
 async function requestJson(url, { token, method = 'GET', body, timeout = 30000 } = {}) {
@@ -142,11 +160,14 @@ async function previousRelease(root, metadata, api) {
 export async function generateNotes(root, metadata, artifacts, output, model, effort) {
   if (!['none', 'low', 'high', 'max'].includes(effort)) throw new Error('Thinking effort must be none, low, high or max.');
   const api = githubClient();
+  const details = `详情 / Details: <https://github.com/${api.repository}/tree/main/docs/releases/${metadata.version}.md>`;
+  if (!fs.readFileSync(path.join(root, 'docs', 'releases', `${metadata.version}.md`), 'utf8').trim()) {
+    throw new Error('The release details document is empty.');
+  }
   const manual = path.join(root, '.github', 'release-notes', `${metadata.tag}.md`);
   if (fs.existsSync(manual)) {
-    const body = fs.readFileSync(manual, 'utf8');
-    if (!body.trim()) throw new Error('The manual release-notes file is empty.');
-    fs.writeFileSync(output, body);
+    const notes = parseManualNotes(fs.readFileSync(manual, 'utf8'), details);
+    fs.writeFileSync(output, renderNotes(notes, details));
     summary('Release notes: **manual**');
     return;
   }
@@ -154,7 +175,7 @@ export async function generateNotes(root, metadata, artifacts, output, model, ef
   const range = previous ? `${previous.tag_name}..${metadata.sha}` : metadata.sha;
   const log = git(root, 'log', '--no-merges', '-n', '100', '--format=%h %s%n%b', range).slice(0, 30000);
   const diff = previous ? git(root, 'diff', '--no-ext-diff', '--unified=2', range, '--', 'composeApp/src', 'iosApp', ':!*.lock').slice(0, 70000) : '';
-  let body, mode;
+  let body;
   try {
     const key = (process.env.DEEPSEEK_API_KEY || '').trim();
     if (!key) throw new Error('DEEPSEEK_API_KEY is not configured.');
@@ -174,23 +195,12 @@ export async function generateNotes(root, metadata, artifacts, output, model, ef
     if (response.choices?.[0]?.finish_reason === 'length') throw new Error('DeepSeek exhausted the thinking/output token budget.');
     const content = response.choices?.[0]?.message?.content;
     if (typeof content !== 'string') throw new Error('DeepSeek returned no release notes.');
-    body = renderNotes(validateGeneratedNotes(JSON.parse(content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, ''))));
-    mode = 'DeepSeek';
+    body = renderNotes(validateGeneratedNotes(JSON.parse(content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, ''))), details);
   } catch (error) {
-    console.warn(`::warning::Release-note generation unavailable (${error.message}); using GitHub generated notes.`);
-    const generated = await api.request('/releases/generate-notes', { method: 'POST', body: { tag_name: metadata.tag, ...(previous ? { previous_tag_name: previous.tag_name } : {}) } });
-    if (!generated.body?.trim()) throw new Error('GitHub returned empty fallback release notes.');
-    body = generated.body.trim();
-    mode = 'GitHub fallback';
-  }
-  const downloadBase = `https://github.com/${api.repository}/releases/download/${metadata.tag}`;
-  body += `\n\n## 下载 / Downloads\n\n${artifacts.map(item => `- [${item.name}](${downloadBase}/${item.name})`).join('\n')}\n- [SHA256SUMS](${downloadBase}/SHA256SUMS)\n`;
-  if (previous) body += `\n[完整变更 / Full Changelog](https://github.com/${api.repository}/compare/${previous.tag_name}...${metadata.tag})\n`;
-  if (fs.existsSync(path.join(root, 'docs', 'releases', `${metadata.version}.md`))) {
-    body += `\n详情 / Details: <https://github.com/${api.repository}/blob/${metadata.tag}/docs/releases/${metadata.version}.md>\n`;
+    throw new Error(`Release-note generation failed (${error.message}). Retry or commit .github/release-notes/${metadata.tag}.md in the historical format; publication is stopped.`);
   }
   fs.writeFileSync(output, body);
-  summary(`Release notes: **${mode}**`);
+  summary('Release notes: **DeepSeek** (historical format)');
 }
 
 /** Check uploaded sizes and server-side digests before publishing a draft. */
@@ -205,6 +215,7 @@ export function assertUploadedAssets(expected, uploaded) {
 
 async function publishRelease(root, metadata, artifacts, notes, allowExisting, prerelease) {
   const api = githubClient();
+  parseManualNotes(fs.readFileSync(notes, 'utf8'), `详情 / Details: <https://github.com/${api.repository}/tree/main/docs/releases/${metadata.version}.md>`);
   let ref = await api.request(`/git/ref/tags/${encodeURIComponent(metadata.tag)}`);
   for (let depth = 0; ref.object.type === 'tag' && depth < 5; depth++) ref = await api.request(`/git/tags/${ref.object.sha}`);
   if (ref.object.type !== 'commit' || ref.object.sha !== metadata.sha) throw new Error('The remote tag changed after validation.');

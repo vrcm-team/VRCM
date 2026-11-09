@@ -12,6 +12,8 @@
 - Xcode 工程的所有 `MARKETING_VERSION`、`CURRENT_PROJECT_VERSION`。
 - `Info.plist` 的两个版本字段继续引用 Xcode 设置。
 
+tag 中还必须有非空的 `docs/releases/<版本>.md`，供公告末尾的详情链接使用。可先用既有 `scripts/codex-release.sh` 准备版本和三语详解，再审核并提交；CD 不自动生成或提交文档源码。
+
 先在 `main` 提交并推送版本调整，再正常创建、推送 tag：
 
 ```bash
@@ -70,9 +72,11 @@ Android 仅发布 `github` flavor，不上传 Google Play AAB。macOS 安装包�
 
 优先使用 tag 中的 `.github/release-notes/<tag>.md` 手写公告。没有手写公告时，使用前一个已发布、可追溯到本次源码的正式版本、真实提交差异和上一版公告，调用 DeepSeek 生成简体中文与英文的“新增 / 优化 / 修复”段落。
 
-只有本次实际构建的四份安装包会进入下载链接。若 tag 中存在 `docs/releases/<版本>.md`，保留指向该文档的详情链接；不存在时不生成失效链接。CD 不自动修改或提交文档源码，也不依赖本地 Codex 登录。
+正文固定沿用历史 `1.1.3`、`1.1.4` 的版式，手写公告也必须通过同一格式校验：先是 `## 新增`、`## 优化`、`## 修复`，接着一行 `****************`，再是 `## New Features`、`## Optimizations`、`## Bug Fixes`，末尾为 `详情 / Details: <https://github.com/vrcm-team/VRCM/tree/main/docs/releases/<版本>.md>`。分类内使用单行 `- ` 列表，中英文条目逐项对应。
 
-DeepSeek 未配置、请求失败或结构校验不通过时，工作流明确给出 warning 并使用 GitHub 生成的变更记录。具体生成模式记录在 Actions Summary，避免将回退结果误认为已通过双语校验的 AI 公告。
+公告不增加下载、校验和或完整变更区块；安装包和 `SHA256SUMS` 只作为 Release 附件。详情文档缺失或为空会在构建前失败，避免发布失效链接。CD 不依赖本地 Codex 登录。
+
+DeepSeek 未配置、请求失败、输出被截断或结构校验不通过时，工作流停止发布，提示重试或在 tag 中提供符合格式的手写公告；不会回退为格式不同的 GitHub 默认变更记录。生成模式记录在 Actions Summary，发布前会再次校验最终正文格式。
 
 ## 验证
 
@@ -83,4 +87,4 @@ node --test scripts/tests/release-ci.test.mjs
 git diff --check
 ```
 
-测试覆盖 tag 与工作区内容不一致、版本声明漂移、非 main 来源、缺失安装包、上传摘要不一致、失败草稿恢复、覆盖已发布版本、手写公告优先，以及 AI 翻译不完整、输出被截断时的回退等发布边界。真实 Android、Windows、macOS 和 iOS 构建分别由对应 runner 验证。
+测试覆盖 tag 与工作区内容不一致、版本声明漂移、非 main 来源、缺少版本详解或安装包、上传摘要不一致、失败草稿恢复、覆盖已发布版本、手写公告优先、禁止额外公告区块，以及 AI 输出格式、翻译不完整和输出被截断时停止发布等边界。真实 Android、Windows、macOS 和 iOS 构建分别由对应 runner 验证。

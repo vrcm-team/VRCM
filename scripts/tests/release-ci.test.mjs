@@ -6,6 +6,36 @@ import { execFileSync } from 'node:child_process';
 import test from 'node:test';
 import { readMetadata, verifyArtifacts, assertUploadedAssets, assertReleaseWritable, validateGeneratedNotes, generateNotes } from '../release-ci.mjs';
 
+// The public Markdown contract used by the historical 1.1.3/1.1.4 releases.
+const HISTORICAL_NOTES = `## 新增
+
+- 新增好友搜索。
+
+## 优化
+
+- 优化资料加载。
+
+## 修复
+
+- 修复页面崩溃。
+
+****************
+
+## New Features
+
+- Added friend search.
+
+## Optimizations
+
+- Improved profile loading.
+
+## Bug Fixes
+
+- Fixed a page crash.
+
+详情 / Details: <https://github.com/vrcm-team/VRCM/tree/main/docs/releases/1.2.3.md>
+`;
+
 function temporary(t) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vrcm-release-tests-'));
   t.after(() => {
@@ -24,6 +54,7 @@ function repository(t, overrides = {}) {
     'installer/VRCM.iss': '#define AppVersion "1.2.3"\n',
     'iosApp/iosApp.xcodeproj/project.pbxproj': 'MARKETING_VERSION = 1.2.3;\nCURRENT_PROJECT_VERSION = 7;\nMARKETING_VERSION = 1.2.3;\nCURRENT_PROJECT_VERSION = 7;\n',
     'iosApp/iosApp/Info.plist': '<key>CFBundleShortVersionString</key><string>$(MARKETING_VERSION)</string>\n<key>CFBundleVersion</key><string>$(CURRENT_PROJECT_VERSION)</string>',
+    'docs/releases/1.2.3.md': '# Release details\n',
     ...overrides,
   };
   for (const [name, content] of Object.entries(files)) {
@@ -60,6 +91,11 @@ test('a mismatched second Xcode configuration stops the release', t => {
     'iosApp/iosApp.xcodeproj/project.pbxproj': 'MARKETING_VERSION = 1.2.3;\nCURRENT_PROJECT_VERSION = 7;\nMARKETING_VERSION = 1.2.3;\nCURRENT_PROJECT_VERSION = 6;\n',
   });
   assert.throws(() => readMetadata(root, '1.2.3'), /CURRENT_PROJECT_VERSION/);
+});
+
+test('a missing release-details document cannot produce a broken historical Details link', t => {
+  const { root } = repository(t, { 'docs/releases/1.2.3.md': '' });
+  assert.throws(() => readMetadata(root, '1.2.3'), /Missing or empty release details/);
 });
 
 test('a release commit outside main is rejected', t => {
@@ -112,16 +148,20 @@ test('incomplete translations and malformed AI notes are rejected', () => {
 });
 
 test('committed manual notes take precedence without requiring an AI or GitHub request', async t => {
-  const manual = '## 新增\n\n- 经人工审核的更新说明。\n';
-  const { root } = repository(t, { '.github/release-notes/1.2.3.md': manual });
+  const { root } = repository(t, { '.github/release-notes/1.2.3.md': HISTORICAL_NOTES });
   t.mock.method(globalThis, 'fetch', async () => { throw new Error('Manual notes must not require network access.'); });
   const output = path.join(root, 'release-notes.md');
   await generateNotes(root, readMetadata(root, '1.2.3'), [], output, 'deepseek-flash', 'high');
-  assert.equal(fs.readFileSync(output, 'utf8'), manual);
+  assert.equal(fs.readFileSync(output, 'utf8'), HISTORICAL_NOTES);
 });
 
-test('truncated AI output falls back to real GitHub notes and retains promised downloads', async t => {
-  const { root } = repository(t);
+test('manual notes with an extra download section cannot bypass the historical format', async t => {
+  const manual = HISTORICAL_NOTES.replace('详情 / Details:', '## 下载\n\n- APK\n\n详情 / Details:');
+  const { root } = repository(t, { '.github/release-notes/1.2.3.md': manual });
+  await assert.rejects(generateNotes(root, readMetadata(root, '1.2.3'), [], path.join(root, 'notes.md'), 'deepseek-flash', 'high'), /single-line bullets/);
+});
+
+function mockDeepSeek(t, response) {
   const previousKey = process.env.DEEPSEEK_API_KEY;
   process.env.DEEPSEEK_API_KEY = 'release-test-placeholder';
   t.after(() => {
@@ -129,17 +169,28 @@ test('truncated AI output falls back to real GitHub notes and retains promised d
     else process.env.DEEPSEEK_API_KEY = previousKey;
   });
   t.mock.method(globalThis, 'fetch', async url => {
-    if (new URL(url).hostname === 'api.deepseek.com') return Response.json({ choices: [{ finish_reason: 'length', message: { content: '{"new_zh":["未完成' } }] });
-    if (new URL(url).pathname.endsWith('/releases/generate-notes')) return Response.json({ body: '## What changed\n\n- A verified GitHub change.' });
+    if (new URL(url).hostname === 'api.deepseek.com') return Response.json(response);
     if (new URL(url).pathname.endsWith('/releases')) return Response.json([]);
     throw new Error(`Unexpected release API request: ${url}`);
   });
+}
+
+test('AI output is rendered in exactly the historical Markdown format', async t => {
+  const { root } = repository(t);
+  mockDeepSeek(t, { choices: [{ finish_reason: 'stop', message: { content: JSON.stringify({
+    new_zh: ['新增好友搜索。'], improvements_zh: ['优化资料加载。'], fixes_zh: ['修复页面崩溃。'],
+    new_en: ['Added friend search.'], improvements_en: ['Improved profile loading.'], fixes_en: ['Fixed a page crash.'],
+  }) } }] });
   const metadata = readMetadata(root, '1.2.3');
   const output = path.join(root, 'release-notes.md');
   await generateNotes(root, metadata, metadata.assets.map(name => ({ name })), output, 'deepseek-flash', 'high');
-  const notes = fs.readFileSync(output, 'utf8');
-  assert.match(notes, /A verified GitHub change\./);
-  assert.doesNotMatch(notes, /未完成/);
-  for (const name of metadata.assets) assert.ok(notes.includes(`/releases/download/1.2.3/${name}`));
-  assert.match(notes, /\[SHA256SUMS\]/);
+  assert.equal(fs.readFileSync(output, 'utf8'), HISTORICAL_NOTES);
+});
+
+test('truncated AI output stops publication instead of changing the announcement format', async t => {
+  const { root } = repository(t);
+  mockDeepSeek(t, { choices: [{ finish_reason: 'length', message: { content: '{"new_zh":["未完成' } }] });
+  const output = path.join(root, 'release-notes.md');
+  await assert.rejects(generateNotes(root, readMetadata(root, '1.2.3'), [], output, 'deepseek-flash', 'high'), /publication is stopped/);
+  assert.equal(fs.existsSync(output), false);
 });
