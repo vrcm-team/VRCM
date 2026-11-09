@@ -5,6 +5,7 @@ import com.russhwolf.settings.MapSettings
 import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.di.supports.PersistentCookiesStorage
+import io.github.vrcmteam.vrcm.network.api.attributes.AccessType
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.files.FileApi
 import io.github.vrcmteam.vrcm.network.api.groups.GroupsApi
@@ -51,6 +52,9 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -67,6 +71,131 @@ import kotlin.test.assertTrue
 class WorldProfileScreenModelTest : MainDispatcherTest() {
     @AfterTest
     fun clearSession() = runTest { SharedFlowCentre.emitLogout() }
+
+    @Test
+    fun sourceGroupRoomIsLoadedWhenAbsentFromCachedPublicInstances() = runBlocking {
+        verifySourceInstanceLoading(useCache = true)
+    }
+
+    @Test
+    fun sourceGroupRoomIsLoadedWhenAbsentFromFreshPublicInstances() = runBlocking {
+        verifySourceInstanceLoading(useCache = false)
+    }
+
+    @Test
+    fun sourceRoomAlreadyListedPubliclyIsLoadedOnlyOnce() = runBlocking {
+        verifySourceInstanceLoading(useCache = true, sourceListedPublicly = true)
+    }
+
+    @Test
+    fun failedSourceRoomLoadCanBeRetriedByRefreshingTheWorld() = runBlocking {
+        verifySourceInstanceLoading(useCache = true, failFirstSourceRequest = true)
+    }
+
+    @Test
+    fun sourceLocationFromAnotherWorldIsNotLoadedIntoThisWorld() = runBlocking {
+        verifySourceInstanceLoading(useCache = true, routeLocation = "wrld_other:$GROUP_INSTANCE_ID")
+    }
+
+    private suspend fun verifySourceInstanceLoading(
+        useCache: Boolean,
+        sourceListedPublicly: Boolean = false,
+        failFirstSourceRequest: Boolean = false,
+        routeLocation: String = GROUP_LOCATION,
+    ) {
+        val world = testWorld(
+            name = "world with public room",
+            instances = buildList {
+                add(listOf("public-room", "2"))
+                if (sourceListedPublicly) add(listOf(GROUP_INSTANCE_ID, "12"))
+            },
+        ).copy(authorId = "usr_other")
+        val worldJson = Json.encodeToString(WorldData.serializer(), world)
+        val instanceRequests = mutableListOf<String>()
+        val fixture = worldProfileFixture { request ->
+            when (val path = request.url.encodedPath) {
+                "/api/1/auth/user" -> jsonResponse(currentUserJson(cachedAccount()))
+                "/api/1/worlds/wrld_owned" -> jsonResponse(worldJson)
+                "/api/1/worlds/wrld_owned/$GROUP_INSTANCE_ID",
+                "/api/1/worlds/wrld_owned/public-room" -> {
+                    val instanceId = path.substringAfterLast('/')
+                    instanceRequests += instanceId
+                    if (failFirstSourceRequest && instanceId == GROUP_INSTANCE_ID &&
+                        instanceRequests.count { it == GROUP_INSTANCE_ID } == 1
+                    ) {
+                        respond("instance temporarily unavailable", HttpStatusCode.ServiceUnavailable)
+                    } else {
+                        jsonResponse(instanceResponse(instanceId, worldJson))
+                    }
+                }
+                "/api/1/groups/$SOURCE_GROUP_ID" -> jsonResponse("""{"id":"$SOURCE_GROUP_ID","name":"Source group"}""")
+                else -> error("Unexpected request: ${request.method} ${request.url}")
+            }
+        }
+        var model: WorldProfileScreenModel? = null
+        try {
+            fixture.service.restoreAuth()
+            model = WorldProfileScreenModel(
+                worldsApi = WorldsApi(fixture.client),
+                instancesApi = InstancesApi(fixture.client),
+                usersApi = UsersApi(fixture.client),
+                groupsApi = GroupsApi(fixture.client),
+                authService = fixture.service,
+                instanceCreationService = InstanceCreationService(
+                    NetworkInstanceCreationRequest(fixture.service, InstancesApi(fixture.client))
+                ),
+                favoriteEntrySource = EmptyFavoriteEntrySource(),
+                inviteApi = InviteApi(fixture.client),
+                worldPlatformService = WorldPlatformService(FileApi(fixture.client), fixture.service),
+                worldProfileCacheStore = RecordingWorldProfileCache(
+                    if (useCache) WorldProfileCache(
+                        world = world,
+                        cachedAtEpochMilliseconds = Long.MAX_VALUE,
+                        supportedPlatforms = emptyList(),
+                        platformFileSizes = emptyList(),
+                    ) else null,
+                ),
+                homeWorldManager = HomeWorldService(UsersApi(fixture.client), fixture.service),
+                worldEditor = TestNoOpWorldEditor,
+            )
+            val screenModel = requireNotNull(model)
+            // 路由恢复后没有瞬态 instances 快照，仍必须凭完整 location 找到来源房间。
+            screenModel.loadWorldData(WorldProfileVo(worldId = world.id), routeLocation)
+            withTimeout(10_000) { screenModel.isLoading.first { !it } }
+            if (failFirstSourceRequest) {
+                assertEquals(listOf("public-room"), screenModel.worldProfileState.value?.instances?.map { it.instanceId })
+                screenModel.refreshWorldData()
+                withTimeout(10_000) { screenModel.isLoading.first { !it } }
+            }
+
+            val instances = requireNotNull(screenModel.worldProfileState.value).instances
+            val expectsSource = routeLocation == GROUP_LOCATION
+            assertEquals(
+                if (expectsSource) setOf("public-room", GROUP_INSTANCE_ID) else setOf("public-room"),
+                instances.map { it.instanceId }.toSet(),
+            )
+            assertEquals(if (expectsSource) 2 else 1, instances.size)
+            assertEquals(
+                if (!expectsSource) 0 else if (failFirstSourceRequest) 2 else 1,
+                instanceRequests.count { it == GROUP_INSTANCE_ID },
+            )
+            if (expectsSource) {
+                val source = instances.single { it.instanceId == GROUP_INSTANCE_ID }
+                assertEquals(GROUP_LOCATION, source.id) // 自我邀请必须使用完整房间地址。
+                assertEquals(AccessType.GroupMembers, source.accessType)
+                assertEquals("Source group", source.owner.value?.displayName)
+            }
+        } finally {
+            model?.let {
+                ViewModelStore().apply {
+                    put("world-profile", it)
+                    clear()
+                }
+            }
+            fixture.service.closeAndJoin()
+            fixture.client.close()
+        }
+    }
 
     @Test
     fun deletionInvalidatesLateWorldRefreshBeforeItWritesCache() = runTest {
@@ -218,6 +347,23 @@ class WorldProfileScreenModelTest : MainDispatcherTest() {
         }
     }
 }
+
+private const val SOURCE_GROUP_ID = "grp_00000000-0000-0000-0000-000000000001"
+private const val GROUP_INSTANCE_ID = "12345~group($SOURCE_GROUP_ID)~groupAccessType(members)~region(jp)"
+private const val GROUP_LOCATION = "wrld_owned:$GROUP_INSTANCE_ID"
+
+private fun instanceResponse(instanceId: String, worldJson: String): String = """
+    {
+      "clientNumber":"unknown","full":false,"id":"wrld_owned:$instanceId",
+      "instanceId":"$instanceId","location":"wrld_owned:$instanceId","n_users":12,
+      "name":"12345","ownerId":${if (instanceId == GROUP_INSTANCE_ID) "\"$SOURCE_GROUP_ID\"" else "null"},
+      "permanent":false,"photonRegion":"jp","platforms":{"standalonewindows":12,"android":0},
+      "queueEnabled":false,"queueSize":0,"recommendedCapacity":16,"region":"jp",
+      "secureName":"secure","strict":false,"tags":[],
+      "type":"${if (instanceId == GROUP_INSTANCE_ID) "group" else "public"}",
+      "userCount":12,"worldId":"wrld_owned","world":$worldJson
+    }
+""".trimIndent()
 
 private class RecordingHomeWorldManager(initialUser: HomeWorldUserContext) : HomeWorldManager {
     val user = MutableStateFlow<HomeWorldUserContext?>(initialUser)
