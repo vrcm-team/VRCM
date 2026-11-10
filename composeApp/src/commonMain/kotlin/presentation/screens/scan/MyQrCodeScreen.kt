@@ -40,6 +40,9 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
 
+private val MyQrCodeGradientDark = listOf(Color(Palette.QrGradientStartDark), Color(Palette.QrGradientEndDark))
+private val MyQrCodeGradientLight = listOf(Color(Palette.QrGradientStartLight), Color(Palette.QrGradientEndLight))
+
 /** Independent public-profile QR page; opening it does not create or edit a meetup card. */
 @Serializable
 data class MyQrCodeScreen(val ownerUserId: String) : AppRoute {
@@ -159,7 +162,8 @@ internal fun MyQrCodeCard(
     modifier: Modifier = Modifier,
 ) {
     val qrColors = AppTheme.colors
-    val qrPainter = rememberQrCodePainter(meetupCardProfileUrl(userId), colored, qrColors.tint, qrColors.secondaryTint, qrColors.label) {
+    val gradient = if (qrColors.isDark) MyQrCodeGradientDark else MyQrCodeGradientLight
+    val qrPainter = rememberQrCodePainter(meetupCardProfileUrl(userId), colored, gradient, qrColors.label) {
         shapes {
             darkPixel = if (colored) QrPixelShape.circle() else QrPixelShape.square()
             frame = QrFrameShape.roundCorners(.25f)
@@ -167,7 +171,7 @@ internal fun MyQrCodeCard(
         }
         colors {
             dark = if (colored) {
-                QrBrush.brush { Brush.linearGradient(listOf(qrColors.tint, qrColors.secondaryTint)) }
+                QrBrush.brush { Brush.horizontalGradient(gradient) }
             } else {
                 QrBrush.solid(qrColors.label)
             }
@@ -186,7 +190,7 @@ internal fun MyQrCodeCard(
                     }
                 }
             }
-            // The quiet zone shares the card background; theme colors keep the modules legible in both modes.
+            // The quiet zone shares the card background in both themes.
             Box(Modifier.fillMaxWidth().padding(24.dp)) {
                 Image(qrPainter, strings.meetupCardQrDescription, Modifier.fillMaxWidth().aspectRatio(1f))
             }
