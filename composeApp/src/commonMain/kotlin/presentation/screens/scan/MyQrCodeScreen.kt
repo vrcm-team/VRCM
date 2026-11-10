@@ -1,7 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.scan
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -33,7 +32,6 @@ import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PlatformImageCodec
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.releasePlatformImageBitmap
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.meetupCardProfileUrl
-import io.github.vrcmteam.vrcm.presentation.settings.LocalSettingsState
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.service.AuthService
@@ -57,6 +55,7 @@ data class MyQrCodeScreen(val ownerUserId: String) : AppRoute {
             userId = account?.userId,
             displayName = user?.displayName ?: account?.username.orEmpty(),
             iconUrl = user?.iconUrl ?: account?.iconUrl,
+            pronouns = user?.pronouns,
             onBack = { navigator.pop() },
             onScan = {
                 if (navigator.items.getOrNull(navigator.size - 2) == QrScannerScreen) navigator.pop()
@@ -71,6 +70,7 @@ internal fun MyQrCodeContent(
     userId: String?,
     displayName: String,
     iconUrl: String?,
+    pronouns: String?,
     onBack: () -> Unit,
     onScan: () -> Unit,
 ) {
@@ -138,7 +138,7 @@ internal fun MyQrCodeContent(
             } else {
                 // Keep the card readable on tablets while letting narrow windows and large fonts scroll.
                 MyQrCodeCard(
-                    userId, displayName, iconUrl, colored,
+                    userId, displayName, iconUrl, pronouns, colored,
                     Modifier.widthIn(max = 440.dp).fillMaxWidth().drawWithContent {
                         layer.record { this@drawWithContent.drawContent() }
                         drawLayer(layer)
@@ -154,12 +154,12 @@ internal fun MyQrCodeCard(
     userId: String,
     displayName: String,
     iconUrl: String?,
+    pronouns: String?,
     colored: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    // Always use the light palette against the white QR backing, including in dark mode.
-    val qrColors = AppColors.light(LocalSettingsState.current.value.themeColor.accent)
-    val qrPainter = rememberQrCodePainter(meetupCardProfileUrl(userId), colored, qrColors.tint, qrColors.secondaryTint) {
+    val qrColors = AppTheme.colors
+    val qrPainter = rememberQrCodePainter(meetupCardProfileUrl(userId), colored, qrColors.tint, qrColors.secondaryTint, qrColors.label) {
         shapes {
             darkPixel = if (colored) QrPixelShape.circle() else QrPixelShape.square()
             frame = QrFrameShape.roundCorners(.25f)
@@ -169,7 +169,7 @@ internal fun MyQrCodeCard(
             dark = if (colored) {
                 QrBrush.brush { Brush.linearGradient(listOf(qrColors.tint, qrColors.secondaryTint)) }
             } else {
-                QrBrush.solid(Color.Black)
+                QrBrush.solid(qrColors.label)
             }
         }
     }
@@ -180,11 +180,14 @@ internal fun MyQrCodeCard(
                 AImage(Modifier.size(64.dp).clip(CircleShape), iconUrl, contentDescription = null)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
                     AppText(displayName, style = AppTheme.type.title2, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    AppText("VRChat", style = AppTheme.type.subheadline, color = AppTheme.colors.secondaryLabel)
+                    pronouns?.takeIf { it.isNotBlank() }?.let {
+                        AppText(it, style = AppTheme.type.subheadline, color = AppTheme.colors.secondaryLabel,
+                            maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    }
                 }
             }
-            // QR contrast and its quiet zone stay white even in dark mode; no logo covers encoded modules.
-            Box(Modifier.fillMaxWidth().background(Color.White, AppShapes.m).padding(24.dp)) {
+            // The quiet zone shares the card background; theme colors keep the modules legible in both modes.
+            Box(Modifier.fillMaxWidth().padding(24.dp)) {
                 Image(qrPainter, strings.meetupCardQrDescription, Modifier.fillMaxWidth().aspectRatio(1f))
             }
             AppText(
