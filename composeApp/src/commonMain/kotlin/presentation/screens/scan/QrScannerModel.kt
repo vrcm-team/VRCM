@@ -19,6 +19,7 @@ internal sealed interface QrScanState {
     data object ChoosingImage : QrScanState
     data object ReadingImage : QrScanState
     data object ViewingMyCode : QrScanState
+    data class Selecting(val batch: QrScanBatch) : QrScanState
     data class ContentLink(val url: String) : QrScanState
     data class DeviceConfirmation(val code: String, val session: AccountSessionToken) : QrScanState
     data class Approving(val confirmation: DeviceConfirmation) : QrScanState
@@ -41,6 +42,25 @@ internal class QrScannerModel(
         resolveCode(value)
     }
 
+    fun onCandidates(batch: QrScanBatch) {
+        if (_state.value != QrScanState.Scanning) return
+        acceptBatch(batch)
+    }
+
+    private fun acceptBatch(batch: QrScanBatch) {
+        when (batch.codes.size) {
+            0 -> _state.value = QrScanState.Failure(ScanFailure.ImageNoCode)
+            1 -> resolveCode(batch.codes.single().value)
+            else -> _state.value = QrScanState.Selecting(batch)
+        }
+    }
+
+    fun selectCode(index: Int) {
+        val selection = _state.value as? QrScanState.Selecting ?: return
+        val code = selection.batch.codes.getOrNull(index) ?: return
+        resolveCode(code.value)
+    }
+
     private fun resolveCode(value: String) {
         val code = parseDeviceAuthCode(value)
         _state.value = when {
@@ -53,7 +73,8 @@ internal class QrScannerModel(
     }
 
     fun chooseImage() {
-        if (_state.value == QrScanState.Scanning || _state.value == QrScanState.Failure(ScanFailure.Camera)) {
+        if (_state.value == QrScanState.Scanning || _state.value is QrScanState.Selecting ||
+            _state.value == QrScanState.Failure(ScanFailure.Camera)) {
             _state.value = QrScanState.ChoosingImage
         }
     }
@@ -68,9 +89,7 @@ internal class QrScannerModel(
         _state.value = QrScanState.ReadingImage
         viewModelScope.launch {
             try {
-                val value = imageDecoder.decode(read())
-                if (value == null) _state.value = QrScanState.Failure(ScanFailure.ImageNoCode)
-                else resolveCode(value)
+                acceptBatch(imageDecoder.decode(read()))
             } catch (cause: CancellationException) {
                 throw cause
             } catch (_: Exception) {
@@ -80,7 +99,7 @@ internal class QrScannerModel(
     }
 
     fun showMyCode(): String? {
-        if (_state.value != QrScanState.Scanning) return null
+        if (_state.value != QrScanState.Scanning && _state.value !is QrScanState.Selecting) return null
         val userId = sessions.value?.token?.userId ?: run {
             _state.value = QrScanState.Failure(ScanFailure.SessionChanged)
             return null

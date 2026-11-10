@@ -33,7 +33,7 @@ class QrScannerModelTest : MainDispatcherTest() {
 
     @Test
     fun imageApprovalUsesTheSameConfirmationAndRejectsCompetingInputs() = runBlocking {
-        val decoded = CompletableDeferred<String?>()
+        val decoded = CompletableDeferred<QrScanBatch>()
         val f = fixture(QrImageDecoder { decoded.await() })
         f.model.chooseImage()
         f.model.readImage { byteArrayOf(1) }
@@ -42,7 +42,7 @@ class QrScannerModelTest : MainDispatcherTest() {
         f.model.imageSelectionCancelled()
         f.model.scanAgain()
         assertEquals(QrScanState.ReadingImage, f.model.state.value)
-        decoded.complete(deviceLink)
+        decoded.complete(batch(deviceLink))
         yield()
         assertEquals("F36XWSHN", assertIs<QrScanState.DeviceConfirmation>(f.model.state.value).code)
         assertTrue(f.requests.tryReceive().isFailure)
@@ -55,7 +55,7 @@ class QrScannerModelTest : MainDispatcherTest() {
     @Test
     fun imageContentLinksUseExistingNavigationAndImageFailuresCanBeRetried() = runBlocking {
         var decoded: String? = "https://vrchat.com/home/avatar/avtr_test"
-        val f = fixture(QrImageDecoder { decoded })
+        val f = fixture(QrImageDecoder { batch(*listOfNotNull(decoded).toTypedArray()) })
         f.model.chooseImage()
         f.model.readImage { byteArrayOf(1) }
         yield()
@@ -81,7 +81,7 @@ class QrScannerModelTest : MainDispatcherTest() {
         val cancelled = CompletableDeferred<Unit>()
         val f = fixture(QrImageDecoder {
             decoding.complete(Unit)
-            try { CompletableDeferred<String?>().await() } finally { cancelled.complete(Unit) }
+            try { CompletableDeferred<QrScanBatch>().await() } finally { cancelled.complete(Unit) }
         })
         f.model.chooseImage()
         f.model.readImage { byteArrayOf(1) }
@@ -99,6 +99,11 @@ class QrScannerModelTest : MainDispatcherTest() {
         f.model.onScanned(deviceLink)
         f.model.chooseImage()
         assertNull(f.model.showMyCode())
+        assertEquals(QrScanState.ViewingMyCode, f.model.state.value)
+        f.model.resumeFromMyCode()
+        f.model.onCandidates(batch(deviceLink, "https://vrchat.com/home/user/usr_other"))
+        assertEquals("usr_owner", f.model.showMyCode())
+        f.model.selectCode(0)
         assertEquals(QrScanState.ViewingMyCode, f.model.state.value)
         f.model.resumeFromMyCode()
         f.model.onScanned(deviceLink)
@@ -211,7 +216,54 @@ class QrScannerModelTest : MainDispatcherTest() {
         Unit
     }
 
-    private fun fixture(imageDecoder: QrImageDecoder = QrImageDecoder { null }): Fixture {
+    @Test
+    fun multipleCameraCodesWaitForAValidSelectionAndIgnoreFurtherFrames() {
+        val f = fixture()
+        val candidates = batch("https://vrchat.com/home/user/usr_other", deviceLink)
+        f.model.onCandidates(candidates)
+        f.model.onScanned(deviceLink)
+        f.model.onCandidates(batch("https://vrchat.com/home/avatar/avtr_wrong"))
+        f.model.approve()
+        f.model.selectCode(-1)
+        f.model.selectCode(2)
+        assertEquals(QrScanState.Selecting(candidates), f.model.state.value)
+        assertTrue(f.requests.tryReceive().isFailure)
+        f.model.selectCode(1)
+        assertEquals("F36XWSHN", assertIs<QrScanState.DeviceConfirmation>(f.model.state.value).code)
+        f.model.selectCode(0)
+        assertIs<QrScanState.DeviceConfirmation>(f.model.state.value)
+        assertTrue(f.requests.tryReceive().isFailure)
+    }
+
+    @Test
+    fun albumSelectionRoutesOnlyTheChosenCodeAndCanReturnToCapture() = runBlocking {
+        val candidates = batch(deviceLink, "https://vrchat.com/home/world/wrld_chosen")
+        val decoding = CompletableDeferred<QrScanBatch>()
+        val f = fixture(QrImageDecoder { decoding.await() })
+        f.model.chooseImage()
+        f.model.readImage { byteArrayOf(1) }
+        f.model.onCandidates(batch(deviceLink))
+        assertEquals(QrScanState.ReadingImage, f.model.state.value)
+        decoding.complete(candidates)
+        yield()
+        assertEquals(QrScanState.Selecting(candidates), f.model.state.value)
+        f.model.selectCode(1)
+        assertEquals(QrScanState.ContentLink(candidates.codes[1].value), f.model.state.value)
+        f.model.scanAgain()
+        f.model.onCandidates(candidates)
+        f.model.scanAgain()
+        assertEquals(QrScanState.Scanning, f.model.state.value)
+        f.model.onCandidates(candidates)
+        f.model.chooseImage()
+        f.model.selectCode(0)
+        assertEquals(QrScanState.ChoosingImage, f.model.state.value)
+        f.model.imageSelectionCancelled()
+        assertEquals(QrScanState.Scanning, f.model.state.value)
+    }
+
+    private fun batch(vararg values: String) = QrScanBatch(values.map { QrDetection(it, 0.5f, 0.5f) })
+
+    private fun fixture(imageDecoder: QrImageDecoder = QrImageDecoder { batch() }): Fixture {
         val sessions = MutableStateFlow<AuthenticatedAccount?>(account("usr_owner", 1))
         val requests = Channel<CompletableDeferred<Result<Unit>>>(Channel.UNLIMITED)
         val approver = DeviceAuthApprover { code, token ->

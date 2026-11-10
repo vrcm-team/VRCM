@@ -17,14 +17,11 @@ import io.github.vrcmteam.vrcm.service.OfficialLinkInbox
 import io.github.vrcmteam.vrcm.service.ScanLaunchInbox
 import kotlinx.serialization.Serializable
 import org.koin.compose.viewmodel.koinViewModel
-import org.koin.compose.koinInject
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.readBoundedBytes
-import io.github.vrcmteam.vrcm.presentation.screens.meetup.startRoute
-import io.github.vrcmteam.vrcm.service.meetup.MeetupCardRepository
 
 internal val LocalScannedLinkHandler = staticCompositionLocalOf<(String) -> Unit> { {} }
 
@@ -54,17 +51,18 @@ object QrScannerScreen : AppRoute {
         val locale = strings
         val openLink = LocalScannedLinkHandler.current
         val busy = state is QrScanState.Approving
-        val cards = koinInject<MeetupCardRepository>()
         val imagePicker = rememberFilePickerLauncher(type = FileKitType.Image) { file ->
             if (file == null) model.imageSelectionCancelled()
             else model.readImage { file.readBoundedBytes(QR_IMAGE_MAX_BYTES) }
         }
         val showMyCode: () -> Unit = {
-            model.showMyCode()?.let { navigator push cards.startRoute(it) }
+            model.showMyCode()?.let { navigator push MyQrCodeScreen(it) }
         }
         QrScannerAppearance()
         HandleBackNavigation(busy) { }
-        LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { model.resumeFromMyCode() }
+        LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+            if (navigator.lastItem == QrScannerScreen) model.resumeFromMyCode()
+        }
         LaunchedEffect(state) {
             if (state == QrScanState.ChoosingImage) imagePicker.launch()
         }
@@ -82,9 +80,13 @@ object QrScannerScreen : AppRoute {
             onMyCode = showMyCode,
             onAlbum = model::chooseImage,
             readingImage = state == QrScanState.ReadingImage,
+            selection = (state as? QrScanState.Selecting)?.let { current ->
+                { QrCodeSelection(current.batch, model::selectCode) }
+            },
+            onRescan = if (state is QrScanState.Selecting) model::scanAgain else null,
         ) {
             if (state == QrScanState.Scanning && qrScanningSupported) {
-                QrCamera(Modifier.fillMaxSize(), model::onScanned, model::cameraFailed, showMyCode, model::chooseImage)
+                QrCamera(Modifier.fillMaxSize(), model::onScanned, model::cameraFailed, showMyCode, model::chooseImage, model::onCandidates)
             }
         }
 

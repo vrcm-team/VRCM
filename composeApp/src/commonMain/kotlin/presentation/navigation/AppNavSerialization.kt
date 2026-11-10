@@ -1,6 +1,7 @@
 package io.github.vrcmteam.vrcm.presentation.navigation
 
 import io.github.vrcmteam.vrcm.presentation.screens.scan.QrScannerScreen
+import io.github.vrcmteam.vrcm.presentation.screens.scan.MyQrCodeScreen
 import androidx.navigation3.runtime.NavKey
 import androidx.savedstate.serialization.SavedStateConfiguration
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
@@ -49,6 +50,7 @@ internal val appSavedStateConfiguration = SavedStateConfiguration {
             subclass(MyGroupsScreen::class, MyGroupsScreen.serializer())
             subclass(GlobalSearchScreen::class, GlobalSearchScreen.serializer())
             subclass(QrScannerScreen::class, QrScannerScreen.serializer())
+            subclass(MyQrCodeScreen::class, MyQrCodeScreen.serializer())
             subclass(GalleryPickerScreen::class, GalleryPickerScreen.serializer())
             subclass(PrintImageEditorScreen::class, PrintImageEditorScreen.serializer())
             subclass(FriendNetworkScreen::class, FriendNetworkScreen.serializer())

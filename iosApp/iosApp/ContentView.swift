@@ -30,6 +30,7 @@ final class NativeQrScannerPresenter: NSObject, QrScannerPresenter {
     init(root: UIViewController) { self.root = root }
 
     func start(title: String, hint: String, backLabel: String, myCodeLabel: String, albumLabel: String,
+               chooseHint: String, rescanLabel: String, selectCodeLabel: String,
                tintArgb: Int64, onScanned: @escaping (String) -> Void,
                onMyCode: @escaping () -> Void, onAlbum: @escaping () -> Void,
                onDismiss: @escaping () -> Void, onFailure: @escaping () -> Void) {
@@ -46,6 +47,9 @@ final class NativeQrScannerPresenter: NSObject, QrScannerPresenter {
                 scanner.backLabel = backLabel
                 scanner.myCodeLabel = myCodeLabel
                 scanner.albumLabel = albumLabel
+                scanner.chooseHint = chooseHint
+                scanner.rescanLabel = rescanLabel
+                scanner.selectCodeLabel = selectCodeLabel
                 scanner.onMyCode = { onMyCode() }
                 scanner.onAlbum = { onAlbum() }
                 let argb = UInt32(truncatingIfNeeded: tintArgb)
@@ -85,6 +89,9 @@ final class QrCaptureController: UIViewController, AVCaptureMetadataOutputObject
     var backLabel = ""
     var myCodeLabel = ""
     var albumLabel = ""
+    var chooseHint = ""
+    var rescanLabel = ""
+    var selectCodeLabel = ""
     var onMyCode: (() -> Void)?
     var onAlbum: (() -> Void)?
     var scanTint = UIColor.systemBlue
@@ -100,6 +107,10 @@ final class QrCaptureController: UIViewController, AVCaptureMetadataOutputObject
     private let topShade = CAGradientLayer()
     private let sweep = CAGradientLayer()
     private let scanLine = CAGradientLayer()
+    private let modeButton = UIButton(type: .system)
+    private let qrOutput = AVCaptureMetadataOutput()
+    private var choices: [(value: String, metadata: AVMetadataMachineReadableCodeObject)] = []
+    private var choiceButtons: [UIButton] = []
 
     override var preferredStatusBarStyle: UIStatusBarStyle { .lightContent }
 
@@ -126,7 +137,7 @@ final class QrCaptureController: UIViewController, AVCaptureMetadataOutputObject
                 return
             }
             self.session.addInput(input)
-            let output = AVCaptureMetadataOutput()
+            let output = self.qrOutput
             guard self.session.canAddOutput(output) else {
                 self.session.commitConfiguration()
                 DispatchQueue.main.async { self.finish(nil, failed: true) }
@@ -141,7 +152,11 @@ final class QrCaptureController: UIViewController, AVCaptureMetadataOutputObject
             output.setMetadataObjectsDelegate(self, queue: .main)
             output.metadataObjectTypes = [.qr]
             self.session.commitConfiguration()
-            self.configured = true
+            DispatchQueue.main.async {
+                self.configured = true
+                self.view.setNeedsLayout()
+                self.foreground()
+            }
         }
     }
 
@@ -167,16 +182,18 @@ final class QrCaptureController: UIViewController, AVCaptureMetadataOutputObject
         hintLabel.numberOfLines = 0
         hintLabel.textAlignment = .center
         footer.backgroundColor = .systemBackground
-        let modeLabel = UILabel()
-        modeLabel.text = title
-        modeLabel.font = .preferredFont(forTextStyle: .headline)
-        modeLabel.adjustsFontForContentSizeCategory = true
-        modeLabel.numberOfLines = 0
-        modeLabel.textAlignment = .center
-        modeLabel.textColor = scanTint
+        modeButton.setTitle(title, for: .normal)
+        modeButton.setTitleColor(scanTint, for: .normal)
+        modeButton.setTitleColor(scanTint, for: .disabled)
+        modeButton.titleLabel?.font = .preferredFont(forTextStyle: .headline)
+        modeButton.titleLabel?.adjustsFontForContentSizeCategory = true
+        modeButton.titleLabel?.numberOfLines = 0
+        modeButton.titleLabel?.textAlignment = .center
+        modeButton.isEnabled = false
+        modeButton.addTarget(self, action: #selector(rescan), for: .touchUpInside)
         let myCode = footerAction(title: myCodeLabel, symbol: "qrcode", action: #selector(showMyCode))
         let album = footerAction(title: albumLabel, symbol: "photo", action: #selector(chooseImage))
-        let menu = UIStackView(arrangedSubviews: [myCode, modeLabel, album])
+        let menu = UIStackView(arrangedSubviews: [myCode, modeButton, album])
         menu.axis = .horizontal
         menu.distribution = .fill
         menu.alignment = .top
@@ -202,8 +219,8 @@ final class QrCaptureController: UIViewController, AVCaptureMetadataOutputObject
             menu.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -16),
             menu.bottomAnchor.constraint(equalTo: safe.bottomAnchor, constant: -20),
             myCode.widthAnchor.constraint(equalTo: album.widthAnchor),
-            modeLabel.widthAnchor.constraint(equalTo: myCode.widthAnchor, multiplier: 1.3),
-            modeLabel.heightAnchor.constraint(greaterThanOrEqualToConstant: 48),
+            modeButton.widthAnchor.constraint(equalTo: myCode.widthAnchor, multiplier: 1.3),
+            modeButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 48),
             hintLabel.leadingAnchor.constraint(equalTo: safe.leadingAnchor, constant: 24),
             hintLabel.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -24),
             hintLabel.bottomAnchor.constraint(equalTo: footer.topAnchor, constant: -36),
@@ -260,6 +277,15 @@ final class QrCaptureController: UIViewController, AVCaptureMetadataOutputObject
             default: connection.videoOrientation = .portrait
             }
         }
+        if let preview = preview, configured {
+            let region = CGRect(x: 0, y: backButton.frame.maxY, width: view.bounds.width,
+                                height: max(0, footer.frame.minY - backButton.frame.maxY))
+            qrOutput.rectOfInterest = preview.metadataOutputRectConverted(fromLayerRect: region)
+            for (index, button) in choiceButtons.enumerated() {
+                guard let code = preview.transformedMetadataObject(for: choices[index].metadata) else { continue }
+                button.frame = CGRect(x: code.bounds.midX - 24, y: code.bounds.midY - 24, width: 48, height: 48)
+            }
+        }
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -275,7 +301,7 @@ final class QrCaptureController: UIViewController, AVCaptureMetadataOutputObject
     }
 
     @objc private func foreground() {
-        guard visible && !finished else { return }
+        guard visible && !finished && choices.isEmpty else { return }
         updateSweep()
         cameraQueue.async { [weak self] in
             guard let self = self, self.configured, !self.session.isRunning else { return }
@@ -289,6 +315,7 @@ final class QrCaptureController: UIViewController, AVCaptureMetadataOutputObject
     }
 
     @objc private func updateSweep() {
+        sweep.isHidden = !choices.isEmpty
         let top = backButton.frame.maxY
         let height = max(0, hintLabel.frame.minY - top)
         let trail = min(96, height * 0.16)
@@ -299,7 +326,7 @@ final class QrCaptureController: UIViewController, AVCaptureMetadataOutputObject
         sweep.position = CGPoint(x: view.bounds.midX, y: top + height * (0.08 + 0.4 * 0.68) - trail / 2)
         scanLine.frame = CGRect(x: 0, y: max(0, trail - 1.5), width: view.bounds.width, height: 1.5)
         CATransaction.commit()
-        guard visible, !finished, UIApplication.shared.applicationState == .active,
+        guard visible, !finished, choices.isEmpty, UIApplication.shared.applicationState == .active,
               !UIAccessibility.isReduceMotionEnabled else {
             sweep.removeAnimation(forKey: "scan")
             return
@@ -341,9 +368,55 @@ final class QrCaptureController: UIViewController, AVCaptureMetadataOutputObject
 
     func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject],
                         from connection: AVCaptureConnection) {
-        if let value = metadataObjects.compactMap({ ($0 as? AVMetadataMachineReadableCodeObject)?.stringValue }).first {
-            finish(value, failed: false)
+        guard !finished, choices.isEmpty, let preview = preview else { return }
+        let detected = metadataObjects.compactMap { object -> (String, AVMetadataMachineReadableCodeObject)? in
+            guard let code = object as? AVMetadataMachineReadableCodeObject, let value = code.stringValue,
+                  let transformed = preview.transformedMetadataObject(for: code) else { return nil }
+            let center = CGPoint(x: transformed.bounds.midX, y: transformed.bounds.midY)
+            guard view.bounds.contains(center), center.y > backButton.frame.maxY && center.y < footer.frame.minY else { return nil }
+            return (value, code)
         }
+        if detected.count == 1 {
+            finish(detected[0].0, failed: false)
+        } else if detected.count > 1 {
+            choices = detected
+            background()
+            hintLabel.text = chooseHint
+            modeButton.setTitle(rescanLabel, for: .normal)
+            modeButton.isEnabled = true
+            for index in choices.indices {
+                let button = UIButton(type: .custom)
+                button.tag = index
+                button.accessibilityLabel = selectCodeLabel.replacingOccurrences(of: "%d", with: String(index + 1))
+                button.addTarget(self, action: #selector(selectCode(_:)), for: .touchUpInside)
+                // The visible dot is 24 pt inside a 48 pt touch target.
+                let dot = UIView(frame: CGRect(x: 12, y: 12, width: 24, height: 24))
+                dot.backgroundColor = scanTint
+                dot.layer.cornerRadius = 12
+                dot.layer.borderWidth = 3
+                dot.layer.borderColor = UIColor.label.resolvedColor(with: view.traitCollection).cgColor
+                dot.isUserInteractionEnabled = false
+                button.addSubview(dot)
+                view.addSubview(button)
+                choiceButtons.append(button)
+            }
+            view.setNeedsLayout()
+        }
+    }
+
+    @objc private func selectCode(_ sender: UIButton) {
+        guard choices.indices.contains(sender.tag) else { return }
+        finish(choices[sender.tag].value, failed: false)
+    }
+
+    @objc private func rescan() {
+        choices.removeAll()
+        choiceButtons.forEach { $0.removeFromSuperview() }
+        choiceButtons.removeAll()
+        hintLabel.text = hint
+        modeButton.setTitle(title, for: .normal)
+        modeButton.isEnabled = false
+        foreground()
     }
 
     deinit { NotificationCenter.default.removeObserver(self) }

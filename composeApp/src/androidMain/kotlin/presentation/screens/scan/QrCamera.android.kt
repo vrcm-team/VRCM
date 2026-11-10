@@ -2,6 +2,8 @@ package io.github.vrcmteam.vrcm.presentation.screens.scan
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Rect
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
@@ -15,12 +17,16 @@ import io.github.vrcmteam.vrcm.presentation.extensions.findActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.google.zxing.BarcodeFormat
+import com.google.zxing.LuminanceSource
+import com.google.zxing.Result
+import com.google.zxing.ResultMetadataType
+import com.google.zxing.multi.qrcode.QRCodeMultiReader
 import com.journeyapps.barcodescanner.BarcodeCallback
 import com.journeyapps.barcodescanner.BarcodeResult
 import com.journeyapps.barcodescanner.BarcodeView
 import com.journeyapps.barcodescanner.CameraPreview
-import com.journeyapps.barcodescanner.DefaultDecoderFactory
+import com.journeyapps.barcodescanner.Decoder
+import java.io.ByteArrayOutputStream
 
 internal actual val qrScanningSupported = true
 
@@ -45,11 +51,12 @@ internal actual fun QrScannerAppearance() {
 
 @Composable
 internal actual fun QrCamera(modifier: Modifier, onScanned: (String) -> Unit, onFailure: () -> Unit,
-    onMyCode: () -> Unit, onAlbum: () -> Unit) {
+    onMyCode: () -> Unit, onAlbum: () -> Unit, onCandidates: (QrScanBatch) -> Unit) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val resultCallback by rememberUpdatedState(onScanned)
     val failureCallback by rememberUpdatedState(onFailure)
+    val candidatesCallback by rememberUpdatedState(onCandidates)
     var granted by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
     }
@@ -61,9 +68,13 @@ internal actual fun QrCamera(modifier: Modifier, onScanned: (String) -> Unit, on
         if (!granted) permission.launch(Manifest.permission.CAMERA)
     }
     if (!granted) return
+    val decoder = remember(context) { MultiQrCameraDecoder() }
     val view = remember(context) {
-        BarcodeView(context).apply {
-            decoderFactory = DefaultDecoderFactory(listOf(BarcodeFormat.QR_CODE))
+        object : BarcodeView(context) {
+            override fun calculateFramingRect(container: Rect, surface: Rect): Rect =
+                Rect(container).apply { intersect(surface) }
+        }.apply {
+            decoderFactory = com.journeyapps.barcodescanner.DecoderFactory { decoder }
         }
     }
     AndroidView(factory = { view }, modifier = modifier)
@@ -81,7 +92,8 @@ internal actual fun QrCamera(modifier: Modifier, onScanned: (String) -> Unit, on
             override fun barcodeResult(result: BarcodeResult) {
                 if (!active) return
                 view.pause()
-                resultCallback(result.text)
+                val batch = result.result.resultMetadata?.get(ResultMetadataType.OTHER) as? QrScanBatch
+                if (batch != null) candidatesCallback(batch) else resultCallback(result.text)
             }
         })
         val observer = LifecycleEventObserver { _, event ->
@@ -99,5 +111,33 @@ internal actual fun QrCamera(modifier: Modifier, onScanned: (String) -> Unit, on
             view.stopDecoding()
             view.pause()
         }
+    }
+}
+
+/** Freezes the same upright crop used by ZXing, so selection dots cannot drift from the image. */
+private class MultiQrCameraDecoder : Decoder(QRCodeMultiReader()) {
+    override fun decode(source: LuminanceSource): Result? {
+        val results = decodeQrSource(source)
+        val result = results.firstOrNull() ?: return null
+        if (results.size > 1) {
+            val luminance = source.matrix
+            val pixels = IntArray(source.width * source.height) { index ->
+                val gray = luminance[index].toInt() and 0xff
+                (0xff shl 24) or (gray shl 16) or (gray shl 8) or gray
+            }
+            val bitmap = Bitmap.createBitmap(pixels, source.width, source.height, Bitmap.Config.ARGB_8888)
+            try {
+                val bytes = ByteArrayOutputStream().use { stream ->
+                    check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream))
+                    stream.toByteArray()
+                }
+                // Bind the image to this result; another camera frame cannot replace its candidates.
+                result.putMetadata(ResultMetadataType.OTHER, QrScanBatch(results.map { it.detection(source.width, source.height) },
+                    bytes, source.width, source.height))
+            } finally {
+                bitmap.recycle()
+            }
+        }
+        return result
     }
 }

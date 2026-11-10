@@ -2,6 +2,7 @@ package io.github.vrcmteam.vrcm.presentation.navigation
 
 import androidx.navigation3.runtime.NavKey
 import io.github.vrcmteam.vrcm.presentation.screens.scan.QrScannerScreen
+import io.github.vrcmteam.vrcm.presentation.screens.scan.MyQrCodeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthScreen
 import io.github.vrcmteam.vrcm.presentation.screens.auth.StartupAnimeScreen
@@ -53,6 +54,7 @@ class AppNavKeySerializationTest {
             MyGroupsScreen,
             GlobalSearchScreen,
             QrScannerScreen,
+            MyQrCodeScreen("usr_test"),
             GalleryScreen,
             PrintImageEditorScreen(sessionId = "session_test"),
             FriendNetworkScreen,

@@ -33,6 +33,8 @@ internal fun QrScannerViewfinder(
     onMyCode: () -> Unit,
     onAlbum: () -> Unit,
     readingImage: Boolean,
+    selection: @Composable (() -> Unit)? = null,
+    onRescan: (() -> Unit)? = null,
     camera: @Composable () -> Unit,
 ) {
     val colors = AppColors.dark(LocalSettingsState.current.value.themeColor.accent)
@@ -60,6 +62,7 @@ internal fun QrScannerViewfinder(
                     }
                 }
                 Box(Modifier.fillMaxWidth().weight(1f)) {
+                    selection?.invoke()
                     if (scanning) ScannerSweep(Modifier.fillMaxSize(), animate)
                     if (readingImage) {
                         Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally,
@@ -86,13 +89,19 @@ internal fun QrScannerViewfinder(
                     horizontalArrangement = Arrangement.spacedBy(AppSpacing.s),
                     verticalAlignment = Alignment.Top,
                 ) {
-                    ScannerAction(locale.scanMyQrCode, AppIcons.QrCode, scanning, onMyCode, Modifier.weight(1f))
+                    ScannerAction(locale.scanMyQrCode, AppIcons.QrCode, scanning || selection != null, onMyCode, Modifier.weight(1f))
                     // Align the mode label with the 48 dp icons while allowing large text to grow.
                     Box(Modifier.weight(1.3f).heightIn(min = 48.dp), contentAlignment = Alignment.Center) {
-                        AppText(locale.scanMode, style = AppTheme.type.headline,
-                            color = colors.tint, textAlign = TextAlign.Center)
+                        if (onRescan != null) {
+                            AppButton(onClick = onRescan, style = AppButtonStyle.Plain) {
+                                AppText(locale.scanAgain, style = AppTheme.type.headline, textAlign = TextAlign.Center)
+                            }
+                        } else {
+                            AppText(locale.scanMode, style = AppTheme.type.headline,
+                                color = colors.tint, textAlign = TextAlign.Center)
+                        }
                     }
-                    ScannerAction(locale.scanAlbum, AppIcons.Gallery, scanning, onAlbum, Modifier.weight(1f))
+                    ScannerAction(locale.scanAlbum, AppIcons.Gallery, scanning || selection != null, onAlbum, Modifier.weight(1f))
                 }
             }
         }
