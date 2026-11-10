@@ -2,6 +2,8 @@
 
 仓库根目录的 `scripts/codex-release.sh` 用于把版本同步、当前主机可用的发行包、Release 文案和 GitHub Release 串成一条可复核的流程。脚本不会自动提交版本修改，也不会推送代码或创建 tag。
 
+需要由 GitHub Actions 同时构建多平台并自动发布时，使用 [GitHub 自动发布](github-cd.md)。它使用仓库 Secrets 中的正式签名及 DeepSeek API，不依赖本地 Codex 登录。
+
 ## 前置条件
 
 - Bash、`curl`、`jq`、`perl`、`git`、已登录的 Codex CLI 和可执行的 `./gradlew`。

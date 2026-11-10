@@ -1,0 +1,305 @@
+name: Release
+
+on:
+  push:
+    tags: ['[0-9]*.[0-9]*.[0-9]*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag, e.g. 1.2.0 (without v)'
+        required: true
+        type: string
+      publish:
+        description: 'Publish the release after all packages and notes are verified'
+        type: boolean
+        default: true
+      prerelease:
+        description: 'Mark a new release as a preview'
+        type: boolean
+        default: false
+      allow_existing:
+        description: 'Explicitly allow replacing assets and notes of a published release'
+        type: boolean
+        default: false
+      model:
+        description: 'DeepSeek model (defaults to RELEASE_NOTES_MODEL or deepseek-flash)'
+        type: string
+      effort:
+        description: 'Thinking effort: none/low/high/max (defaults to RELEASE_NOTES_EFFORT or high)'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+  # Public certificate fingerprint, verified against the historical 1.1.4 APK.
+  ANDROID_SIGNING_CERT_SHA256: 6f7db55d319ae6487ef69c82c676e92bbf1e91c170afa368fbe9e2cb8d3ff12b
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      tag: ${{ steps.metadata.outputs.tag }}
+      version: ${{ steps.metadata.outputs.version }}
+      sha: ${{ steps.metadata.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Test release orchestration
+        run: node --test scripts/tests/release-ci.test.mjs
+      - name: Validate tag, versions and release state
+        id: metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ALLOW_EXISTING: ${{ inputs.allow_existing || (github.event_name == 'workflow_dispatch' && !inputs.publish) }}
+        run: |
+          args=()
+          if [[ "$ALLOW_EXISTING" == true ]]; then args+=(--allow-existing); fi
+          node scripts/release-ci.mjs prepare --tag "$RELEASE_TAG" \
+            --output "$RUNNER_TEMP/release-tools/metadata.json" "${args[@]}"
+          cp scripts/release-ci.mjs "$RUNNER_TEMP/release-tools/"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-tools
+          path: ${{ runner.temp }}/release-tools/
+          if-no-files-found: error
+          retention-days: 7
+
+  android:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v6
+      - uses: android-actions/setup-android@v3
+      - name: Install the project's Android SDK platform
+        run: |
+          compile_sdk="$(sed -nE 's/^android-compileSdk[[:space:]]*=[[:space:]]*"([0-9]+)"/\1/p' gradle/libs.versions.toml)"
+          [[ "$compile_sdk" =~ ^[0-9]+$ ]] || { echo 'Invalid android-compileSdk'; exit 1; }
+          sdkmanager "platforms;android-$compile_sdk"
+      - name: Prepare and verify the formal signing certificate
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          umask 077
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_STORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            [[ -n "${!name}" ]] || { echo "Missing secret: $name"; exit 1; }
+            # Normalize line endings introduced when pasting CLI or UI secret values.
+            printf -v "$name" '%s' "$(printf '%s' "${!name}" | tr -d '\r\n')"
+            export "$name"
+          done
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/vrcm-release.jks"
+          keytool -exportcert -rfc -keystore "$RUNNER_TEMP/vrcm-release.jks" \
+            -alias "$ANDROID_KEY_ALIAS" -storepass:env ANDROID_STORE_PASSWORD \
+            -file "$RUNNER_TEMP/vrcm-signing-cert.pem"
+          actual="$(openssl x509 -in "$RUNNER_TEMP/vrcm-signing-cert.pem" -noout -fingerprint -sha256 | cut -d= -f2 | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          [[ "$actual" == "$ANDROID_SIGNING_CERT_SHA256" ]] || { echo 'The keystore is not the formal VRCM signing key.'; exit 1; }
+          printf 'store_file=%s\nstore_pass=%s\nkey_alias=%s\nkey_pass=%s\n' \
+            "$RUNNER_TEMP/vrcm-release.jks" "$ANDROID_STORE_PASSWORD" "$ANDROID_KEY_ALIAS" "$ANDROID_KEY_PASSWORD" > local.properties
+      - name: Test and build the GitHub release APK
+        run: |
+          chmod +x gradlew
+          ./gradlew :composeApp:testGithubDebugUnitTest :composeApp:assembleGithubRelease \
+            --no-daemon --console=plain --stacktrace --max-workers=1 \
+            '-Dorg.gradle.jvmargs=-Xmx2048M -Dfile.encoding=UTF-8' '-Pkotlin.daemon.jvmargs=-Xmx4096M'
+      - name: Verify the actual APK signature and collect it
+        run: |
+          set -euo pipefail
+          mapfile -t apks < <(find composeApp/build/outputs/apk/github/release -maxdepth 1 -type f -name '*.apk')
+          [[ "${#apks[@]}" -eq 1 ]] || { echo 'Expected exactly one GitHub release APK.'; exit 1; }
+          signer="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          "$signer" verify --print-certs "${apks[0]}" > "$RUNNER_TEMP/apk-certificate.txt"
+          actual="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/apk-certificate.txt" | tr '[:upper:]' '[:lower:]')"
+          [[ "$actual" == "$ANDROID_SIGNING_CERT_SHA256" ]] || { echo 'The APK is not signed with the formal VRCM certificate.'; exit 1; }
+          mkdir -p artifacts
+          cp "${apks[0]}" "artifacts/VRCM-v$VERSION.apk"
+      - name: Remove signing material
+        if: always()
+        run: rm -f local.properties "$RUNNER_TEMP/vrcm-release.jks" "$RUNNER_TEMP/vrcm-signing-cert.pem"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-packages-android
+          path: artifacts/*.apk
+          if-no-files-found: error
+          retention-days: 7
+
+  windows:
+    needs: prepare
+    runs-on: windows-latest
+    timeout-minutes: 90
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Test Desktop and build the release application directory
+        shell: pwsh
+        run: |
+          .\gradlew.bat :composeApp:desktopTest :composeApp:createReleaseDistributable `
+            --no-daemon --console=plain --stacktrace --max-workers=1 `
+            '-Dorg.gradle.jvmargs=-Xmx2048M -Dfile.encoding=UTF-8' '-Pkotlin.daemon.jvmargs=-Xmx4096M'
+          if ($LASTEXITCODE -ne 0) { throw 'Desktop tests or release build failed.' }
+      - name: Build the existing Inno Setup installer
+        shell: pwsh
+        run: |
+          $candidates = @(
+            (Get-Command ISCC.exe -ErrorAction SilentlyContinue).Source
+            "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          )
+          $iscc = $candidates | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -First 1
+          if (-not $iscc) {
+            choco install innosetup --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed.' }
+            $iscc = $candidates | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -First 1
+          }
+          if (-not $iscc) { throw 'ISCC.exe not found.' }
+          & $iscc 'installer\VRCM.iss'
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup compilation failed.' }
+          New-Item -ItemType Directory -Path artifacts -Force | Out-Null
+          Copy-Item -LiteralPath "composeApp/build/installer/VRCM-v${env:VERSION}-setup.exe" -Destination artifacts
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-packages-windows
+          path: artifacts/*.exe
+          if-no-files-found: error
+          retention-days: 7
+
+  apple:
+    needs: prepare
+    runs-on: macos-latest
+    timeout-minutes: 120
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Build the macOS DMG
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew :composeApp:packageReleaseDmg \
+            --no-daemon --console=plain --stacktrace --max-workers=1 \
+            '-Dorg.gradle.jvmargs=-Xmx2048M -Dfile.encoding=UTF-8' '-Pkotlin.daemon.jvmargs=-Xmx4096M'
+          # macOS ships Bash 3, so do not use mapfile here.
+          count="$(find composeApp/build/compose/binaries/main-release -type f -name '*.dmg' | wc -l | tr -d ' ')"
+          [[ "$count" == 1 ]] || { echo 'Expected exactly one DMG.'; exit 1; }
+          mkdir -p artifacts
+          find composeApp/build/compose/binaries/main-release -type f -name '*.dmg' -exec cp {} "artifacts/VRCM-v$VERSION.dmg" \;
+      - name: Archive iOS and reuse the existing ad-hoc IPA packager
+        env:
+          # Xcode invokes gradlew internally, so pass the runner's memory limits through its environment.
+          GRADLE_OPTS: >-
+            -Dorg.gradle.jvmargs="-Xmx2048M -Dfile.encoding=UTF-8"
+            -Dorg.gradle.project.kotlin.daemon.jvmargs=-Xmx4096M
+            -Dorg.gradle.workers.max=1 -Dorg.gradle.daemon=false
+        run: |
+          set -euo pipefail
+          xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/VRCM.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO VRCM_DISTRIBUTION_CHANNEL=GitHub archive
+          bash iosApp/package-ipa.sh "$RUNNER_TEMP/VRCM.xcarchive" "$GITHUB_WORKSPACE/artifacts/VRCM-v$VERSION.ipa"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-packages-apple
+          path: |
+            artifacts/*.dmg
+            artifacts/*.ipa
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: [prepare, android, windows, apple]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-tools
+          path: ${{ runner.temp }}/release-tools
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: release-packages-*
+          path: artifacts
+          merge-multiple: true
+      - name: Verify all packages and prepare bilingual release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          AI_MODEL: ${{ inputs.model || vars.RELEASE_NOTES_MODEL || 'deepseek-flash' }}
+          AI_EFFORT: ${{ inputs.effort || vars.RELEASE_NOTES_EFFORT || 'high' }}
+        run: |
+          node "$RUNNER_TEMP/release-tools/release-ci.mjs" notes \
+            --metadata "$RUNNER_TEMP/release-tools/metadata.json" --artifacts artifacts \
+            --output "$RUNNER_TEMP/release-notes.md" --model "$AI_MODEL" --effort "$AI_EFFORT"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-notes-and-checksums
+          path: |
+            ${{ runner.temp }}/release-notes.md
+            artifacts/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 7
+      - name: Publish only after every artifact passes verification
+        if: github.event_name != 'workflow_dispatch' || inputs.publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ALLOW_EXISTING: ${{ inputs.allow_existing }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          args=()
+          if [[ "$ALLOW_EXISTING" == true ]]; then args+=(--allow-existing); fi
+          if [[ "$PRERELEASE" == true ]]; then args+=(--prerelease); fi
+          node "$RUNNER_TEMP/release-tools/release-ci.mjs" publish \
+            --metadata "$RUNNER_TEMP/release-tools/metadata.json" --artifacts artifacts \
+            --notes "$RUNNER_TEMP/release-notes.md" "${args[@]}"
