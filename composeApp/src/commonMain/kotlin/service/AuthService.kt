@@ -533,14 +533,17 @@ class AuthService(
     }
 
     private suspend fun doReTryAuthLocked(expectedUserId: String? = null): Boolean {
-        val accountInfo = accountDao.currentAccountDtoOrNull() ?: return false
-        if (expectedUserId != null && accountInfo.userId != expectedUserId) return false
-        val password = accountInfo.password ?: return false
-        return loginLocked(accountInfo.username, password) is AuthState.Authed
+        val sessionToken = SharedFlowCentre.currentSession.value?.token ?: return false
+        if (expectedUserId != null && sessionToken.userId != expectedUserId) return false
+        return recoverExpiredSessionLocked(sessionToken)
     }
 
-    override suspend fun recoverExpiredSession(sessionToken: AccountSessionToken) = authMutex.withLock {
-        if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@withLock
+    override suspend fun recoverExpiredSession(sessionToken: AccountSessionToken) {
+        authMutex.withLock { recoverExpiredSessionLocked(sessionToken) }
+    }
+
+    private suspend fun recoverExpiredSessionLocked(sessionToken: AccountSessionToken): Boolean {
+        if (!SharedFlowCentre.isCurrentSession(sessionToken)) return false
 
         val account = accountDao.currentAccountDtoOrNull()
             ?.takeIf { it.userId == sessionToken.userId }
@@ -548,10 +551,10 @@ class AuthService(
         if (account == null || password == null) {
             clearAuthCookie(sessionToken.userId)
             invalidateCurrentSessionLocked()
-            return@withLock
+            return false
         }
 
-        // Pipeline rejected this cookie. Keep the two-factor cookie available for the
+        // The server rejected this cookie. Keep the two-factor cookie available for the
         // credential request, but do not send the rejected auth cookie again.
         val rejectedAuthCookie = cookiesStorage.cookieValue(AUTH_COOKIE)
         cookiesStorage.removeCookie(AUTH_COOKIE)
@@ -582,6 +585,7 @@ class AuthService(
             clearAuthCookie(account.userId)
             invalidateCurrentSessionLocked()
         }
+        return authState is AuthState.Authed
     }
 
     internal suspend fun <T> runSessionBoundCatching(

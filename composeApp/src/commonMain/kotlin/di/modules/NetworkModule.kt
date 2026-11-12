@@ -32,6 +32,7 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 import org.koin.core.definition.Definition
 import org.koin.core.module.dsl.singleOf
+import org.koin.core.module.dsl.onClose
 import org.koin.dsl.module
 
 internal val networkModule = module(true) {
@@ -49,7 +50,9 @@ internal val networkModule = module(true) {
     singleOf(::WorldsApi)
     singleOf(::FavoriteApi)
     singleOf(::FeedbackApi)
-    singleOf(::WebSocketApi)
+    singleOf(::WebSocketApi) {
+        onClose { it?.close() }
+    }
     singleOf(::GitHubApi)
     singleOf(::AppStoreApi)
     singleOf(::GroupsApi)

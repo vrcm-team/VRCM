@@ -43,6 +43,7 @@ import io.github.vrcmteam.vrcm.storage.AccountCacheManager
 import io.github.vrcmteam.vrcm.storage.AccountCacheWriteToken
 import io.github.vrcmteam.vrcm.storage.FavoriteListCacheStore
 import io.github.vrcmteam.vrcm.storage.data.FavoritedWorldGroup
+import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -2043,7 +2044,10 @@ class FriendListPagerModel(
 
             // 每页流只包含当前页；收齐后再替换缓存，避免刷新期间留下失效记录。
             val remoteFavoritedWorlds = worldsApi.favoritedWorldsFlow()
-                .retry { if (it is VRCApiException) authService.doReTryAuth() else false }
+                .retry(1) {
+                    it is VRCApiException && it.code == HttpStatusCode.Unauthorized.value &&
+                        authService.doReTryAuth()
+                }
                 .toList()
                 .flatten()
 
