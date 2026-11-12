@@ -296,6 +296,8 @@ internal fun FriendActivityEvent.activityLabel(): String = when (type) {
     FriendActivityEventType.LocationChanged -> strings.friendActivityEventLocation
     FriendActivityEventType.StatusChanged -> strings.friendActivityEventStatus
     FriendActivityEventType.BioChanged -> strings.friendActivityEventBio
+    FriendActivityEventType.DisplayNameChanged -> strings.friendActivityEventDisplayName
+    FriendActivityEventType.AvatarChanged -> strings.friendActivityEventAvatar
     FriendActivityEventType.Met -> strings.friendActivityEventMet
     FriendActivityEventType.Left -> strings.friendActivityEventLeft
 }
@@ -316,6 +318,8 @@ internal fun FriendActivityEvent.activityDetail(): String? {
         -> listOfNotNull(location, access)
         FriendActivityEventType.StatusChanged -> listOfNotNull(status)
         FriendActivityEventType.BioChanged -> emptyList()
+        FriendActivityEventType.DisplayNameChanged -> listOfNotNull(previousValue, currentValue)
+        FriendActivityEventType.AvatarChanged -> emptyList()
     }
     return parts.takeIf(List<String>::isNotEmpty)?.joinToString(" · ")
 }

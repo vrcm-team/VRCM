@@ -23,7 +23,8 @@ enum class FriendActivityTimelineFilter(internal val eventTypes: Set<FriendActiv
     All(emptySet()),
     Presence(setOf(FriendActivityEventType.Online, FriendActivityEventType.Offline)),
     Location(setOf(FriendActivityEventType.LocationChanged)),
-    Profile(setOf(FriendActivityEventType.StatusChanged, FriendActivityEventType.BioChanged)),
+    Profile(setOf(FriendActivityEventType.StatusChanged, FriendActivityEventType.BioChanged,
+        FriendActivityEventType.DisplayNameChanged, FriendActivityEventType.AvatarChanged)),
     Meetup(setOf(FriendActivityEventType.Met, FriendActivityEventType.Left)),
 }
 

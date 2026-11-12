@@ -10,6 +10,7 @@ internal data class FriendActivityObservation(
     val bio: String,
     val lastActivityAtMillis: Long?,
     val travelingToLocation: String = "",
+    val avatarImageUrl: String = "",
 )
 
 internal enum class FriendSocketPresenceType { Online, Offline }
@@ -40,6 +41,7 @@ internal sealed interface FriendMeetingChange {
         val worldId: String,
         val accessType: FriendActivityAccessType,
         val announce: Boolean,
+        val location: String = "",
     ) : FriendMeetingChange
 
     data class Ended(
@@ -61,6 +63,8 @@ enum class FriendActivityEventType {
     LocationChanged,
     StatusChanged,
     BioChanged,
+    DisplayNameChanged,
+    AvatarChanged,
     Met,
     Left,
 }
@@ -75,6 +79,7 @@ internal data class FriendActivityEventDraft(
     val currentValue: String? = null,
     val worldId: String? = null,
     val accessType: FriendActivityAccessType? = null,
+    val location: String = "",
 )
 
 internal data class FriendActivityBatch(
@@ -141,6 +146,7 @@ internal class FriendActivityTracker(
                                 worldId = sharedInstance.substringBefore(':'),
                                 accessType = sharedInstance.accessType(),
                                 announce = false,
+                                location = sharedInstance,
                             )
                         )
                     }
@@ -174,6 +180,7 @@ internal class FriendActivityTracker(
                             worldId = sharedInstance.substringBefore(':'),
                             accessType = sharedInstance.accessType(),
                             announce = canAnnounceNewMeeting,
+                            location = sharedInstance,
                         )
                     )
                 }
@@ -216,6 +223,7 @@ internal class FriendActivityTracker(
             currentValue = if (type == FriendActivityEventType.Online) friend.statusValue() else null,
             worldId = location?.substringBefore(':'),
             accessType = location?.accessType(),
+            location = location.orEmpty(),
         )))
     }
 
@@ -259,6 +267,7 @@ internal class FriendActivityTracker(
                     currentValue = statusValue(),
                     worldId = currentInstance.substringBefore(':'),
                     accessType = currentInstance.accessType(),
+                    location = currentInstance,
                 )
             )
             derivePresenceEvents && previousInstance != null && currentInstance == null -> add(
@@ -266,14 +275,16 @@ internal class FriendActivityTracker(
                     type = FriendActivityEventType.Offline,
                     worldId = previousInstance.substringBefore(':'),
                     accessType = previousInstance.accessType(),
+                    location = previousInstance,
                 )
             )
             locationChanged -> add(
                 baseEvent.copy(
-                    previousValue = previousInstance.substringBefore(':'),
+                    previousValue = previousInstance,
                     currentValue = statusValue(),
                     worldId = currentInstance.substringBefore(':'),
                     accessType = currentInstance.accessType(),
+                    location = currentInstance,
                 )
             )
         }
@@ -306,6 +317,14 @@ internal class FriendActivityTracker(
                     accessType = null,
                 )
             )
+        }
+        if (previous.displayName.isNotBlank() && displayName.isNotBlank() && previous.displayName != displayName) {
+            add(baseEvent.copy(type = FriendActivityEventType.DisplayNameChanged,
+                previousValue = previous.displayName, currentValue = displayName))
+        }
+        if (previous.avatarImageUrl.isNotBlank() && avatarImageUrl.isNotBlank() && previous.avatarImageUrl != avatarImageUrl) {
+            add(baseEvent.copy(type = FriendActivityEventType.AvatarChanged,
+                previousValue = previous.avatarImageUrl, currentValue = avatarImageUrl))
         }
     }
 

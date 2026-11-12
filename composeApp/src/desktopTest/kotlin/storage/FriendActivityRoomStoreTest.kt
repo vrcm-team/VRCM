@@ -334,9 +334,11 @@ class FriendActivityRoomStoreTest {
                 nowMillis = 31_000L,
             )
 
-            store.discardIncompleteSessions("usr_owner")
+            store.finalizeIncompleteSessions("usr_owner")
 
-            assertEquals(emptyList(), store.sessions("usr_owner", observation.userId))
+            val recoveredSession = store.sessions("usr_owner", observation.userId).single()
+            assertEquals(31_000L, recoveredSession.endedAtMillis)
+            assertEquals(30_000L, recoveredSession.durationMillis)
             val summary = store.summary("usr_owner", observation.userId)
             assertEquals(0, summary?.meetingCount)
             assertEquals(30_000L, summary?.togetherDurationMillis)
@@ -880,7 +882,7 @@ class FriendActivityRoomStoreTest {
     }
 
     @Test
-    fun accountCacheClearAlsoRemovesRoomActivity() = runTest {
+    fun cacheClearPreservesStatisticsWhileRemovingAccountDeletesThem() = runTest {
         withStore { store ->
             val token = store.activateAccount("usr_owner")
             store.record(
@@ -900,6 +902,10 @@ class FriendActivityRoomStoreTest {
                 ),
             )
 
+            val before = store.statisticsSnapshot("usr_owner")
+            manager.clearAll(includeStatistics = false)
+            assertEquals(before, store.statisticsSnapshot("usr_owner"))
+            assertTrue(store.record(token, listOf(observation()), FriendActivityBatch(), 2_000L))
             manager.clearAccount("usr_owner")
 
             assertNull(store.summary("usr_owner", "usr_friend"))

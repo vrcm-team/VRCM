@@ -1,6 +1,19 @@
 package io.github.vrcmteam.vrcm.presentation.settings.locale
 
 internal object LocaleStringsZhHans : LocaleStrings() {
+    override val statisticsExport = "导出统计数据"
+    override val friendActivityEventDisplayName = "更改显示名称"
+    override val friendActivityEventAvatar = "更换模型"
+    override val statisticsImport = "导入统计数据"
+    override val statisticsImportConfirmation = "将导入 %friends% 位用户的统计、%events% 条动态和 %sessions% 次相遇，重复记录会合并。VRCX 游戏日志由多个账号共用，导入后将归入当前账号。"
+    override val statisticsExportSuccess = "统计数据已导出"
+    override val statisticsImportSuccess = "统计数据已导入"
+    override val statisticsInvalidFile = "此文件不是有效的统计数据库。"
+    override val statisticsWrongAccount = "数据库中没有当前账号的统计，请登录对应的 VRChat 账号。"
+    override val statisticsUnsupportedVersion = "此备份由更新版本创建，请更新 VRCM 后再导入。"
+    override val statisticsEmpty = "暂无可迁移的统计数据。"
+    override val statisticsSessionChanged = "账号已切换，请重试。"
+    override val statisticsIoFailed = "无法读取或写入统计文件，请检查文件和存储访问权限后重试。"
     override val startupDialogTitle = "新版本可用"
     override val startupDialogUpdate = "更新"
     override val startupDialogIgnore = "忽略"
