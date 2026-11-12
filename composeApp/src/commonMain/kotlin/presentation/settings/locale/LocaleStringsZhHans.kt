@@ -299,6 +299,7 @@ internal object LocaleStringsZhHans : LocaleStrings() {
     override val editProfileStatusAskMe = "忙碌"
     override val editProfileStatusBusy = "请勿打扰"
     override val editProfileUpdateSuccess = "资料已更新"
+    override val editProfileSaveFailed: String = "无法保存资料，已保留修改内容，请重试。"
     override val editProfileUpdateFailed = "无法更新隐私设置。"
     override val mutualFriendsTitle = "共同好友"
     override val mutualFriendsEmpty = "与%s暂无共同好友"

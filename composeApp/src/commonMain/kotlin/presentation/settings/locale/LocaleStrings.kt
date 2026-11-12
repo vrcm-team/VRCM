@@ -319,6 +319,7 @@ sealed class LocaleStrings {
     open val editProfileStatusAskMe: String = "Ask Me"
     open val editProfileStatusBusy: String = "Do Not Disturb"
     open val editProfileUpdateSuccess: String = "Profile updated"
+    open val editProfileSaveFailed: String = "Could not save the profile. Your changes are kept for retry."
     open val editProfileUpdateFailed: String = "Could not update the privacy setting."
     open val mutualFriendsTitle: String = "Mutual Friends"
     open val mutualFriendsEmpty: String = "No mutual friends with %s"

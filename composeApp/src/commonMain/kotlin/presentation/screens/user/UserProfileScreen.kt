@@ -321,9 +321,10 @@ data class UserProfileScreen(
         // 编辑资料底部弹窗
         val editSuccessMsg = strings.editProfileUpdateSuccess
         val editFailureMsg = strings.editProfileUpdateFailed
+        val profileSaveFailureMsg = strings.editProfileSaveFailed
         val avatarCopyingEnabledMessage = strings.editProfileAvatarCopyingEnabled
         val avatarCopyingDisabledMessage = strings.editProfileAvatarCopyingDisabled
-        val bioLinksUpdateState by userProfileScreenModel.bioLinksUpdateState.collectAsState()
+        val profileUpdateState by userProfileScreenModel.profileUpdateState.collectAsState()
         val boopPrivacyState by userProfileScreenModel.boopPrivacyState.collectAsState()
         val avatarCopyingPrivacyState by userProfileScreenModel
             .avatarCopyingPrivacyState
@@ -331,26 +332,27 @@ data class UserProfileScreen(
         EditProfileSheet(
             isVisible = openEditProfileDialog,
             currentUser = currentUser,
-            bioLinksUpdateState = bioLinksUpdateState,
+            profileUpdateState = profileUpdateState,
             boopPrivacyState = boopPrivacyState,
             avatarCopyingPrivacyState = avatarCopyingPrivacyState,
             onDismiss = { openEditProfileDialog = false },
             onStatusSave = { status, statusDescription ->
-                userProfileScreenModel.updateUserProfile(status = status, statusDescription = statusDescription, successMessage = editSuccessMsg)
+                userProfileScreenModel.updateUserProfile(status = status, statusDescription = statusDescription, successMessage = editSuccessMsg, failureMessage = profileSaveFailureMsg)
             },
             onLanguageSave = { languages ->
-                userProfileScreenModel.updateUserProfile(languages = languages, successMessage = editSuccessMsg)
+                userProfileScreenModel.updateUserProfile(languages = languages, successMessage = editSuccessMsg, failureMessage = profileSaveFailureMsg)
             },
             onPronounsSave = { pronouns ->
-                userProfileScreenModel.updateUserProfile(pronouns = pronouns, successMessage = editSuccessMsg)
+                userProfileScreenModel.updateUserProfile(pronouns = pronouns, successMessage = editSuccessMsg, failureMessage = profileSaveFailureMsg)
             },
             onBioSave = { bio ->
-                userProfileScreenModel.updateUserProfile(bio = bio, successMessage = editSuccessMsg)
+                userProfileScreenModel.updateUserProfile(bio = bio, successMessage = editSuccessMsg, failureMessage = profileSaveFailureMsg)
             },
             onBioLinksSave = { bioLinks ->
-                userProfileScreenModel.updateBioLinks(
+                userProfileScreenModel.updateUserProfile(
                     bioLinks = bioLinks,
                     successMessage = editSuccessMsg,
+                    failureMessage = profileSaveFailureMsg,
                 )
             },
             onBoopPrivacyChange = { isEnabled ->

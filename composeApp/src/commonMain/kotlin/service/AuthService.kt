@@ -13,6 +13,7 @@ import io.github.vrcmteam.vrcm.network.api.auth.data.Presence
 import io.github.vrcmteam.vrcm.network.api.profile.ProfileAppearanceApi
 import io.github.vrcmteam.vrcm.network.api.profile.data.ProfileAppearanceData
 import io.github.vrcmteam.vrcm.network.api.users.data.UserData
+import io.github.vrcmteam.vrcm.network.api.users.data.CurrentUpdateUserData
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.network.websocket.data.content.UserContent
@@ -321,7 +322,10 @@ class AuthService(
         }
     }
 
-    suspend fun applyOwnProfileRefresh(user: UserData): CurrentUserData? =
+    suspend fun applyOwnProfileRefresh(
+        user: UserData,
+        publicProfile: ProfileAppearanceData? = null,
+    ): CurrentUserData? =
         homeWorldMutationGate.withLock {
             synchronized(currentUserLock) {
                 val existing = currentUser ?: return@synchronized null
@@ -365,10 +369,34 @@ class AuthService(
                         bannerType = user.bannerType ?: existing.bannerType,
                         bannerUrl = user.bannerUrl ?: existing.bannerUrl,
                         presence = updatedPresence,
-                    )
+                    ).let { merged -> publicProfile?.let(merged::mergePublicProfile) ?: merged }
                 )
             }
         }
+
+    /** Publishes accepted profile edits only to the account that made the request. */
+    internal suspend fun applyProfileUpdate(
+        sessionToken: AccountSessionToken,
+        profile: ProfileAppearanceData?,
+        user: CurrentUpdateUserData?,
+    ): CurrentUserData? = authMutex.withLock {
+        synchronized(currentUserLock) {
+            if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@synchronized null
+            val existing = currentUser?.takeIf { it.id == sessionToken.userId }
+                ?: return@synchronized null
+            if ((profile != null && profile.id != existing.id) || (user != null && user.id != existing.id)) {
+                return@synchronized null
+            }
+            val merged = profile?.let(existing::mergePublicProfile) ?: existing
+            publishCurrentUserLocked(
+                if (user == null) merged else merged.copy(
+                    status = user.status,
+                    statusDescription = user.statusDescription,
+                    pronouns = user.pronouns ?: merged.pronouns,
+                ),
+            )
+        }
+    }
 
     fun applySocketUserUpdate(user: UserContent) {
         synchronized(currentUserLock) {
@@ -716,6 +744,9 @@ class AuthService(
 internal fun CurrentUserData.mergePublicProfile(profile: ProfileAppearanceData): CurrentUserData = copy(
     bio = profile.bio ?: bio,
     bioLinks = profile.bioLinks ?: bioLinks,
+    tags = profile.languages?.let { languages ->
+        tags.filterNot { it.startsWith("language_") } + languages.map { "language_$it" }
+    } ?: tags,
     displayName = profile.displayName?.takeIf(String::isNotBlank) ?: displayName,
     profileIconUrl = profile.iconUrl?.takeIf(String::isNotBlank) ?: profileIconUrl,
     userIcon = profile.iconUrl?.takeIf(String::isNotBlank) ?: userIcon,
