@@ -11,6 +11,7 @@ import io.github.vrcmteam.vrcm.network.websocket.data.WebSocketSessionRejectedEx
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.ktor.client.*
 import io.ktor.client.plugins.websocket.*
+import io.ktor.client.plugins.ResponseException
 import io.ktor.client.request.*
 import io.ktor.client.call.*
 import io.ktor.http.HttpStatusCode
@@ -24,23 +25,19 @@ class WebSocketApi(
     private val apiClient: HttpClient,
     private val sessionRecovery: WebSocketSessionRecovery,
     private val logger: Logger,
-) {
+) : AutoCloseable {
 
     private var currentJob: Job? = null
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val serviceJob = SupervisorJob()
+    private val scope = CoroutineScope(Dispatchers.IO + serviceJob)
     private val connectionLock = SynchronizedObject()
     private val connectionPolicy = WebSocketConnectionPolicy()
     private val connectedSessionToken = atomic<AccountSessionToken?>(null)
 
     init {
         scope.launch {
-            SharedFlowCentre.authed.collect { session ->
-                if (connectionPolicy.shouldKeepConnection) replaceConnection(session.token)
-            }
-        }
-        scope.launch {
-            SharedFlowCentre.logout.collect {
-                replaceConnection(null)
+            SharedFlowCentre.currentSession.collect { session ->
+                replaceConnection(session?.token.takeIf { connectionPolicy.shouldKeepConnection })
             }
         }
     }
@@ -87,10 +84,14 @@ class WebSocketApi(
             },
         ) { markConnected ->
             val authResponse = apiClient.get(AUTH_API_PREFIX)
+            if (authResponse.status == HttpStatusCode.Unauthorized) {
+                throw WebSocketSessionRejectedException()
+            }
             check(authResponse.status == HttpStatusCode.OK) {
                 "WebSocket auth failed with HTTP ${authResponse.status.value}"
             }
             val authData = authResponse.body<AuthData>()
+            if (authData.ok == false) throw WebSocketSessionRejectedException()
             val token = authData.token.takeIf { authData.ok == true && !it.isNullOrBlank() }
                 ?: error("WebSocket auth response did not contain a token")
             apiClient.ws(
@@ -108,7 +109,7 @@ class WebSocketApi(
                         )
                     }
                 } finally {
-                    connectedSessionToken.value = null
+                    connectedSessionToken.compareAndSet(sessionToken, null)
                 }
             }
         }
@@ -119,12 +120,14 @@ class WebSocketApi(
         error: Exception,
         consecutiveFailures: Int,
     ) {
-        if (error !is WebSocketSessionRejectedException) {
+        val sessionRejected = error is WebSocketSessionRejectedException ||
+            (error is ResponseException && error.response.status == HttpStatusCode.Unauthorized)
+        if (!sessionRejected) {
             reportConnectionFailure(error, consecutiveFailures)
             return
         }
 
-        logger.warn("Pipeline rejected the current session; attempting authentication recovery")
+        logger.warn("Realtime authentication rejected the current session; attempting authentication recovery")
         try {
             sessionRecovery.recoverExpiredSession(sessionToken)
         } catch (cancellation: CancellationException) {
@@ -146,6 +149,14 @@ class WebSocketApi(
                 )
             )
         }
+    }
+
+    override fun close() {
+        serviceJob.cancel()
+    }
+
+    internal suspend fun closeAndJoin() {
+        serviceJob.cancelAndJoin()
     }
 
     private companion object {

@@ -13,6 +13,7 @@ import io.github.vrcmteam.vrcm.network.api.profile.data.ProfileAppearanceData
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
+import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarSelector
 import io.github.vrcmteam.vrcm.service.data.AccountDto
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
@@ -31,6 +32,7 @@ import io.ktor.client.engine.mock.respond
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.cookies.HttpCookies
 import io.ktor.client.plugins.defaultRequest
+import io.ktor.client.request.get
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
@@ -893,6 +895,85 @@ class AuthServiceTest : MainDispatcherTest() {
         assertFalse(response.sessionToken == firstSession.token)
         assertTrue(SharedFlowCentre.isCurrentSession(response.sessionToken))
         fixture.client.close()
+    }
+
+    @Test
+    fun unauthorizedRequestsReplaceRejectedCookieBeforeRetrying() = runTest {
+        for (sessionBound in listOf(false, true)) {
+            val requests = mutableListOf<Pair<String?, String?>>()
+            val fixture = fixture { request ->
+                val cookie = request.headers[HttpHeaders.Cookie].orEmpty()
+                val authorization = request.headers[HttpHeaders.Authorization]
+                requests += cookie to authorization
+                when {
+                    requests.size == 1 -> jsonResponse(currentUserJson(cachedAccount()))
+                    authorization != null && !cookie.contains("auth=cached-auth") -> respond(
+                        content = currentUserJson(cachedAccount()),
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(
+                            HttpHeaders.ContentType to listOf("application/json"),
+                            HttpHeaders.SetCookie to listOf("auth=new-auth; Path=/"),
+                        ),
+                    )
+                    !cookie.contains("auth=new-auth") -> respond("expired", HttpStatusCode.Unauthorized)
+                    request.url.encodedPath.endsWith("/friends") -> jsonResponse("refreshed-friends")
+                    else -> jsonResponse(currentUserJson(cachedAccount()))
+                }
+            }
+            try {
+                fixture.service.restoreAuth()
+                val previousSession = assertNotNull(SharedFlowCentre.currentSession.value)
+                val request: suspend () -> String = {
+                    fixture.client.get("auth/user/friends").checkSuccess<String>()
+                }
+
+                val result = if (sessionBound) {
+                    assertNotNull(fixture.service.runSessionBoundCatching(previousSession.token, request)).result
+                } else {
+                    fixture.service.reTryAuthCatching(request)
+                }
+
+                assertEquals("refreshed-friends", result.getOrThrow())
+                val recoveredSession = assertNotNull(SharedFlowCentre.currentSession.value)
+                assertEquals(previousSession.token.userId, recoveredSession.token.userId)
+                assertFalse(previousSession.token == recoveredSession.token)
+                val loginRequest = requests.single { it.second != null }
+                assertTrue(loginRequest.first.orEmpty().contains("twoFactorAuth=cached-2fa"))
+                assertFalse(loginRequest.first.orEmpty().contains("auth=cached-auth"))
+                assertEquals("new-auth", fixture.accountDao.currentAccountDtoOrNull()?.authCookie)
+            } finally {
+                fixture.service.closeAndJoin()
+                fixture.client.close()
+                SharedFlowCentre.emitLogout()
+            }
+        }
+    }
+
+    @Test
+    fun expiredHttpSessionRequiringVerificationStopsAutomaticLogin() = runTest {
+        var loginRequests = 0
+        val fixture = fixture { request ->
+            if (request.headers[HttpHeaders.Authorization] != null) {
+                loginRequests++
+                jsonResponse("""{"requiresTwoFactorAuth":["emailOtp"]}""")
+            } else {
+                jsonResponse(currentUserJson(cachedAccount()))
+            }
+        }
+        try {
+            fixture.service.restoreAuth()
+
+            assertFalse(fixture.service.doReTryAuth())
+
+            assertNull(SharedFlowCentre.currentSession.value)
+            assertNull(fixture.accountDao.currentAccountDtoOrNull()?.authCookie)
+            assertNull(fixture.service.restoreAuth())
+            assertFalse(fixture.service.doReTryAuth())
+            assertEquals(1, loginRequests)
+        } finally {
+            fixture.service.closeAndJoin()
+            fixture.client.close()
+        }
     }
 
     @Test
