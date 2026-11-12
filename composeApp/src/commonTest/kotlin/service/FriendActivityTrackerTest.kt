@@ -6,6 +6,21 @@ import kotlin.test.assertTrue
 
 class FriendActivityTrackerTest {
     @Test
+    fun profileChangesUseAvatarIdentityAndDoNotTreatMissingImagesAsAvatarChanges() {
+        val tracker = FriendActivityTracker()
+        val friend = FriendActivityObservation("usr_friend", "Original", "icon", "offline", "offline", "", "", null,
+            avatarImageUrl = "avatar-a")
+        assertTrue(tracker.observe(listOf(friend), null, 1_000L).events.isEmpty())
+        val changed = friend.copy(displayName = "Renamed", profileImageUrl = "new-icon", avatarImageUrl = "avatar-b")
+        val events = tracker.observe(listOf(changed), null, 2_000L).events
+        assertEquals(setOf(FriendActivityEventType.DisplayNameChanged, FriendActivityEventType.AvatarChanged), events.map { it.type }.toSet())
+        assertEquals("avatar-a", events.single { it.type == FriendActivityEventType.AvatarChanged }.previousValue)
+        assertTrue(tracker.observe(listOf(changed.copy(profileImageUrl = "another-icon")), null, 3_000L).events.isEmpty())
+        assertTrue(tracker.observe(listOf(changed.copy(avatarImageUrl = "")), null, 4_000L).events.isEmpty())
+        assertTrue(tracker.observe(listOf(changed), null, 5_000L).events.isEmpty())
+    }
+
+    @Test
     fun repeatedSocketPresenceOnlyRecordsStateTransitions() {
         val tracker = FriendActivityTracker()
         val friend = FriendActivityObservation(
@@ -198,6 +213,7 @@ class FriendActivityTrackerTest {
                     worldId = "wrld_world",
                     accessType = FriendActivityAccessType.Public,
                     announce = false,
+                    location = "wrld_world:instance_a",
                 )
             ),
             baseline.meetings,
@@ -245,7 +261,7 @@ class FriendActivityTrackerTest {
         )
         assertEquals("wrld_second", changes.events.first().worldId)
         assertEquals(FriendActivityAccessType.Invite, changes.events.first().accessType)
-        assertEquals("wrld_first", changes.events.first().previousValue)
+        assertEquals("wrld_first:instance_a", changes.events.first().previousValue)
         assertEquals("join me\nCome over", changes.events.first().currentValue)
         assertEquals("First line\nShared line", changes.events[1].previousValue)
         assertEquals("Second line\nShared line", changes.events[1].currentValue)
@@ -283,7 +299,7 @@ class FriendActivityTrackerTest {
         )
 
         assertEquals(listOf(FriendActivityEventType.LocationChanged), traveling.events.map { it.type })
-        assertEquals("wrld_first", traveling.events.single().previousValue)
+        assertEquals("wrld_first:instance_a", traveling.events.single().previousValue)
         assertEquals("wrld_second", traveling.events.single().worldId)
         assertTrue(arrived.events.isEmpty())
     }
@@ -355,6 +371,7 @@ class FriendActivityTrackerTest {
                     worldId = "wrld_world",
                     accessType = FriendActivityAccessType.Public,
                     announce = true,
+                    location = "wrld_world:instance_a",
                 )
             ),
             met.meetings,
@@ -426,6 +443,7 @@ class FriendActivityTrackerTest {
                     worldId = "wrld_world",
                     accessType = FriendActivityAccessType.Public,
                     announce = false,
+                    location = "wrld_world:instance_a",
                 )
             ),
             returned.meetings,

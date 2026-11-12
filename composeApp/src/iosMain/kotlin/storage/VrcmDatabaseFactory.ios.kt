@@ -3,12 +3,15 @@ package io.github.vrcmteam.vrcm.storage
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
+import androidx.sqlite.SQLiteDriver
 import io.github.vrcmteam.vrcm.AppPlatform
 import kotlinx.cinterop.ExperimentalForeignApi
 import platform.Foundation.NSApplicationSupportDirectory
 import platform.Foundation.NSFileManager
 import platform.Foundation.NSSearchPathForDirectoriesInDomains
 import platform.Foundation.NSUserDomainMask
+
+internal actual fun statisticsSQLiteDriver(): SQLiteDriver = BundledSQLiteDriver()
 
 @OptIn(ExperimentalForeignApi::class)
 internal actual fun platformVrcmDatabaseBuilder(

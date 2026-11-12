@@ -3,6 +3,8 @@ package io.github.vrcmteam.vrcm.storage
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
+import androidx.room.ColumnInfo
+import kotlinx.serialization.Serializable
 
 @Entity(tableName = "friend_activity_generations")
 internal data class FriendActivityGenerationEntity(
@@ -24,6 +26,7 @@ internal data class FriendActivityGenerationEntity(
     ],
     indices = [Index("ownerUserId"), Index(value = ["ownerUserId", "lastSeenTogetherAtMillis"])],
 )
+@Serializable
 internal data class FriendActivitySummaryEntity(
     val ownerUserId: String,
     val friendUserId: String,
@@ -53,6 +56,7 @@ internal data class FriendActivitySummaryEntity(
         Index(value = ["ownerUserId", "friendUserId", "occurredAtMillis"]),
     ],
 )
+@Serializable
 internal data class FriendActivityEventEntity(
     @androidx.room.PrimaryKey(autoGenerate = true)
     val id: Long = 0L,
@@ -67,6 +71,8 @@ internal data class FriendActivityEventEntity(
     val worldId: String? = null,
     val worldName: String? = null,
     val accessType: String? = null,
+    @ColumnInfo(defaultValue = "''")
+    val location: String = "",
 )
 
 @Entity(
@@ -85,6 +91,7 @@ internal data class FriendActivityEventEntity(
         Index(value = ["ownerUserId", "endedAtMillis"]),
     ],
 )
+@Serializable
 internal data class FriendActivitySessionEntity(
     @androidx.room.PrimaryKey(autoGenerate = true)
     val id: Long = 0L,
@@ -99,4 +106,6 @@ internal data class FriendActivitySessionEntity(
     val worldName: String? = null,
     val accessType: String,
     val announced: Boolean,
+    @ColumnInfo(defaultValue = "''")
+    val location: String = "",
 )

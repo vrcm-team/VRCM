@@ -214,7 +214,7 @@ class AccountCacheManager(
         }
     }
 
-    suspend fun clearAll() {
+    suspend fun clearAll(includeStatistics: Boolean = true) {
         var invalidation: AccountCacheInvalidation? = null
         accountMutationMutex.lock()
         try {
@@ -227,7 +227,7 @@ class AccountCacheManager(
             friendListCacheStore.clearAll()
             favoriteListCacheStore.clearAll()
             userProfileCacheStore.clearAll()
-            friendActivityStore.clearAll()
+            if (includeStatistics) friendActivityStore.clearAll()
         } finally {
             accountMutationMutex.unlock()
             invalidation?.let { notifyInvalidated(it) }

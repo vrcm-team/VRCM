@@ -176,20 +176,6 @@ internal interface FriendActivityDao {
     )
     suspend fun updateSessionWorldNames(ownerUserId: String, worldId: String, worldName: String)
 
-    @Query(
-        "DELETE FROM friend_activity_events WHERE ownerUserId = :ownerUserId " +
-            "AND occurredAtMillis < :cutoffMillis"
-    )
-    suspend fun deleteEventsBefore(ownerUserId: String, cutoffMillis: Long)
-
-    @Query(
-        "DELETE FROM friend_activity_events WHERE ownerUserId = :ownerUserId AND friendUserId = :friendUserId " +
-            "AND id NOT IN (SELECT id FROM friend_activity_events " +
-            "WHERE ownerUserId = :ownerUserId AND friendUserId = :friendUserId " +
-            "ORDER BY occurredAtMillis DESC, id DESC LIMIT :limit)"
-    )
-    suspend fun trimFriendEvents(ownerUserId: String, friendUserId: String, limit: Int)
-
     @Insert
     suspend fun insertSession(session: FriendActivitySessionEntity): Long
 
@@ -222,14 +208,13 @@ internal interface FriendActivityDao {
     )
     suspend fun sessions(ownerUserId: String, friendUserId: String): List<FriendActivitySessionEntity>
 
-    @Query("DELETE FROM friend_activity_sessions WHERE ownerUserId = :ownerUserId AND endedAtMillis IS NULL")
-    suspend fun deleteIncompleteSessions(ownerUserId: String)
-
+    /** 进程中断后只结算到最后的检查点，不把未监测的间隔算入相遇时长。 */
     @Transaction
-    suspend fun discardIncompleteSessions(ownerUserId: String) {
+    suspend fun finalizeIncompleteSessions(ownerUserId: String) {
         val summariesByUserId = summaries(ownerUserId)
             .associateByTo(mutableMapOf(), FriendActivitySummaryEntity::friendUserId)
         incompleteSessions(ownerUserId).forEach { session ->
+            completeSession(session.id, session.startedAtMillis + session.durationMillis, session.durationMillis)
             if (session.durationMillis <= 0L) return@forEach
             val summary = summariesByUserId[session.friendUserId] ?: return@forEach
             summariesByUserId[session.friendUserId] = summary.copy(
@@ -240,14 +225,7 @@ internal interface FriendActivityDao {
             )
         }
         if (summariesByUserId.isNotEmpty()) upsertSummaries(summariesByUserId.values.toList())
-        deleteIncompleteSessions(ownerUserId)
     }
-
-    @Query(
-        "DELETE FROM friend_activity_sessions WHERE ownerUserId = :ownerUserId " +
-            "AND endedAtMillis IS NOT NULL AND endedAtMillis < :cutoffMillis"
-    )
-    suspend fun deleteSessionsBefore(ownerUserId: String, cutoffMillis: Long)
 
     @Query("DELETE FROM friend_activity_events WHERE ownerUserId = :ownerUserId")
     suspend fun deleteEvents(ownerUserId: String)
@@ -267,6 +245,48 @@ internal interface FriendActivityDao {
     @Query("DELETE FROM friend_activity_summaries")
     suspend fun deleteAllSummaries()
 
+    @Query("SELECT * FROM friend_activity_events WHERE ownerUserId = :ownerUserId ORDER BY occurredAtMillis, id")
+    suspend fun exportEvents(ownerUserId: String): List<FriendActivityEventEntity>
+
+    @Query("SELECT * FROM friend_activity_sessions WHERE ownerUserId = :ownerUserId ORDER BY startedAtMillis, id")
+    suspend fun exportSessions(ownerUserId: String): List<FriendActivitySessionEntity>
+
+    @Query("SELECT * FROM imported_statistics_rows WHERE ownerUserId = :ownerUserId")
+    suspend fun importedStatisticsRows(ownerUserId: String): List<ImportedStatisticsRowEntity>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertImportedStatisticsRows(rows: List<ImportedStatisticsRowEntity>)
+
+    @Upsert
+    suspend fun upsertSessions(sessions: List<FriendActivitySessionEntity>)
+
+    @Query("DELETE FROM imported_statistics_rows WHERE ownerUserId = :ownerUserId")
+    suspend fun deleteImportedStatisticsRows(ownerUserId: String)
+
+    @Query("DELETE FROM imported_statistics_rows")
+    suspend fun deleteAllImportedStatisticsRows()
+
+    @Transaction
+    suspend fun statisticsSnapshot(ownerUserId: String): StatisticsSnapshot = StatisticsSnapshot(
+        ownerUserId, summaries(ownerUserId), exportEvents(ownerUserId), exportSessions(ownerUserId),
+        importedStatisticsRows(ownerUserId),
+    )
+
+    /** 与实时监测共用写入代次和事务，避免删除账户后慢速导入使数据复活。 */
+    @Transaction
+    suspend fun mergeStatistics(token: FriendActivityWriteToken, incoming: StatisticsSnapshot): Boolean {
+        if (generation(token.ownerUserId) != token.generation) return false
+        require(incoming.ownerUserId == token.ownerUserId)
+        val local = statisticsSnapshot(token.ownerUserId)
+        val sessions = mergeStatisticsSessions(local.sessions, incoming.sessions, preserveLocalOpenSessions = true)
+        upsertSessions(sessions)
+        upsertSummaries(mergeStatisticsSummaries(local, incoming, sessions))
+        val knownEvents = local.events.mapTo(mutableSetOf()) { it.statisticsKey() }
+        insertEvents(incoming.events.filter { knownEvents.add(it.statisticsKey()) }.map { it.copy(id = 0L) })
+        insertImportedStatisticsRows(incoming.importedRows)
+        return true
+    }
+
     @Transaction
     suspend fun activateAccount(ownerUserId: String): FriendActivityWriteToken {
         insertGeneration(FriendActivityGenerationEntity(ownerUserId, generation = 0L))
@@ -280,6 +300,7 @@ internal interface FriendActivityDao {
         deleteEvents(ownerUserId)
         deleteSessions(ownerUserId)
         deleteSummaries(ownerUserId)
+        deleteImportedStatisticsRows(ownerUserId)
     }
 
     @Transaction
@@ -288,6 +309,7 @@ internal interface FriendActivityDao {
         deleteAllEvents()
         deleteAllSessions()
         deleteAllSummaries()
+        deleteAllImportedStatisticsRows()
     }
 
     @Transaction
@@ -362,6 +384,7 @@ internal interface FriendActivityDao {
                             worldId = meeting.worldId,
                             accessType = meeting.accessType.name,
                             announced = meeting.announce,
+                            location = meeting.location,
                         )
                     )
                     summariesByUserId[meeting.userId] = current.copy(
@@ -409,18 +432,8 @@ internal interface FriendActivityDao {
         if (summariesByUserId.isNotEmpty()) upsertSummaries(summariesByUserId.values.toList())
         if (storedEvents.isNotEmpty()) insertEvents(storedEvents)
 
-        val cutoff = nowMillis - EVENT_RETENTION_MILLIS
-        deleteEventsBefore(token.ownerUserId, cutoff)
-        deleteSessionsBefore(token.ownerUserId, cutoff)
-        (batch.events.map { it.userId } + batch.meetings.map { it.userId })
-            .distinct()
-            .forEach { trimFriendEvents(token.ownerUserId, it, MAX_EVENTS_PER_FRIEND) }
+        // 动态和相遇明细是可迁移的统计数据，不能随时间线展示上限过期删除。
         return true
-    }
-
-    private companion object {
-        const val EVENT_RETENTION_MILLIS = 180L * 24L * 60L * 60L * 1_000L
-        const val MAX_EVENTS_PER_FRIEND = 500
     }
 }
 
@@ -450,6 +463,7 @@ private fun FriendActivityEventDraft.toEntity(ownerUserId: String) = FriendActiv
     worldId = worldId,
     worldName = null,
     accessType = accessType?.name,
+    location = location,
 )
 
 private fun FriendMeetingChange.toEvent(
