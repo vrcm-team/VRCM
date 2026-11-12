@@ -66,6 +66,8 @@ import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.CardListDetailScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.MutualFriendsScreen
 import io.github.vrcmteam.vrcm.service.FriendActivityService
+import io.github.vrcmteam.vrcm.presentation.screens.scan.ScanLaunchHandler
+import io.github.vrcmteam.vrcm.service.ScanLaunchInbox
 import io.github.vrcmteam.vrcm.service.OfficialLinkInbox
 import io.github.vrcmteam.vrcm.service.NotificationLaunchInbox
 import org.koin.compose.KoinContext
@@ -77,7 +79,9 @@ fun App(
     windowChrome: @Composable () -> Unit = {},
     officialLinkInbox: OfficialLinkInbox? = null,
     notificationLaunchInbox: NotificationLaunchInbox? = null,
+    scanLaunchInbox: ScanLaunchInbox? = null,
 ) {
+    val activeScanLaunchInbox = remember(scanLaunchInbox) { scanLaunchInbox ?: ScanLaunchInbox() }
     val backNavigationPolicy = remember { BackNavigationPolicy() }
     val navigator = rememberAppNavigator(StartupAnimeScreen)
     val activeOfficialLinkInbox = remember(officialLinkInbox) {
@@ -136,15 +140,17 @@ fun App(
                             CompositionLocalProvider(LocalAppOverlayBackHandler provides OverlayBackHandler) {
                                 AppOverlayHost {
                                     VersionDialog()
-                                    OfficialLinkPrompt(navigator, activeOfficialLinkInbox) {
-                                        NotificationLaunchHandler(navigator, activeNotificationLaunchInbox)
-                                        SharedTransitionScreen(
-                                            navigator = navigator,
-                                            transitionSpec = { selectTransition(isPop = false) },
-                                            popTransitionSpec = { selectTransition(isPop = true) },
-                                        ) { screen ->
-                                            SharedTransitionDialog(key = screen.key) {
-                                                screen.Content()
+                                    ScanLaunchHandler(activeScanLaunchInbox, activeOfficialLinkInbox) { scanning ->
+                                        OfficialLinkPrompt(navigator, activeOfficialLinkInbox, suppressClipboardInspection = scanning) {
+                                            NotificationLaunchHandler(navigator, activeNotificationLaunchInbox)
+                                            SharedTransitionScreen(
+                                                navigator = navigator,
+                                                transitionSpec = { selectTransition(isPop = false) },
+                                                popTransitionSpec = { selectTransition(isPop = true) },
+                                            ) { screen ->
+                                                SharedTransitionDialog(key = screen.key) {
+                                                    screen.Content()
+                                                }
                                             }
                                         }
                                     }
