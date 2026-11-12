@@ -2,6 +2,7 @@ package io.github.vrcmteam.vrcm.presentation.screens.user
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
@@ -19,9 +21,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.presentation.compoments.AImage
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppButton
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonStyle
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppDivider
@@ -186,7 +190,9 @@ internal fun ActivityEventRow(
                 style = AppTheme.type.subheadline,
                 fontWeight = FontWeight.Medium,
             )
-            if (bioDiff.isNotEmpty()) {
+            if (event.type == FriendActivityEventType.AvatarChanged) {
+                AvatarChangePreview(event.previousValue, event.currentValue)
+            } else if (bioDiff.isNotEmpty()) {
                 BioDiffLines(bioDiff)
             } else if (detail != null) {
                 val hasWorld = event.worldId?.isNotBlank() == true
@@ -211,6 +217,26 @@ internal fun ActivityEventRow(
             style = AppTheme.type.caption1,
             color = AppTheme.colors.secondaryLabel,
             modifier = Modifier.padding(top = 1.dp),
+        )
+    }
+}
+
+@Composable
+private fun AvatarChangePreview(previousUrl: String?, currentUrl: String?) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        AvatarChangeImage(previousUrl, strings.friendActivityAvatarBefore, Modifier.weight(1f))
+        AvatarChangeImage(currentUrl, strings.friendActivityAvatarAfter, Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun AvatarChangeImage(imageUrl: String?, label: String, modifier: Modifier) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        AppText(label, style = AppTheme.type.caption1, color = AppTheme.colors.secondaryLabel)
+        // 64dp 是时间线缩略图的最大边长；窄窗口按各自列宽缩小，文字不限制高度。
+        AImage(
+            imageData = imageUrl.orEmpty(),
+            modifier = Modifier.widthIn(max = 64.dp).fillMaxWidth().aspectRatio(1f).clip(AppShapes.s),
         )
     }
 }
@@ -321,7 +347,8 @@ internal fun FriendActivityEvent.activityDetail(): String? {
         FriendActivityEventType.DisplayNameChanged -> listOfNotNull(previousValue, currentValue)
         FriendActivityEventType.AvatarChanged -> emptyList()
     }
-    return parts.takeIf(List<String>::isNotEmpty)?.joinToString(" · ")
+    val separator = if (type == FriendActivityEventType.DisplayNameChanged) " → " else " · "
+    return parts.takeIf(List<String>::isNotEmpty)?.joinToString(separator)
 }
 
 @Composable

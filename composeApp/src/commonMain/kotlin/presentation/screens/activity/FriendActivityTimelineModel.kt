@@ -24,8 +24,10 @@ enum class FriendActivityTimelineFilter(internal val eventTypes: Set<FriendActiv
     Presence(setOf(FriendActivityEventType.Online, FriendActivityEventType.Offline)),
     Location(setOf(FriendActivityEventType.LocationChanged)),
     Profile(setOf(FriendActivityEventType.StatusChanged, FriendActivityEventType.BioChanged,
-        FriendActivityEventType.DisplayNameChanged, FriendActivityEventType.AvatarChanged)),
+        FriendActivityEventType.DisplayNameChanged)),
     Meetup(setOf(FriendActivityEventType.Met, FriendActivityEventType.Left)),
+    // 首页按序号恢复已选分类，新增项放在末尾以保留现有选择。
+    Avatar(setOf(FriendActivityEventType.AvatarChanged)),
 }
 
 sealed interface FriendActivityTimelineState {
