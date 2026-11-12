@@ -14,6 +14,11 @@ interface FriendActivityCacheStore {
 internal class RoomFriendActivityStore(
     private val dao: FriendActivityDao,
 ) : FriendActivityCacheStore {
+    suspend fun statisticsSnapshot(ownerUserId: String): StatisticsSnapshot = dao.statisticsSnapshot(ownerUserId)
+
+    suspend fun mergeStatistics(token: FriendActivityWriteToken, snapshot: StatisticsSnapshot): Boolean =
+        dao.mergeStatistics(token, snapshot)
+
     suspend fun activateAccount(ownerUserId: String): FriendActivityWriteToken =
         dao.activateAccount(ownerUserId)
 
@@ -24,8 +29,8 @@ internal class RoomFriendActivityStore(
         nowMillis: Long,
     ): Boolean = dao.record(token, observations, batch, nowMillis)
 
-    suspend fun discardIncompleteSessions(ownerUserId: String) =
-        dao.discardIncompleteSessions(ownerUserId)
+    suspend fun finalizeIncompleteSessions(ownerUserId: String) =
+        dao.finalizeIncompleteSessions(ownerUserId)
 
     override suspend fun clearAccount(ownerUserId: String) = dao.clearAccount(ownerUserId)
 

@@ -56,7 +56,7 @@ private fun UserStatus.toLocalizedString(): String = when (this) {
 fun EditProfileSheet(
     isVisible: Boolean,
     currentUser: UserProfileVo,
-    bioLinksUpdateState: BioLinksUpdateState,
+    profileUpdateState: ProfileUpdateState,
     boopPrivacyState: BoopPrivacyUiState,
     avatarCopyingPrivacyState: AvatarCopyingPrivacyState,
     onDismiss: () -> Unit,
@@ -86,32 +86,35 @@ fun EditProfileSheet(
     var editBio by remember { mutableStateOf(bio) }
     var editBioLinks by remember { mutableStateOf(bioLinks) }
     var editLanguages by remember { mutableStateOf(languages) }
-    var handledBioLinksRequestId by remember {
-        mutableLongStateOf(bioLinksUpdateState.completedRequestId)
+    var handledProfileRequestId by remember {
+        mutableLongStateOf(profileUpdateState.completedRequestId)
     }
-    val latestBioLinksSaving = rememberUpdatedState(bioLinksUpdateState.isSaving)
+    val latestProfileSaving = rememberUpdatedState(profileUpdateState.isSaving)
     val profileSheetState = rememberAppSheetState(
         skipPartiallyExpanded = true,
         confirmValueChange = { targetValue ->
-            targetValue != AppSheetValue.Hidden || !latestBioLinksSaving.value
+            targetValue != AppSheetValue.Hidden || !latestProfileSaving.value
         },
     )
 
-    LaunchedEffect(bioLinksUpdateState.completedRequestId) {
-        if (bioLinksUpdateState.completedRequestId == handledBioLinksRequestId) return@LaunchedEffect
-        handledBioLinksRequestId = bioLinksUpdateState.completedRequestId
-        bioLinksUpdateState.savedLinks?.let { savedLinks ->
-            val limitedLinks = savedLinks.take(MAX_PROFILE_BIO_LINKS)
-            bioLinks = limitedLinks
-            editBioLinks = limitedLinks
-            if (editingField == EditField.SocialLinks) editingField = null
+    LaunchedEffect(profileUpdateState.completedRequestId) {
+        if (profileUpdateState.completedRequestId == handledProfileRequestId) return@LaunchedEffect
+        handledProfileRequestId = profileUpdateState.completedRequestId
+        profileUpdateState.savedProfile?.let { saved ->
+            status = saved.status.safeStatus()
+            statusDescription = saved.statusDescription
+            pronouns = saved.pronouns
+            bio = saved.bio
+            bioLinks = saved.bioLinks.take(MAX_PROFILE_BIO_LINKS)
+            languages = extractLanguages(saved.tags)
+            editingField = null
         }
     }
 
     AppSheet(
-        onDismissRequest = { if (!bioLinksUpdateState.isSaving) onDismiss() },
+        onDismissRequest = { if (!profileUpdateState.isSaving) onDismiss() },
         sheetState = profileSheetState,
-        sheetGesturesEnabled = !bioLinksUpdateState.isSaving,
+        sheetGesturesEnabled = !profileUpdateState.isSaving,
     ) {
         Column(
             modifier = Modifier
@@ -158,21 +161,37 @@ fun EditProfileSheet(
                 )
             } else {
                 when (editingField) {
-                    EditField.Status -> EditStatusField(editStatus, editStatusDesc, { editStatus = it }, { editStatusDesc = it }, {
-                        status = editStatus; statusDescription = editStatusDesc; onStatusSave(editStatus, editStatusDesc); editingField = null
-                    }) { editingField = null }
-                    EditField.Language -> EditLanguageField(editLanguages, { editLanguages = it }, {
-                        languages = editLanguages; onLanguageSave(editLanguages); editingField = null
-                    }) { editingField = null }
-                    EditField.Pronouns -> EditContentField(strings.editProfilePronouns, editPronouns, { editPronouns = it }, 32, 2, {
-                        pronouns = editPronouns; onPronounsSave(editPronouns); editingField = null
-                    }) { editingField = null }
-                    EditField.Bio -> EditContentField(strings.editProfileBio, editBio, { editBio = it }, 512, 8, {
-                        bio = editBio; onBioSave(editBio); editingField = null
-                    }) { editingField = null }
+                    EditField.Status -> EditStatusField(
+                        status = editStatus,
+                        statusDescription = editStatusDesc,
+                        onStatusChange = { editStatus = it },
+                        onStatusDescChange = { editStatusDesc = it },
+                        isSaving = profileUpdateState.isSaving,
+                        onSave = { onStatusSave(editStatus, editStatusDesc) },
+                        onBack = { editingField = null },
+                    )
+                    EditField.Language -> EditLanguageField(
+                        languages = editLanguages,
+                        onLanguagesChange = { editLanguages = it },
+                        isSaving = profileUpdateState.isSaving,
+                        onSave = { onLanguageSave(editLanguages) },
+                        onBack = { editingField = null },
+                    )
+                    EditField.Pronouns -> EditContentField(
+                        strings.editProfilePronouns, editPronouns, { editPronouns = it }, 32, 2,
+                        isSaving = profileUpdateState.isSaving,
+                        onSave = { onPronounsSave(editPronouns) },
+                        onBack = { editingField = null },
+                    )
+                    EditField.Bio -> EditContentField(
+                        strings.editProfileBio, editBio, { editBio = it }, 512, 8,
+                        isSaving = profileUpdateState.isSaving,
+                        onSave = { onBioSave(editBio) },
+                        onBack = { editingField = null },
+                    )
                     EditField.SocialLinks -> EditSocialLinksField(
                         bioLinks = editBioLinks,
-                        isSaving = bioLinksUpdateState.isSaving,
+                        isSaving = profileUpdateState.isSaving,
                         onBioLinksChange = {
                             editBioLinks = it.take(MAX_PROFILE_BIO_LINKS)
                         },
@@ -360,21 +379,7 @@ private fun EditSocialLinksField(
         color = AppTheme.colors.secondaryLabel,
     )
     Spacer(Modifier.height(16.dp))
-    AppButton(
-        onClick = onSave,
-        modifier = Modifier.fillMaxWidth(),
-        enabled = !isSaving,
-        style = AppButtonStyle.Prominent,
-    ) {
-        if (isSaving) {
-            AppActivityIndicator(
-                modifier = Modifier.size(18.dp),
-                color = LocalContentColor.current,
-            )
-            Spacer(Modifier.width(8.dp))
-        }
-        AppText(strings.editProfileSave)
-    }
+    ProfileSaveButton(isSaving, onSave)
 }
 
 @Composable
@@ -408,38 +413,38 @@ internal fun EditHeader(title: String, onBack: () -> Unit, enabled: Boolean = tr
 private fun EditStatusField(
     status: UserStatus, statusDescription: String,
     onStatusChange: (UserStatus) -> Unit, onStatusDescChange: (String) -> Unit,
-    onSave: () -> Unit, onBack: () -> Unit,
+    isSaving: Boolean, onSave: () -> Unit, onBack: () -> Unit,
 ) {
-    EditHeader(strings.editProfileStatus, onBack)
+    EditHeader(strings.editProfileStatus, onBack, enabled = !isSaving)
     AppTextField(
         value = statusDescription, onValueChange = { if (it.length <= 32) onStatusDescChange(it) },
         label = { AppText(strings.editProfileStatusDescription) },
-        modifier = Modifier.fillMaxWidth(), singleLine = true,
+        modifier = Modifier.fillMaxWidth(), singleLine = true, enabled = !isSaving,
         supportingText = { AppText("${statusDescription.length}/32") },
     )
     Spacer(Modifier.height(10.dp))
     STATUS_OPTIONS.forEach { option ->
-        Row(Modifier.fillMaxWidth().clickable { onStatusChange(option) }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            AppRadioButton(selected = status == option, onClick = { onStatusChange(option) })
+        Row(Modifier.fillMaxWidth().clickable(enabled = !isSaving) { onStatusChange(option) }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            AppRadioButton(selected = status == option, onClick = { onStatusChange(option) }, enabled = !isSaving)
             AppText(option.toLocalizedString(), style = AppTheme.type.subheadline)
         }
     }
     Spacer(Modifier.height(16.dp))
-    AppButton(onClick = onSave, modifier = Modifier.fillMaxWidth(), style = AppButtonStyle.Prominent) { AppText(strings.editProfileSave) }
+    ProfileSaveButton(isSaving, onSave)
 }
 
 @Composable
 private fun EditLanguageField(
     languages: List<String>, onLanguagesChange: (List<String>) -> Unit,
-    onSave: () -> Unit, onBack: () -> Unit,
+    isSaving: Boolean, onSave: () -> Unit, onBack: () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    EditHeader(strings.editProfileLanguage, onBack)
+    EditHeader(strings.editProfileLanguage, onBack, enabled = !isSaving)
     if (languages.isNotEmpty()) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             languages.forEach { code ->
                 val name = LANGUAGE_OPTIONS.find { it.first == code }?.second ?: code
-                AppFilterChip(selected = false, onClick = { onLanguagesChange(languages - code) }, label = { AppText(name) },
+                AppFilterChip(selected = false, enabled = !isSaving, onClick = { onLanguagesChange(languages - code) }, label = { AppText(name) },
                     trailingIcon = { AppIcon(AppIcons.Close, "remove", modifier = Modifier.size(16.dp)) })
             }
         }
@@ -447,7 +452,7 @@ private fun EditLanguageField(
     }
     if (languages.size < 3) {
         Box {
-            AppButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth(), style = AppButtonStyle.Gray) { AppText(strings.editProfileAddLanguage) }
+            AppButton(onClick = { expanded = true }, enabled = !isSaving, modifier = Modifier.fillMaxWidth(), style = AppButtonStyle.Gray) { AppText(strings.editProfileAddLanguage) }
             AppMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                 LANGUAGE_OPTIONS.filter { it.first !in languages }.forEach { (code, name) ->
                     AppMenuItem(text = { AppText("$name (${code.uppercase()})") }, onClick = { onLanguagesChange(languages + code); expanded = false })
@@ -458,20 +463,36 @@ private fun EditLanguageField(
     Spacer(Modifier.height(8.dp))
     AppText(strings.editProfileLanguageHint, style = AppTheme.type.caption1, color = AppTheme.colors.secondaryLabel)
     Spacer(Modifier.height(16.dp))
-    AppButton(onClick = onSave, modifier = Modifier.fillMaxWidth(), style = AppButtonStyle.Prominent) { AppText(strings.editProfileSave) }
+    ProfileSaveButton(isSaving, onSave)
 }
 
 @Composable
 private fun EditContentField(
     title: String, value: String, onValueChange: (String) -> Unit,
-    maxLength: Int, maxLines: Int, onSave: () -> Unit, onBack: () -> Unit,
+    maxLength: Int, maxLines: Int, isSaving: Boolean, onSave: () -> Unit, onBack: () -> Unit,
 ) {
-    EditHeader(title, onBack)
+    EditHeader(title, onBack, enabled = !isSaving)
     AppTextField(
         value = value, onValueChange = { if (it.length <= maxLength) onValueChange(it) },
-        modifier = Modifier.fillMaxWidth(), maxLines = maxLines,
+        modifier = Modifier.fillMaxWidth(), maxLines = maxLines, enabled = !isSaving,
         supportingText = { AppText("${value.length}/$maxLength") },
     )
     Spacer(Modifier.height(16.dp))
-    AppButton(onClick = onSave, modifier = Modifier.fillMaxWidth(), style = AppButtonStyle.Prominent) { AppText(strings.editProfileSave) }
+    ProfileSaveButton(isSaving, onSave)
+}
+
+@Composable
+private fun ProfileSaveButton(isSaving: Boolean, onSave: () -> Unit) {
+    AppButton(
+        onClick = onSave,
+        enabled = !isSaving,
+        modifier = Modifier.fillMaxWidth(),
+        style = AppButtonStyle.Prominent,
+    ) {
+        if (isSaving) {
+            AppActivityIndicator(modifier = Modifier.size(18.dp), color = LocalContentColor.current)
+            Spacer(Modifier.width(8.dp))
+        }
+        AppText(strings.editProfileSave)
+    }
 }

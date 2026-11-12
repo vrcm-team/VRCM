@@ -428,7 +428,7 @@ internal suspend fun trackFriendActivity(
     cancellationTimeMillis: () -> Long = { Clock.System.now().toEpochMilliseconds() },
 ) {
     var writeToken = store.activateAccount(session.account.userId)
-    store.discardIncompleteSessions(session.account.userId)
+    store.finalizeIncompleteSessions(session.account.userId)
     var tracker = FriendActivityTracker(derivePresenceEvents = false)
     var trackingEnabled = true
     var latestObservations: Collection<FriendActivityObservation> = emptyList()
@@ -533,6 +533,7 @@ private fun FriendActivitySourceSnapshot.toInputSnapshot(
                 ?.takeIf { includeLastActivity }
                 ?.takeIf { friend.status == UserStatus.Offline },
             travelingToLocation = friend.travelingToLocation,
+            avatarImageUrl = friend.currentAvatarImageUrl,
         )
     },
     selfLocation = selfLocation,
