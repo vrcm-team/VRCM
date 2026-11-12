@@ -96,6 +96,9 @@ internal fun UserData.mergePublicProfile(profile: ProfileAppearanceData?): UserD
     return copy(
         bio = profile.bio ?: bio,
         bioLinks = profile.bioLinks ?: bioLinks,
+        tags = profile.languages?.let { languages ->
+            tags.filterNot { it.startsWith("language_") } + languages.map { "language_$it" }
+        } ?: tags,
         currentAvatarImageUrl = currentAvatarImageUrl.ifBlank { iconUrl },
         currentAvatarThumbnailImageUrl = currentAvatarThumbnailImageUrl
             ?: iconUrl.takeIf(String::isNotBlank),

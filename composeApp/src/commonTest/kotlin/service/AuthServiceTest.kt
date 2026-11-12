@@ -11,6 +11,7 @@ import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.network.api.profile.data.ProfileAppearanceData
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
+import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarSelector
 import io.github.vrcmteam.vrcm.service.data.AccountDto
@@ -68,6 +69,55 @@ import kotlin.test.assertTrue
 class AuthServiceTest : MainDispatcherTest() {
     @AfterTest
     fun clearSession() = runTest { SharedFlowCentre.emitLogout() }
+
+    @Test
+    fun profileEditsReplaceLanguageTagsAndKeepClearedLinksAfterRefresh() = runTest {
+        val account = cachedAccount()
+        val body = currentUserJson(account).replace("\"tags\":[]", "\"tags\":[\"system_supporter\",\"language_eng\"]")
+        val fixture = fixture { jsonResponse(body) }
+        try {
+            assertIs<AuthState.Authed>(fixture.service.restoreAuth())
+            val token = SharedFlowCentre.currentSession.value!!.token
+            val saved = fixture.service.applyProfileUpdate(
+                token,
+                ProfileAppearanceData(id = account.userId, bio = "New bio", bioLinks = listOf("https://example.com"), languages = listOf("jpn")),
+                user = null,
+            )!!
+            assertEquals("New bio", saved.bio)
+            assertEquals(listOf("jpn"), saved.speakLanguages)
+            assertTrue("system_supporter" in saved.tags)
+
+            val publicProfile = ProfileAppearanceData(id = account.userId, bio = "", bioLinks = emptyList(), languages = emptyList())
+            val user = Json { ignoreUnknownKeys = true }.decodeFromString<UserData>(body)
+            val refreshed = fixture.service.applyOwnProfileRefresh(user, publicProfile)!!
+            assertEquals("", refreshed.bio)
+            assertEquals(emptyList(), refreshed.bioLinks)
+            assertEquals(emptyList(), refreshed.speakLanguages)
+            assertTrue("system_supporter" in refreshed.tags)
+            assertEquals(refreshed, fixture.service.currentUserState.value)
+        } finally {
+            fixture.service.closeAndJoin()
+            fixture.client.close()
+        }
+    }
+
+    @Test
+    fun profileEditCannotApplyAfterLogoutOrForAnotherUser() = runTest {
+        val fixture = fixture { jsonResponse(currentUserJson(cachedAccount())) }
+        try {
+            assertIs<AuthState.Authed>(fixture.service.restoreAuth())
+            val token = SharedFlowCentre.currentSession.value!!.token
+            val original = fixture.service.currentUserState.value
+            assertNull(fixture.service.applyProfileUpdate(token, ProfileAppearanceData(id = "usr_other", bio = "Wrong account"), null))
+            assertEquals(original, fixture.service.currentUserState.value)
+            fixture.service.logout()
+            assertNull(fixture.service.applyProfileUpdate(token, ProfileAppearanceData(id = token.userId, bio = "Late response"), null))
+            assertNull(fixture.service.currentUserState.value)
+        } finally {
+            fixture.service.closeAndJoin()
+            fixture.client.close()
+        }
+    }
 
     @Test
     fun loginAcceptsAuthResponseWithoutOptionalProfileFields() = runTest {

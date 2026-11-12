@@ -303,6 +303,7 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val editProfileStatusAskMe = "きいてみてね"
     override val editProfileStatusBusy = "取り込み中"
     override val editProfileUpdateSuccess = "プロフィールを更新しました"
+    override val editProfileSaveFailed: String = "プロフィールを保存できませんでした。変更内容は保持されています。もう一度お試しください。"
     override val editProfileUpdateFailed = "プライバシー設定を更新できませんでした。"
     override val mutualFriendsTitle = "共通の友達"
     override val mutualFriendsEmpty = "%sとの共通の友達はいません"
