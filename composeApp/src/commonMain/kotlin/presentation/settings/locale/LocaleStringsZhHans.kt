@@ -319,6 +319,7 @@ internal object LocaleStringsZhHans : LocaleStrings() {
     override val locationDialogDescription = "描述"
     override val locationDialogTags = "标签"
     override val locationInvited = "已邀请"
+    override val locationInviteFailed = "邀请自己失败，请重试。"
     override val locationInviteMe = "邀请自己"
     override val createInstance = "创建房间"
     override val accessType = "访问权限"

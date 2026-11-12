@@ -323,6 +323,7 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val locationDialogDescription = "説明"
     override val locationDialogTags = "タグ"
     override val locationInvited = "誘い済み"
+    override val locationInviteFailed = "自分への招待に失敗しました。もう一度お試しください。"
     override val locationInviteMe = "自分を誘う"
     override val createInstance = "インスタンス作成"
     override val accessType = "アクセス権限"

@@ -339,6 +339,7 @@ sealed class LocaleStrings {
     open val locationDialogDescription: String = "Description"
     open val locationDialogTags: String = "Tags"
     open val locationInvited: String = "Invited"
+    open val locationInviteFailed: String = "Failed to invite yourself. Please try again."
     open val locationInviteMe: String = "Invite Me"
     open val createInstance: String = "Create Instance"
     open val accessType: String = "Access Type"

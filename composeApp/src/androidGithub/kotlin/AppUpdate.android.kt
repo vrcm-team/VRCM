@@ -47,7 +47,7 @@ internal class ApkUpdateInstaller(context: Context) : AppUpdateInstaller {
         onProgress: (downloadedBytes: Long, totalBytes: Long?) -> Unit,
     ): Result<DownloadedAppUpdate> = withContext(Dispatchers.IO) {
         try {
-            val source = downloadUrls.firstOrNull { it.endsWith(".apk", ignoreCase = true) }
+            val source = downloadUrls.firstOrNull(::isApkDownloadUrl)
                 ?: error("This release has no Android APK")
             val directory = File(context.cacheDir, UPDATE_DIRECTORY)
             check(directory.isDirectory || directory.mkdirs()) { "Unable to create $directory" }
@@ -116,15 +116,21 @@ internal class ApkUpdateInstaller(context: Context) : AppUpdateInstaller {
             PackageManager.GET_SIGNATURES
         }
         val archive = context.packageManager.getPackageArchiveInfo(apk.path, flags)
-        check(archive?.packageName == context.packageName) { "Downloaded APK package does not match" }
+            ?: throw ApkValidationException("Downloaded file is not a valid APK")
+        if (archive.packageName != context.packageName) {
+            throw ApkIdentityException("Downloaded APK package does not match")
+        }
         val installed = context.packageManager.getPackageInfo(context.packageName, flags)
-        check(signatures(archive).contentDeepEquals(signatures(installed))) { "Downloaded APK signature does not match" }
+        if (!signatures(archive).contentDeepEquals(signatures(installed))) {
+            throw ApkIdentityException("Downloaded APK signature does not match")
+        }
     }
 }
 
 /**
  * 把 [source] 下载到 [target]。GitHub 直连在国内常常很慢，所以同时探测直连和各个镜像，按响应先后逐个下载；
- * 某个源中途断开、长时间没有数据，或者下到的文件通不过 [verify]，就换下一个源。全部失败时抛出汇总各源原因的异常。
+ * 某个源中途断开、长时间没有数据，或者下到的文件内容无效，就换下一个源；安装包身份不匹配时直接失败。
+ * 全部可重试的源都失败时抛出汇总各源原因的异常。
  */
 internal suspend fun HttpClient.downloadFromFastestSource(
     source: String,
@@ -145,10 +151,14 @@ internal suspend fun HttpClient.downloadFromFastestSource(
     val failures = mutableListOf<String>()
     for (url in candidates) {
         try {
-            downloadTo(url, target, onProgress)
+            val progress = downloadTo(url, target, onProgress)
             verify(target)
+            onProgress(progress.downloadedBytes, progress.totalBytes)
             probing.cancel()
             return@coroutineScope
+        } catch (cause: ApkIdentityException) {
+            target.delete()
+            throw cause
         } catch (cause: CancellationException) {
             throw cause
         } catch (cause: Exception) {
@@ -181,7 +191,7 @@ private suspend fun HttpClient.downloadTo(
     url: String,
     target: File,
     onProgress: (downloadedBytes: Long, totalBytes: Long?) -> Unit,
-) = prepareGet(url) { header(HttpHeaders.UserAgent, USER_AGENT) }.execute { response ->
+): DownloadProgress = prepareGet(url) { header(HttpHeaders.UserAgent, USER_AGENT) }.execute { response ->
     check(response.status.isSuccess()) { "HTTP ${response.status.value}" }
     val total = response.contentLength()?.takeIf { it > 0 }
     val body = response.bodyAsChannel()
@@ -195,14 +205,24 @@ private suspend fun HttpClient.downloadTo(
             if (read < 0) break
             output.write(buffer, 0, read)
             downloaded += read
-            if (downloaded - reported >= PROGRESS_STEP_BYTES) {
+            if (downloaded - reported >= PROGRESS_STEP_BYTES && downloaded < (total ?: Long.MAX_VALUE)) {
                 reported = downloaded
                 onProgress(downloaded, total)
             }
         }
     }
-    onProgress(downloaded, total)
+    DownloadProgress(downloaded, total)
 }
+
+private data class DownloadProgress(
+    val downloadedBytes: Long,
+    val totalBytes: Long?,
+)
+
+/** APK 内容不完整时可以换下载源；身份不匹配时换源也不会改变结果。 */
+internal open class ApkValidationException(message: String) : IOException(message)
+
+internal class ApkIdentityException(message: String) : ApkValidationException(message)
 
 private fun signatures(info: PackageInfo): Array<ByteArray> =
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -217,6 +237,9 @@ private fun apkFileName(tagName: String) =
     APK_NAME_PREFIX + tagName.replace(Regex("[^A-Za-z0-9._-]"), "_") + APK_NAME_SUFFIX
 
 private fun mirrorUrl(prefix: String, source: String) = if (prefix.isEmpty()) source else prefix + source
+private fun isApkDownloadUrl(rawUrl: String): Boolean = runCatching {
+    Url(rawUrl).encodedPath.substringAfterLast('/').endsWith(APK_NAME_SUFFIX, ignoreCase = true)
+}.getOrDefault(false)
 private val downloadMirrors = listOf(
     "",
     "https://ghfast.top/",
