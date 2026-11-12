@@ -84,10 +84,11 @@ object QrScannerScreen : AppRoute {
                 { QrCodeSelection(current.batch, model::selectCode) }
             },
             onRescan = if (state is QrScanState.Selecting) model::scanAgain else null,
-        ) {
+        ) { controls ->
             if (state == QrScanState.Scanning && qrScanningSupported) {
-                QrCamera(Modifier.fillMaxSize(), model::onScanned, model::cameraFailed, showMyCode, model::chooseImage, model::onCandidates)
-            }
+                QrCamera(Modifier.fillMaxSize(), model::onScanned, model::cameraFailed,
+                    showMyCode, model::chooseImage, model::onCandidates, controls)
+            } else controls()
         }
 
         if (state is QrScanState.DeviceConfirmation || state is QrScanState.Approving ||

@@ -4,6 +4,8 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Rect
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
@@ -51,7 +53,17 @@ internal actual fun QrScannerAppearance() {
 
 @Composable
 internal actual fun QrCamera(modifier: Modifier, onScanned: (String) -> Unit, onFailure: () -> Unit,
-    onMyCode: () -> Unit, onAlbum: () -> Unit, onCandidates: (QrScanBatch) -> Unit) {
+    onMyCode: () -> Unit, onAlbum: () -> Unit, onCandidates: (QrScanBatch) -> Unit,
+    controls: @Composable () -> Unit) {
+    Box(modifier) {
+        QrCameraPreview(Modifier.fillMaxSize(), onScanned, onFailure, onCandidates)
+        controls()
+    }
+}
+
+@Composable
+private fun QrCameraPreview(modifier: Modifier, onScanned: (String) -> Unit, onFailure: () -> Unit,
+    onCandidates: (QrScanBatch) -> Unit) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val resultCallback by rememberUpdatedState(onScanned)

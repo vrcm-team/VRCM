@@ -14,72 +14,48 @@ import AVFoundation
 struct ComposeView: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> UIViewController {
         let controller = MainViewControllerKt.MainViewController()
-        QrScannerBridge.shared.presenter = NativeQrScannerPresenter(root: controller)
+        QrScannerBridge.shared.presenter = NativeQrScannerPresenter()
         return controller
     }
 
     func updateUIViewController(_ uiViewController: UIViewController, context: Context) {}
 }
 
-/// Keeps camera work in the native shell; shared UI owns code validation and login approval.
+/// Creates an embedded scanner; Compose owns navigation and all page transitions.
 final class NativeQrScannerPresenter: NSObject, QrScannerPresenter {
-    private weak var root: UIViewController?
-    private var scanner: QrCaptureController?
-    private var generation = UUID()
-
-    init(root: UIViewController) { self.root = root }
-
-    func start(title: String, hint: String, backLabel: String, myCodeLabel: String, albumLabel: String,
+    func create(title: String, hint: String, backLabel: String, myCodeLabel: String, albumLabel: String,
                chooseHint: String, rescanLabel: String, selectCodeLabel: String,
                tintArgb: Int64, onScanned: @escaping (String) -> Void,
                onMyCode: @escaping () -> Void, onAlbum: @escaping () -> Void,
-               onDismiss: @escaping () -> Void, onFailure: @escaping () -> Void) {
-        let request = UUID()
-        generation = request
-        let present: (Bool) -> Void = { [weak self] allowed in
-            DispatchQueue.main.async {
-                guard let self = self, self.generation == request else { return }
-                guard allowed, var presenter = self.root else { onFailure(); return }
-                while let presented = presenter.presentedViewController { presenter = presented }
-                let scanner = QrCaptureController()
-                scanner.title = title
-                scanner.hint = hint
-                scanner.backLabel = backLabel
-                scanner.myCodeLabel = myCodeLabel
-                scanner.albumLabel = albumLabel
-                scanner.chooseHint = chooseHint
-                scanner.rescanLabel = rescanLabel
-                scanner.selectCodeLabel = selectCodeLabel
-                scanner.onMyCode = { onMyCode() }
-                scanner.onAlbum = { onAlbum() }
-                let argb = UInt32(truncatingIfNeeded: tintArgb)
-                scanner.scanTint = UIColor(
-                    red: CGFloat((argb >> 16) & 0xff) / 255,
-                    green: CGFloat((argb >> 8) & 0xff) / 255,
-                    blue: CGFloat(argb & 0xff) / 255,
-                    alpha: 1
-                )
-                scanner.complete = { value, failed in
-                    if failed { onFailure() }
-                    else if let value = value { onScanned(value) }
-                    else { onDismiss() }
-                }
-                scanner.modalPresentationStyle = .fullScreen
-                self.scanner = scanner
-                presenter.present(scanner, animated: true)
-            }
+               onDismiss: @escaping () -> Void, onFailure: @escaping () -> Void) -> UIViewController {
+        let scanner = QrCaptureController()
+        scanner.title = title
+        scanner.hint = hint
+        scanner.backLabel = backLabel
+        scanner.myCodeLabel = myCodeLabel
+        scanner.albumLabel = albumLabel
+        scanner.chooseHint = chooseHint
+        scanner.rescanLabel = rescanLabel
+        scanner.selectCodeLabel = selectCodeLabel
+        scanner.onMyCode = { onMyCode() }
+        scanner.onAlbum = { onAlbum() }
+        let argb = UInt32(truncatingIfNeeded: tintArgb)
+        scanner.scanTint = UIColor(
+            red: CGFloat((argb >> 16) & 0xff) / 255,
+            green: CGFloat((argb >> 8) & 0xff) / 255,
+            blue: CGFloat(argb & 0xff) / 255,
+            alpha: 1
+        )
+        scanner.complete = { value, failed in
+            if failed { onFailure() }
+            else if let value = value { onScanned(value) }
+            else { onDismiss() }
         }
-        switch AVCaptureDevice.authorizationStatus(for: .video) {
-        case .authorized: present(true)
-        case .notDetermined: AVCaptureDevice.requestAccess(for: .video, completionHandler: present)
-        default: present(false)
-        }
+        return scanner
     }
 
-    func stop() {
-        generation = UUID()
-        scanner?.cancelWithoutCallback()
-        scanner = nil
+    func stop(controller: UIViewController) {
+        (controller as? QrCaptureController)?.cancelWithoutCallback()
     }
 }
 
@@ -127,6 +103,21 @@ final class QrCaptureController: UIViewController, AVCaptureMetadataOutputObject
         NotificationCenter.default.addObserver(self, selector: #selector(foreground), name: UIApplication.didBecomeActiveNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(cameraFailed), name: .AVCaptureSessionRuntimeError, object: session)
         NotificationCenter.default.addObserver(self, selector: #selector(updateSweep), name: UIAccessibility.reduceMotionStatusDidChangeNotification, object: nil)
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized: configureCamera()
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { [weak self] allowed in
+                DispatchQueue.main.async {
+                    guard let self = self, !self.finished else { return }
+                    if allowed { self.configureCamera() }
+                    else { self.finish(nil, failed: true) }
+                }
+            }
+        default: finish(nil, failed: true)
+        }
+    }
+
+    private func configureCamera() {
         cameraQueue.async { [weak self] in
             guard let self = self else { return }
             self.session.beginConfiguration()
@@ -153,6 +144,7 @@ final class QrCaptureController: UIViewController, AVCaptureMetadataOutputObject
             output.metadataObjectTypes = [.qr]
             self.session.commitConfiguration()
             DispatchQueue.main.async {
+                guard !self.finished else { return }
                 self.configured = true
                 self.view.setNeedsLayout()
                 self.foreground()
@@ -363,7 +355,7 @@ final class QrCaptureController: UIViewController, AVCaptureMetadataOutputObject
         complete = nil
         onMyCode = nil
         onAlbum = nil
-        dismiss(animated: true, completion: callback)
+        callback?()
     }
 
     func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject],

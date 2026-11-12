@@ -35,7 +35,7 @@ internal fun QrScannerViewfinder(
     readingImage: Boolean,
     selection: @Composable (() -> Unit)? = null,
     onRescan: (() -> Unit)? = null,
-    camera: @Composable () -> Unit,
+    camera: @Composable (controls: @Composable () -> Unit) -> Unit,
 ) {
     val colors = AppColors.dark(LocalSettingsState.current.value.themeColor.accent)
     val locale = strings
@@ -43,65 +43,66 @@ internal fun QrScannerViewfinder(
     val animate = scanning && lifecycle.isAtLeast(Lifecycle.State.RESUMED) && !AppTheme.a11y.reduceMotion
     CompositionLocalProvider(LocalAppColors provides colors, LocalContentColor provides colors.label) {
         Box(Modifier.fillMaxSize().background(colors.systemBackground).semantics { paneTitle = locale.scanQrCode }) {
-            camera()
-            Column(Modifier.fillMaxSize()) {
-                Row(
-                    Modifier.fillMaxWidth()
-                        .background(Brush.verticalGradient(listOf(colors.systemBackground.copy(alpha = 0.55f), Color.Transparent)))
-                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
-                        .padding(horizontal = AppSpacing.s, vertical = AppSpacing.s),
-                ) {
-                    AppIconButton(
-                        onClick = onBack,
-                        enabled = canGoBack,
-                        size = AppSize.touchTarget,
-                        containerColor = Color.Transparent,
-                        contentColor = colors.label,
+            camera {
+                Column(Modifier.fillMaxSize()) {
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .background(Brush.verticalGradient(listOf(colors.systemBackground.copy(alpha = 0.55f), Color.Transparent)))
+                            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+                            .padding(horizontal = AppSpacing.s, vertical = AppSpacing.s),
                     ) {
-                        AppIcon(AppIcons.ArrowBackIosNew, locale.back)
-                    }
-                }
-                Box(Modifier.fillMaxWidth().weight(1f)) {
-                    selection?.invoke()
-                    if (scanning) ScannerSweep(Modifier.fillMaxSize(), animate)
-                    if (readingImage) {
-                        Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(AppSpacing.m)) {
-                            AppActivityIndicator()
-                            AppText(locale.scanImageReading)
+                        AppIconButton(
+                            onClick = onBack,
+                            enabled = canGoBack,
+                            size = AppSize.touchTarget,
+                            containerColor = Color.Transparent,
+                            contentColor = colors.label,
+                        ) {
+                            AppIcon(AppIcons.ArrowBackIosNew, locale.back)
                         }
                     }
-                    if (scanning) {
-                        AppText(
-                            locale.scanQrHint,
-                            modifier = Modifier.align(Alignment.BottomCenter)
-                                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
-                                .padding(horizontal = 24.dp, vertical = 36.dp),
-                            style = AppTheme.type.subheadline,
-                            textAlign = TextAlign.Center,
-                        )
-                    }
-                }
-                Row(
-                    Modifier.fillMaxWidth().background(colors.systemBackground)
-                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal))
-                        .padding(horizontal = AppSpacing.m, vertical = AppSpacing.l),
-                    horizontalArrangement = Arrangement.spacedBy(AppSpacing.s),
-                    verticalAlignment = Alignment.Top,
-                ) {
-                    ScannerAction(locale.scanMyQrCode, AppIcons.QrCode, scanning || selection != null, onMyCode, Modifier.weight(1f))
-                    // Align the mode label with the 48 dp icons while allowing large text to grow.
-                    Box(Modifier.weight(1.3f).heightIn(min = 48.dp), contentAlignment = Alignment.Center) {
-                        if (onRescan != null) {
-                            AppButton(onClick = onRescan, style = AppButtonStyle.Plain) {
-                                AppText(locale.scanAgain, style = AppTheme.type.headline, textAlign = TextAlign.Center)
+                    Box(Modifier.fillMaxWidth().weight(1f)) {
+                        selection?.invoke()
+                        if (scanning) ScannerSweep(Modifier.fillMaxSize(), animate)
+                        if (readingImage) {
+                            Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(AppSpacing.m)) {
+                                AppActivityIndicator()
+                                AppText(locale.scanImageReading)
                             }
-                        } else {
-                            AppText(locale.scanMode, style = AppTheme.type.headline,
-                                color = colors.tint, textAlign = TextAlign.Center)
+                        }
+                        if (scanning) {
+                            AppText(
+                                locale.scanQrHint,
+                                modifier = Modifier.align(Alignment.BottomCenter)
+                                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
+                                    .padding(horizontal = 24.dp, vertical = 36.dp),
+                                style = AppTheme.type.subheadline,
+                                textAlign = TextAlign.Center,
+                            )
                         }
                     }
-                    ScannerAction(locale.scanAlbum, AppIcons.Gallery, scanning || selection != null, onAlbum, Modifier.weight(1f))
+                    Row(
+                        Modifier.fillMaxWidth().background(colors.systemBackground)
+                            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal))
+                            .padding(horizontal = AppSpacing.m, vertical = AppSpacing.l),
+                        horizontalArrangement = Arrangement.spacedBy(AppSpacing.s),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        ScannerAction(locale.scanMyQrCode, AppIcons.QrCode, scanning || selection != null, onMyCode, Modifier.weight(1f))
+                        // Align the mode label with the 48 dp icons while allowing large text to grow.
+                        Box(Modifier.weight(1.3f).heightIn(min = 48.dp), contentAlignment = Alignment.Center) {
+                            if (onRescan != null) {
+                                AppButton(onClick = onRescan, style = AppButtonStyle.Plain) {
+                                    AppText(locale.scanAgain, style = AppTheme.type.headline, textAlign = TextAlign.Center)
+                                }
+                            } else {
+                                AppText(locale.scanMode, style = AppTheme.type.headline,
+                                    color = colors.tint, textAlign = TextAlign.Center)
+                            }
+                        }
+                        ScannerAction(locale.scanAlbum, AppIcons.Gallery, scanning || selection != null, onAlbum, Modifier.weight(1f))
+                    }
                 }
             }
         }

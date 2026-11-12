@@ -9,7 +9,8 @@ internal expect val qrScanningSupported: Boolean
 @Composable
 internal expect fun QrScannerAppearance()
 
-/** Owns camera permission and preview resources for the lifetime of this composition. */
+/** Owns capture resources within the route, using shared controls unless the camera supplies native ones. */
 @Composable
 internal expect fun QrCamera(modifier: Modifier, onScanned: (String) -> Unit, onFailure: () -> Unit,
-    onMyCode: () -> Unit, onAlbum: () -> Unit, onCandidates: (QrScanBatch) -> Unit)
+    onMyCode: () -> Unit, onAlbum: () -> Unit, onCandidates: (QrScanBatch) -> Unit,
+    controls: @Composable () -> Unit)

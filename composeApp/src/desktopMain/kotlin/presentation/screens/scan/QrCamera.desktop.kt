@@ -11,6 +11,8 @@ internal actual fun QrScannerAppearance() = Unit
 
 @Composable
 internal actual fun QrCamera(modifier: Modifier, onScanned: (String) -> Unit, onFailure: () -> Unit,
-    onMyCode: () -> Unit, onAlbum: () -> Unit, onCandidates: (QrScanBatch) -> Unit) {
+    onMyCode: () -> Unit, onAlbum: () -> Unit, onCandidates: (QrScanBatch) -> Unit,
+    controls: @Composable () -> Unit) {
+    controls()
     LaunchedEffect(Unit) { onFailure() }
 }
