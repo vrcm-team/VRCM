@@ -12,12 +12,14 @@ import io.github.vrcmteam.vrcm.storage.statisticsSQLiteDriver
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.cacheDir
-import io.github.vinceglb.filekit.copyTo
 import io.github.vinceglb.filekit.path
-import io.github.vinceglb.filekit.write
+import io.github.vinceglb.filekit.sink
+import io.github.vinceglb.filekit.source
+import io.github.vinceglb.filekit.withScopedAccess
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.withContext
+import kotlinx.io.buffered
 import okio.FileSystem
 import okio.Path
 import okio.Path.Companion.toPath
@@ -51,7 +53,7 @@ internal class StatisticsTransferService(private val store: RoomFriendActivitySt
         withTemporaryDatabase { path ->
             archive.write(path.toString(), snapshot)
             requireCurrent(session)
-            destination.write(PlatformFile(path.toString()))
+            copyStatisticsFile(PlatformFile(path.toString()), destination)
         }
     }
 
@@ -60,7 +62,7 @@ internal class StatisticsTransferService(private val store: RoomFriendActivitySt
             requireCurrent(session)
             val writeToken = store.activateAccount(session.userId)
             val snapshot = withTemporaryDatabase { path ->
-                source.copyTo(PlatformFile(path.toString()))
+                copyStatisticsFile(source, PlatformFile(path.toString()))
                 val validHeader = fileSystem.source(path).buffer().use { input ->
                     input.request(16L) && input.readUtf8(16L) == "SQLite format 3\u0000"
                 }
@@ -81,6 +83,17 @@ internal class StatisticsTransferService(private val store: RoomFriendActivitySt
     private fun requireCurrent(session: AccountSessionToken) {
         if (!SharedFlowCentre.isCurrentSession(session)) {
             throw StatisticsTransferException(StatisticsTransferFailure.SessionChanged)
+        }
+    }
+
+    private fun copyStatisticsFile(source: PlatformFile, destination: PlatformFile) {
+        source.withScopedAccess { inputFile ->
+            destination.withScopedAccess { outputFile ->
+                // 文档提供方可能不报告文件大小；读到 EOF，并在清理临时文件前关闭两端。
+                inputFile.source().use { input ->
+                    outputFile.sink().buffered().use { output -> output.transferFrom(input) }
+                }
+            }
         }
     }
 
