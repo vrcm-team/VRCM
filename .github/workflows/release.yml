@@ -13,6 +13,10 @@ on:
         description: 'Publish the release after all packages and notes are verified'
         type: boolean
         default: true
+      android_only:
+        description: 'Build only the Android APK; skip other platforms and publication'
+        type: boolean
+        default: false
       prerelease:
         description: 'Mark a new release as a preview'
         type: boolean
@@ -32,7 +36,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: release-${{ inputs.tag || github.ref_name }}
+  group: release-${{ inputs.tag || github.ref_name }}${{ inputs.android_only && '-android' || '' }}
   cancel-in-progress: false
 
 env:
@@ -93,6 +97,9 @@ jobs:
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v6
       - uses: android-actions/setup-android@v3
+        with:
+          # The legacy tools package is no longer available from the SDK repository.
+          packages: platform-tools
       - name: Install the project's Android SDK platform
         run: |
           compile_sdk="$(sed -nE 's/^android-compileSdk[[:space:]]*=[[:space:]]*"([0-9]+)"/\1/p' gradle/libs.versions.toml)"
@@ -149,6 +156,7 @@ jobs:
           retention-days: 7
 
   windows:
+    if: ${{ !inputs.android_only }}
     needs: prepare
     runs-on: windows-latest
     timeout-minutes: 90
@@ -198,6 +206,7 @@ jobs:
           retention-days: 7
 
   apple:
+    if: ${{ !inputs.android_only }}
     needs: prepare
     runs-on: macos-latest
     timeout-minutes: 120
@@ -249,6 +258,7 @@ jobs:
           retention-days: 7
 
   publish:
+    if: ${{ !inputs.android_only }}
     needs: [prepare, android, windows, apple]
     runs-on: ubuntu-latest
     timeout-minutes: 20
