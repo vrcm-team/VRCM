@@ -75,7 +75,7 @@ iOS Release 的 Kotlin/Native 链接在 Gradle 进程内执行，使用 8 GB 堆
 
 Android 仅发布 `github` flavor，不上传 Google Play AAB。macOS 安装包遵循 runner 的 CPU 架构；iOS IPA 沿用项目的侧载打包方式，不是 App Store 分发或开发者账号签名。Windows EXE 和 DMG 沿用现有打包配置，不新增代码签名或公证凭据。
 
-所有平台从同一个已校验的 tag commit 构建。四份安装包必须齐全且非空，才会生成公告和 `SHA256SUMS`。发布时先创建草稿、上传附件，再按 Release ID 查询并校验 GitHub 返回的大小和 SHA-256 摘要，全部通过才公开。tag 查询不返回草稿时，通过分页 Release 列表识别已有草稿，避免重复创建。失败的草稿可重跑恢复，不会暴露缺少附件的新 Release。
+所有平台从同一个已校验的 tag commit 构建。四份安装包必须齐全且非空，才会生成公告和 `SHA256SUMS`。发布时先创建草稿，按 Release ID 上传、查询附件，并校验 GitHub 返回的大小和 SHA-256 摘要，全部通过才公开。tag 查询不返回草稿时，通过分页 Release 列表识别已有草稿，避免重复创建。更新草稿公告和公开草稿时显式保留版本标签，避免变为内部的 `untagged` 标识。恢复时复用大小和摘要均一致的已上传附件，仅替换不匹配的文件。失败的草稿可重跑恢复，不会暴露缺少附件的新 Release。
 
 安装器升级标识、应用 ID、Manifest 和既有 Gradle 打包配置不在此流程中修改。本地 `scripts/codex-release.sh` 仍可按原方式使用。
 

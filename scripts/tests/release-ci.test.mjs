@@ -3,8 +3,6 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import childProcess from 'node:child_process';
-import { syncBuiltinESMExports } from 'node:module';
 import test from 'node:test';
 import { readMetadata, verifyArtifacts, assertUploadedAssets, assertReleaseWritable, validateGeneratedNotes, generateNotes, publishRelease, validateBuildRun } from '../release-ci.mjs';
 
@@ -173,15 +171,20 @@ test('failed drafts are resumable, published releases require explicit replaceme
   assert.doesNotThrow(() => assertReleaseWritable({ draft: false }, true));
 });
 
-function publishingFixture(t, { existingDraft = false, corruptUpload = false } = {}) {
+function publishingFixture(t, { existingDraft = false, corruptUpload = false, uploaded = false, corruptExisting = false } = {}) {
   const { root } = repository(t);
   const metadata = readMetadata(root, '1.2.3');
   const notes = path.join(root, 'notes.md');
   fs.writeFileSync(notes, HISTORICAL_NOTES);
   for (const name of metadata.assets) fs.writeFileSync(path.join(root, name), `Built package: ${name}`);
   const artifacts = verifyArtifacts(root, metadata);
-  const makeDraft = () => ({ id: 42, tag_name: metadata.tag, draft: true, assets: [] });
+  const makeDraft = () => ({
+    id: 42, tag_name: metadata.tag, draft: true, assets: [],
+    upload_url: 'https://uploads.github.com/repos/vrcm-team/VRCM/releases/42/assets{?name,label}',
+  });
   let release = existingDraft ? makeDraft() : null;
+  if (uploaded || corruptExisting) release.assets = artifacts.map((item, index) => ({ ...item, id: index + 1, state: 'uploaded' }));
+  if (corruptExisting) release.assets[0].digest = 'sha256:old-failed-upload';
   t.mock.method(globalThis, 'fetch', async (url, options = {}) => {
     const endpoint = new URL(url);
     const method = options.method || 'GET';
@@ -204,30 +207,29 @@ function publishingFixture(t, { existingDraft = false, corruptUpload = false } =
       return Response.json(release);
     }
     if (endpoint.pathname.endsWith('/releases/42') && release) {
-      if (method === 'PATCH') Object.assign(release, JSON.parse(options.body));
+      if (method === 'PATCH') {
+        // Draft edits can return GitHub's internal untagged ID if the tag is omitted.
+        const changes = JSON.parse(options.body);
+        release.tag_name = changes.tag_name || 'untagged-internal-id';
+        Object.assign(release, changes);
+      }
       return Response.json(release);
     }
+    if (endpoint.hostname === 'uploads.github.com' && endpoint.pathname.endsWith('/releases/42/assets') && method === 'POST') {
+      if (uploaded) throw new Error('Matching uploaded packages must be reused.');
+      const artifact = artifacts.find(item => item.name === endpoint.searchParams.get('name'));
+      assert.ok(artifact, 'Upload must belong to the validated package set.');
+      assert.deepEqual(Buffer.from(options.body), fs.readFileSync(artifact.file));
+      const asset = { name: artifact.name, id: release.assets.length + 1, size: artifact.size, digest: artifact.digest, state: 'uploaded' };
+      if (corruptUpload && artifact === artifacts[0]) asset.digest = 'sha256:changed-on-server';
+      release.assets.push(asset);
+      return Response.json(asset);
+    }
+    if (endpoint.pathname.endsWith('/releases/assets/1') && method === 'DELETE' && corruptExisting) {
+      release.assets = release.assets.filter(asset => asset.id !== 1);
+      return new Response(null, { status: 204 });
+    }
     throw new Error(`Unexpected publishing request: ${method} ${url}`);
-  });
-  const originalExec = childProcess.execFileSync;
-  const execMock = t.mock.method(childProcess, 'execFileSync', (command, args, options) => {
-    if (command !== 'gh') return originalExec(command, args, options);
-    if (args[0] !== 'release') throw new Error('Unexpected gh command');
-    if (args[1] === 'create') {
-      if (release) throw new Error('Release already exists');
-      release = makeDraft();
-    } else if (args[1] === 'edit') {
-      if (args.includes('--draft=false')) release.draft = false;
-    } else if (args[1] === 'upload') {
-      release.assets = artifacts.map(item => ({ name: item.name, size: item.size, digest: item.digest, state: 'uploaded' }));
-      if (corruptUpload) release.assets[0].digest = 'sha256:changed-on-server';
-    } else throw new Error('Unexpected gh release command');
-    return '';
-  });
-  syncBuiltinESMExports();
-  t.after(() => {
-    execMock.mock.restore();
-    syncBuiltinESMExports();
   });
   return { root, metadata, notes, artifacts, get release() { return release; } };
 }
@@ -246,6 +248,24 @@ test('a draft found on a later release-list page is resumed without creating ano
   assert.equal(fixture.release.id, 42);
   assert.equal(fixture.release.draft, false);
   assert.equal(fixture.release.body, HISTORICAL_NOTES);
+  assert.equal(fixture.release.tag_name, fixture.metadata.tag);
+});
+
+test('publication recovery preserves the tag and reuses already verified assets while correcting notes', async t => {
+  const fixture = publishingFixture(t, { existingDraft: true, uploaded: true });
+  await publishRelease(fixture.root, fixture.metadata, fixture.artifacts, fixture.notes, false, false);
+  assert.equal(fixture.release.tag_name, fixture.metadata.tag);
+  assert.equal(fixture.release.draft, false);
+  assert.equal(fixture.release.body, HISTORICAL_NOTES);
+  assert.deepEqual(fixture.release.assets.map(item => item.digest), fixture.artifacts.map(item => item.digest));
+});
+
+test('publication recovery replaces a corrupt prior upload and verifies its new bytes', async t => {
+  const fixture = publishingFixture(t, { existingDraft: true, corruptExisting: true });
+  await publishRelease(fixture.root, fixture.metadata, fixture.artifacts, fixture.notes, false, false);
+  assert.equal(fixture.release.draft, false);
+  assertUploadedAssets(fixture.artifacts, fixture.release.assets);
+  assert.equal(fixture.release.assets.length, fixture.artifacts.length);
 });
 
 test('a draft stays private when its uploaded package fails integrity verification', async t => {

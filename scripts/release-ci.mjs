@@ -112,11 +112,12 @@ function parseManualNotes(body, details) {
   return validateGeneratedNotes(notes);
 }
 
-async function requestJson(url, { token, method = 'GET', body, timeout = 30000 } = {}) {
+async function requestJson(url, { token, method = 'GET', body, file, timeout = 30000 } = {}) {
   const response = await fetch(url, {
     method,
-    headers: { Accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(body ? { 'Content-Type': 'application/json' } : {}) },
-    ...(body ? { body: JSON.stringify(body) } : {}),
+    headers: { Accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(file ? { 'Content-Type': 'application/octet-stream' } : body ? { 'Content-Type': 'application/json' } : {}) },
+    ...(file ? { body: fs.readFileSync(file) } : body ? { body: JSON.stringify(body) } : {}),
     signal: AbortSignal.timeout(timeout),
   });
   if (!response.ok) {
@@ -124,7 +125,7 @@ async function requestJson(url, { token, method = 'GET', body, timeout = 30000 }
     error.status = response.status;
     throw error;
   }
-  return response.json();
+  return response.status === 204 ? null : response.json();
 }
 
 function githubClient() {
@@ -132,7 +133,15 @@ function githubClient() {
   if (!/^[\w.-]+\/[\w.-]+$/.test(repository)) throw new Error('Invalid GITHUB_REPOSITORY.');
   const token = (process.env.GH_TOKEN || process.env.GITHUB_TOKEN || '').trim();
   const base = `${process.env.GITHUB_API_URL || 'https://api.github.com'}/repos/${repository}`;
-  return { repository, request: (endpoint, options = {}) => requestJson(`${base}${endpoint}`, { token, ...options }) };
+  return {
+    repository,
+    request: (endpoint, options = {}) => requestJson(`${base}${endpoint}`, { token, ...options }),
+    upload: (release, artifact) => {
+      const url = new URL(release.upload_url.replace(/\{.*$/, ''));
+      url.searchParams.set('name', artifact.name);
+      return requestJson(url.href, { token, method: 'POST', file: artifact.file, timeout: 300000 });
+    },
+  };
 }
 
 async function existingRelease(api, tag) {
@@ -257,19 +266,26 @@ export async function publishRelease(root, metadata, artifacts, notes, allowExis
   if (ref.object.type !== 'commit' || ref.object.sha !== metadata.sha) throw new Error('The remote tag changed after validation.');
   let release = await existingRelease(api, metadata.tag);
   assertReleaseWritable(release, allowExisting);
-  const gh = (...args) => execFileSync('gh', args, { cwd: root, stdio: 'inherit' });
   if (!release) {
     release = await api.request('/releases', { method: 'POST', body: {
       tag_name: metadata.tag, target_commitish: metadata.sha, name: `v${metadata.version}`,
       body: fs.readFileSync(notes, 'utf8'), draft: true, prerelease,
     } });
   } else {
-    await api.request(`/releases/${release.id}`, { method: 'PATCH', body: { body: fs.readFileSync(notes, 'utf8') } });
+    release = await api.request(`/releases/${release.id}`, { method: 'PATCH', body: {
+      tag_name: metadata.tag, target_commitish: metadata.sha, body: fs.readFileSync(notes, 'utf8'),
+    } });
   }
-  gh('release', 'upload', metadata.tag, ...artifacts.map(item => item.file), '--clobber');
+  if (release.tag_name !== metadata.tag) throw new Error('The draft no longer references the validated release tag.');
+  for (const artifact of artifacts) {
+    const existing = release.assets.find(asset => asset.name === artifact.name);
+    if (existing?.state === 'uploaded' && existing.size === artifact.size && existing.digest === artifact.digest) continue;
+    if (existing) await api.request(`/releases/assets/${existing.id}`, { method: 'DELETE' });
+    await api.upload(release, artifact);
+  }
   const updated = await api.request(`/releases/${release.id}`);
   assertUploadedAssets(artifacts, updated.assets);
-  if (release.draft) await api.request(`/releases/${release.id}`, { method: 'PATCH', body: { draft: false } });
+  if (release.draft) await api.request(`/releases/${release.id}`, { method: 'PATCH', body: { tag_name: metadata.tag, draft: false } });
   summary(`Published: https://github.com/${api.repository}/releases/tag/${metadata.tag}`);
 }
 
