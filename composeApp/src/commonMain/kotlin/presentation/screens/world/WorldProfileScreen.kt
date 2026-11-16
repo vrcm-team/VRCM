@@ -172,7 +172,7 @@ class WorldProfileScreen(
         }
         // 组件首次加载时自动刷新数据
         LaunchedEffect(Unit) {
-            screenModel.loadWorldData(worldProfileVO)
+            screenModel.loadWorldData(worldProfileVO, location)
         }
         LaunchedEffect(screenModel, localeStrings) {
             screenModel.publicationNotices.collect { notice ->

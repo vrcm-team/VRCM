@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
@@ -191,19 +192,40 @@ fun LazyItemScope.InviteSelf(
 ) {
     val inviteApi: InviteApi = koinInject()
     val authService: AuthService = koinInject()
-    var isInvited by remember { mutableStateOf(false) }
+    val currentSession by SharedFlowCentre.currentSession.collectAsState()
+    var isInvited by remember(instanceId, currentSession?.token?.userId) { mutableStateOf(false) }
+    var isInviting by remember(instanceId, currentSession?.token?.userId) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    val onClickInvite = {
+    val localeStrings = strings
+    val onClickInvite: () -> Unit = invite@{
+        val sessionToken = currentSession?.token ?: return@invite
+        if (isInvited || isInviting) return@invite
+        isInviting = true
         scope.launch(Dispatchers.IO) {
-            authService.reTryAuthCatching { inviteApi.inviteMyselfToInstance(instanceId) }.onSuccess {
-                isInvited = true
+            try {
+                val response = authService.runSessionBoundCatching(sessionToken) {
+                    inviteApi.inviteMyselfToInstance(instanceId)
+                } ?: return@launch
+                if (!SharedFlowCentre.isCurrentSession(response.sessionToken)) return@launch
+                response.result.onSuccess {
+                    isInvited = true
+                }.onFailure { error ->
+                    SharedFlowCentre.toastText.emit(
+                        ToastText.Error(
+                            localeStrings.locationInviteFailed +
+                                (error.message?.takeIf { it.isNotBlank() }?.let { " $it" } ?: "")
+                        )
+                    )
+                }
+            } finally {
+                isInviting = false
             }
         }
     }
     Column(
         modifier = Modifier.width(60.dp)
             .clip(AppShapes.s)
-            .clickable(enabled = !isInvited){ onClickInvite() }
+            .clickable(enabled = !isInvited && !isInviting && currentSession != null) { onClickInvite() }
             .animateItem(),
         verticalArrangement = Arrangement.Center
     ) {
@@ -212,18 +234,23 @@ fun LazyItemScope.InviteSelf(
                 .fillMaxWidth()
                 .aspectRatio(1f)
                 .clip(CircleShape)
-                .background(AppTheme.colors.tintSoft)
+                .background(AppTheme.colors.tintSoft),
+            contentAlignment = Alignment.Center,
         ) {
-            AppIcon(
-                imageVector = if (isInvited) AppIcons.Check else AppIcons.Add,
-                modifier = Modifier.padding(4.dp).fillMaxSize(),
-                contentDescription = "InviteSelfIcon",
-                tint = AppTheme.colors.onTintSoft,
-            )
+            if (isInviting) {
+                AppActivityIndicator(color = AppTheme.colors.onTintSoft)
+            } else {
+                AppIcon(
+                    imageVector = if (isInvited) AppIcons.Check else AppIcons.Add,
+                    modifier = Modifier.padding(4.dp).fillMaxSize(),
+                    contentDescription = null,
+                    tint = AppTheme.colors.onTintSoft,
+                )
+            }
         }
         AppText(
             modifier = Modifier.fillMaxWidth(),
-            text = strings.locationInviteMe,
+            text = if (isInvited) localeStrings.locationInvited else localeStrings.locationInviteMe,
             maxLines = 1,
             textAlign = TextAlign.Center,
             style = AppTheme.type.caption2Emphasized,

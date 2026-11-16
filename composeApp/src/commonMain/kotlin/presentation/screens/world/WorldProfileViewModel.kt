@@ -121,6 +121,7 @@ class WorldProfileScreenModel internal constructor(
     private val _worldProfileState = MutableStateFlow<WorldProfileVo?>(null)
     val worldProfileState: StateFlow<WorldProfileVo?> = _worldProfileState.asStateFlow()
     private val worldInstanceStateStore = WorldInstanceStateStore(_worldProfileState)
+    private var sourceInstanceId: String? = null
 
     // 加载状态
     private val _isLoading = MutableStateFlow(false)
@@ -402,7 +403,7 @@ class WorldProfileScreenModel internal constructor(
     /**
      * 刷新世界数据
      */
-    fun loadWorldData(worldProfileVO: WorldProfileVo) {
+    fun loadWorldData(worldProfileVO: WorldProfileVo, location: String? = null) {
         metadataEditor.invalidate()
         metadataReady.value = false
         refreshMetadataAfterCurrentLoad = false
@@ -418,6 +419,10 @@ class WorldProfileScreenModel internal constructor(
         val loadGeneration = ++worldLoadGeneration
         _worldProfileState.value = worldProfileVO
         val worldId = worldProfileVO.worldId
+        sourceInstanceId = location
+            ?.takeIf { it.substringBefore(':') == worldId }
+            ?.substringAfter(':', "")
+            ?.takeIf { it.isNotBlank() }
         publication.setTarget(worldId, worldProfileVO.authorID)
         worldPersistence.bindWorld(worldId)
         // 路由快照可能来自列表、活动或房间事件，作者字段不作为删除权限依据。
@@ -782,7 +787,9 @@ class WorldProfileScreenModel internal constructor(
             .mapNotNull { it.firstOrNull() }
             .filter { it.isNotBlank() }
             .associateWith { null }
-        return currentInstanceIds + publicInstanceIds
+        // 群组房间不一定出现在世界的公开实例列表中，路由携带的来源房间也必须查询。
+        val sourceInstanceIds = sourceInstanceId?.let { mapOf(it to null) }.orEmpty()
+        return sourceInstanceIds + publicInstanceIds + currentInstanceIds
     }
 
     /**

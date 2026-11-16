@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
@@ -17,11 +18,14 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.presentation.adaptive.AppWindowWidthClass
 import io.github.vrcmteam.vrcm.presentation.adaptive.LocalAppWindowWidthClass
+import io.github.vrcmteam.vrcm.presentation.compoments.InviteSelf
 import io.github.vrcmteam.vrcm.presentation.compoments.ListStateOverlay
 import io.github.vrcmteam.vrcm.presentation.compoments.LocationCard
 import io.github.vrcmteam.vrcm.presentation.compoments.RefreshBox
@@ -38,7 +42,7 @@ import org.koin.compose.viewmodel.koinViewModel
 
 /**
  * 位置页的「群组房间」来源：自己加入的群组现在开着的房间，按群组分段显示。
- * 卡片沿用好友位置那一套 [LocationCard]，只是没有在场好友，点卡片直接进世界。
+ * 卡片沿用好友位置的 [LocationCard]：点图片进入世界，点信息区展开房间操作。
  */
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -50,6 +54,7 @@ fun GroupInstancePager(
     val lazyListState = rememberLazyListState()
     val currentIsActive by rememberUpdatedState(isActive)
     val navigator = currentNavigator
+    var selectedLocation by rememberSaveable { mutableStateOf<String?>(null) }
 
     LaunchedEffect(model) { model.loadIfNeeded() }
     LaunchedEffect(lazyListState) {
@@ -102,7 +107,14 @@ fun GroupInstancePager(
                     LocationTitle("${rooms.first().groupName}(${rooms.size})")
                 }
                 items(rooms, key = { it.location }) { room ->
-                    GroupInstanceCard(room = room, onClickRoom = openWorld)
+                    GroupInstanceCard(
+                        room = room,
+                        isSelected = selectedLocation == room.location,
+                        onClickWorldImage = openWorld,
+                        onClickRoom = {
+                            selectedLocation = if (selectedLocation == room.location) null else room.location
+                        },
+                    )
                 }
             }
         }
@@ -122,7 +134,9 @@ fun GroupInstancePager(
 @Composable
 private fun GroupInstanceCard(
     room: GroupInstanceVo,
-    onClickRoom: (GroupInstanceVo, String) -> Unit,
+    isSelected: Boolean,
+    onClickWorldImage: (GroupInstanceVo, String) -> Unit,
+    onClickRoom: () -> Unit,
 ) {
     // LocationCard 认的是 FriendLocation：群组房间没有在场好友名单，只包一层实例信息
     val location = remember(room) {
@@ -135,9 +149,14 @@ private fun GroupInstanceCard(
     LocationCard(
         modifier = Modifier.padding(horizontal = 16.dp),
         location = location,
-        isSelected = false,
-        onClickWorldImage = { sharedSuffixKey -> onClickRoom(room, sharedSuffixKey) },
-        onClickLocationCard = { sharedSuffixKey -> onClickRoom(room, sharedSuffixKey) },
-        content = {},
-    )
+        isSelected = isSelected,
+        onClickWorldImage = { sharedSuffixKey -> onClickWorldImage(room, sharedSuffixKey) },
+        onClickLocationCard = { onClickRoom() },
+    ) {
+        LazyRow {
+            item(key = room.location) {
+                InviteSelf(instanceId = room.location)
+            }
+        }
+    }
 }
