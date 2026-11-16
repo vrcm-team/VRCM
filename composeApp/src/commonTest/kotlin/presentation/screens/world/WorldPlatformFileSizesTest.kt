@@ -61,6 +61,7 @@ import kotlin.test.assertNull
 class WorldPlatformFileSizesTest : MainDispatcherTest() {
     private val models = mutableListOf<WorldProfileScreenModel>()
     private val clients = mutableListOf<HttpClient>()
+    private val authServices = mutableListOf<AuthService>()
 
     @BeforeTest
     fun authenticateViewer() = runBlocking {
@@ -72,6 +73,7 @@ class WorldPlatformFileSizesTest : MainDispatcherTest() {
         models.forEach(::clearModel)
         clients.forEach(HttpClient::close)
         runBlocking {
+            authServices.forEach { it.closeAndJoin() }
             if (SharedFlowCentre.currentSession.value != null) SharedFlowCentre.emitLogout()
         }
     }
@@ -271,15 +273,17 @@ class WorldPlatformFileSizesTest : MainDispatcherTest() {
             }
         }.also(clients::add)
         val cache = RecordingWorldProfileCacheStore()
+        val account = AccountDto(
+            userId = "usr_cached",
+            username = "cached-user",
+            password = "cached-password",
+            current = true,
+        )
+        SharedFlowCentre.emitAuthenticated(account)
         val model = createModel(
             client = client,
             cache = cache,
-            account = AccountDto(
-                userId = "usr_cached",
-                username = "cached-user",
-                password = "cached-password",
-                current = true,
-            ),
+            account = account,
         )
 
         model.loadWorldData(WorldProfileVo(worldId = WORLD_ID))
@@ -316,7 +320,7 @@ class WorldPlatformFileSizesTest : MainDispatcherTest() {
                     "/meetup-assets".toPath(),
                 ),
             ),
-        )
+        ).also(authServices::add)
         return WorldProfileScreenModel(
             worldsApi = WorldsApi(client),
             instancesApi = InstancesApi(client),
