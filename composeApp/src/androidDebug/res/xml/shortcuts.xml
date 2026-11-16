@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="scan-qr-code"
+        android:enabled="true"
+        android:icon="@drawable/ic_scan_shortcut"
+        android:shortcutShortLabel="@string/scan_qr_code">
+        <intent
+            android:action="io.github.vrcmteam.vrcm.SCAN_QR_CODE"
+            android:targetPackage="io.github.vrcmteam.vrcm.debug"
+            android:targetClass="io.github.vrcmteam.vrcm.ScanShortcutActivity" />
+    </shortcut>
+</shortcuts>

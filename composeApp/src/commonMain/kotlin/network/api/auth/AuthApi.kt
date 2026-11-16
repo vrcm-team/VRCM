@@ -6,6 +6,7 @@ import io.github.vrcmteam.vrcm.network.api.attributes.AuthType
 import io.github.vrcmteam.vrcm.network.api.attributes.USER_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.auth.data.AuthData
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
+import io.github.vrcmteam.vrcm.network.api.auth.data.DeviceAuthInfoData
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccessResult
 import io.github.vrcmteam.vrcm.network.extensions.urlEncode
@@ -16,10 +17,26 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.http.content.*
+import kotlinx.serialization.Serializable
 
 class AuthApi(
     private val client: HttpClient,
 ) {
+
+    /** Loads the origin of a pending login before the user explicitly approves it. */
+    suspend fun deviceAuthInfo(userCode: String): DeviceAuthInfoData =
+        client.get("$AUTH_API_PREFIX/device/info") {
+            parameter("userCode", userCode)
+        }.checkSuccess()
+
+    /** Approves a scanned login code using the current authenticated cookie. */
+    suspend fun approveDevice(userCode: String) {
+        val response = client.post("$AUTH_API_PREFIX/device/approve") {
+            contentType(ContentType.Application.Json)
+            setBody(ApproveDeviceRequest(userCode))
+        }.checkSuccess<ApproveDeviceResponse>()
+        check(response.success) { "Device approval was not accepted" }
+    }
 
     suspend fun currentUser(): CurrentUserData = userRes().checkSuccess()
 
@@ -88,6 +105,12 @@ class AuthApi(
     }
 
 }
+
+@Serializable
+private data class ApproveDeviceRequest(val userCode: String)
+
+@Serializable
+private data class ApproveDeviceResponse(val success: Boolean)
 
 
 

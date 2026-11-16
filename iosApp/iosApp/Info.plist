@@ -2,6 +2,19 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSCameraUsageDescription</key>
+	<string>VRCM uses the camera to scan VRChat login and content QR codes.</string>
+	<key>UIApplicationShortcutItems</key>
+	<array>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>io.github.vrcmteam.vrcm.scan</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>scan_qr_code</string>
+			<key>UIApplicationShortcutItemIconSymbolName</key>
+			<string>qrcode.viewfinder</string>
+		</dict>
+	</array>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>VRCM adds the images you choose to save, such as VRChat Gallery photos, Prints and your Nameplate, to your photo library.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>

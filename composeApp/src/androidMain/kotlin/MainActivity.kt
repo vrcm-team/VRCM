@@ -12,10 +12,12 @@ import androidx.activity.enableEdgeToEdge
 import io.github.vrcmteam.vrcm.service.OfficialLinkInbox
 import io.github.vrcmteam.vrcm.service.NotificationLaunchDestination
 import io.github.vrcmteam.vrcm.service.NotificationLaunchInbox
+import io.github.vrcmteam.vrcm.service.ScanLaunchInbox
 
 class MainActivity : ComponentActivity() {
     private val officialLinkInbox = OfficialLinkInbox()
     private val notificationLaunchInbox = NotificationLaunchInbox()
+    private val scanLaunchInbox = ScanLaunchInbox()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge(navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT))
@@ -24,7 +26,9 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null) {
             submitOfficialLink(intent)
             intent.submitNotificationLaunch(notificationLaunchInbox)
+            submitScanLaunch(intent)
         } else {
+            if (savedInstanceState.getBoolean(PENDING_SCAN_KEY)) scanLaunchInbox.requestScan()
             savedInstanceState.getString(PENDING_OFFICIAL_LINK_KEY)?.let(officialLinkInbox::submit)
             val destination = savedInstanceState.getString(PENDING_NOTIFICATION_DESTINATION_KEY)
                 ?.let { value -> NotificationLaunchDestination.entries.firstOrNull { it.name == value } }
@@ -37,6 +41,7 @@ class MainActivity : ComponentActivity() {
             App(
                 officialLinkInbox = officialLinkInbox,
                 notificationLaunchInbox = notificationLaunchInbox,
+                scanLaunchInbox = scanLaunchInbox,
             )
         }
     }
@@ -51,9 +56,11 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         submitOfficialLink(intent)
         intent.submitNotificationLaunch(notificationLaunchInbox)
+        submitScanLaunch(intent)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean(PENDING_SCAN_KEY, scanLaunchInbox.pending.value)
         officialLinkInbox.pendingUrl()?.let {
             outState.putString(PENDING_OFFICIAL_LINK_KEY, it)
         }
@@ -67,6 +74,10 @@ class MainActivity : ComponentActivity() {
     private fun submitOfficialLink(intent: Intent) {
         if (intent.action != Intent.ACTION_VIEW) return
         intent.dataString?.let(officialLinkInbox::submit)
+    }
+
+    private fun submitScanLaunch(intent: Intent) {
+        if (intent.action == ScanShortcutActivity.ACTION_SCAN_QR_CODE) scanLaunchInbox.requestScan()
     }
 
     private fun updateRequestedOrientation(configuration: Configuration) {
@@ -86,6 +97,7 @@ class MainActivity : ComponentActivity() {
 
     private companion object {
         const val WIDE_SCREEN_MIN_WIDTH_DP = 600
+        const val PENDING_SCAN_KEY = "pending-scan"
         const val PENDING_OFFICIAL_LINK_KEY = "pending-official-link"
         const val PENDING_NOTIFICATION_DESTINATION_KEY = "pending-notification-destination"
         const val PENDING_NOTIFICATION_TARGET_ID_KEY = "pending-notification-target-id"

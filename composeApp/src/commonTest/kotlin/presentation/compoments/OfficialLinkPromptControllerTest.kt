@@ -15,6 +15,34 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class OfficialLinkPromptControllerTest {
     @Test
+    fun scannerPauseStopsNavigationAndPreservesTheExternalRequestForResuming() = runTest {
+        val completion = CompletableDeferred<Result<String>>()
+        val resolved = mutableListOf<String>()
+        val consumed = mutableListOf<OfficialLinkRequest>()
+        val controller = OfficialLinkPromptController(
+            scope = this,
+            resolve = { completion.await() },
+            onResolved = resolved::add,
+            onExternalConsumed = consumed::add,
+        )
+        val request = OfficialLinkRequest(1, "https://vrchat.com/home/user/usr_waiting")
+        controller.updateAuthentication(true)
+        controller.openExternal(request)
+        runCurrent()
+        controller.pause()
+        completion.complete(Result.success("profile"))
+        runCurrent()
+        assertEquals(OfficialLinkPromptState.Idle, controller.state.value)
+        assertTrue(resolved.isEmpty())
+        assertTrue(consumed.isEmpty())
+
+        controller.openExternal(request)
+        runCurrent()
+        assertEquals(listOf("profile"), resolved)
+        assertEquals(listOf(request), consumed)
+    }
+
+    @Test
     fun clipboardAcceptsSupportedOfficialIds() = runTest {
         val controller = OfficialLinkPromptController<String>(
             scope = this,

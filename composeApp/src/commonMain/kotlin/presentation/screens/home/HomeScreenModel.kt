@@ -16,8 +16,7 @@ import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
 import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
 import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesTab
-import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardDisplayRoute
-import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardEditorRoute
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.startRoute
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.meetup.MeetupCardRepository
 import kotlinx.coroutines.Dispatchers
@@ -50,11 +49,7 @@ class HomeScreenModel(
         get() = shellState.drawerVisible
 
     /** 长按头像的入口分流：已有配置直接展示，首次使用进入编辑器。 */
-    fun meetupCardStartRoute(): AppRoute = if (meetupCardRepository.isConfigured(userId)) {
-        MeetupCardDisplayRoute(userId)
-    } else {
-        MeetupCardEditorRoute(userId)
-    }
+    fun meetupCardStartRoute(): AppRoute = meetupCardRepository.startRoute(userId)
 
     private val _currentUser = mutableStateOf<CurrentUserData?>(null)
 

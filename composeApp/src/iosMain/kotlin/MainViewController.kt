@@ -7,10 +7,16 @@ import io.github.vrcmteam.vrcm.di.modules.platformModule
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.display.MeetupPresentationRootViewController
 import org.koin.core.context.startKoin
 import platform.UIKit.UIViewController
+import io.github.vrcmteam.vrcm.service.ScanLaunchInbox
+
+private val scanLaunchInbox = ScanLaunchInbox()
+
+/** Called by the iOS home-screen quick action, including before Compose is created. */
+fun RequestQrScanner() = scanLaunchInbox.requestScan()
 
 /** 用薄 root wrapper 承载 Compose，供身份牌展示页切换状态栏/home indicator 偏好。 */
 fun MainViewController(): UIViewController =
-    MeetupPresentationRootViewController(ComposeUIViewController { App() })
+    MeetupPresentationRootViewController(ComposeUIViewController { App(scanLaunchInbox = scanLaunchInbox) })
 
 fun StartKoin() = startKoin {
     printLogger()

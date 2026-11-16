@@ -63,6 +63,12 @@ object Palette {
     const val RowIconTeal: Long = 0xFF30B0C7
     const val RowIconGray: Long = 0xFF8E8E93
 
+    // ---- 个人二维码：QQ 参考图的青蓝/浅紫，浅色背景使用加深版本以保证识别 ----
+    const val QrGradientStartLight: Long = 0xFF087F9F
+    const val QrGradientEndLight: Long = 0xFF7564B5
+    const val QrGradientStartDark: Long = 0xFF65D8F6
+    const val QrGradientEndDark: Long = 0xFFC0B9FC
+
     /** WCAG 相对亮度（sRGB）。 */
     fun relativeLuminance(argb: Long): Double {
         fun ch(v: Long): Double {

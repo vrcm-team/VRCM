@@ -9,6 +9,11 @@ import io.github.vrcmteam.vrcm.presentation.screens.meetup.editor.MeetupCardEdit
 import kotlinx.serialization.Serializable
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
+import io.github.vrcmteam.vrcm.service.meetup.MeetupCardRepository
+
+/** Both the avatar shortcut and scanner use the same first-time setup flow. */
+internal fun MeetupCardRepository.startRoute(ownerUserId: String): AppRoute =
+    if (isConfigured(ownerUserId)) MeetupCardDisplayRoute(ownerUserId) else MeetupCardEditorRoute(ownerUserId)
 
 /** 身份牌全屏展示路由；payload 只有 owner ID。 */
 @Serializable

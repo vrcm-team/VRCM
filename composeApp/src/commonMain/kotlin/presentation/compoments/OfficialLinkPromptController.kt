@@ -68,6 +68,12 @@ internal class OfficialLinkPromptController<T>(
         }
     }
 
+    /** Yields to the scanner without consuming an external request that can resume later. */
+    fun pause() {
+        cancelActiveResolution()
+        _state.value = OfficialLinkPromptState.Idle
+    }
+
     fun markClipboardInspected(value: String) {
         val target = parseOfficialId(value) ?: parseOfficialLink(value) ?: return
         markInspected(target.key())
