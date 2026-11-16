@@ -1266,6 +1266,131 @@ class AuthServiceTest : MainDispatcherTest() {
         fixture.client.close()
     }
 
+    @Test
+    fun quickSwitchUsesSelectedCookieAndPreservesPreviousAccount() = runTest {
+        val previous = cachedAccount()
+        val selected = previous.copy(userId = "usr_other", username = "other-user", password = null, authCookie = "other-auth")
+        val fixture = fixture { request ->
+            assertNull(SharedFlowCentre.currentSession.value)
+            assertEquals(null, request.headers[HttpHeaders.Authorization])
+            assertTrue(request.headers[HttpHeaders.Cookie].orEmpty().contains("auth=other-auth"))
+            assertFalse(request.headers[HttpHeaders.Cookie].orEmpty().contains("auth=cached-auth"))
+            jsonResponse(currentUserJson(selected))
+        }
+        try {
+            fixture.accountDao.saveAccountInfo(selected)
+            fixture.accountDao.saveAccountInfo(previous)
+            SharedFlowCentre.emitAuthenticated(previous)
+
+            assertIs<AuthState.Authed>(fixture.service.beginAccountLogin(selected.userId))
+
+            assertEquals(selected.userId, SharedFlowCentre.currentSession.value?.account?.userId)
+            assertEquals(selected.userId, fixture.accountDao.currentAccountDtoOrNull()?.userId)
+            assertEquals(previous.authCookie, fixture.accountDao.accountDtoByUserName(previous.username)?.authCookie)
+            assertEquals(selected.userId, fixture.service.currentUserState.value?.id)
+        } finally {
+            fixture.service.closeAndJoin()
+            fixture.client.close()
+        }
+    }
+
+    @Test
+    fun addingAccountClearsLiveSessionWithoutRevokingSavedCredentials() = runTest {
+        val account = cachedAccount()
+        val fixture = fixture { error("Adding an account must wait for entered credentials") }
+        try {
+            SharedFlowCentre.emitAuthenticated(account)
+            fixture.cookies.addCookie(AUTH_COOKIE, account.authCookie)
+
+            assertNull(fixture.service.beginAccountLogin())
+
+            assertNull(SharedFlowCentre.currentSession.value)
+            assertNull(fixture.cookies.cookieValue(AUTH_COOKIE))
+            assertEquals("", fixture.service.accountDto().username)
+            assertEquals(account.authCookie, fixture.accountDao.accountDtoByUserName(account.username)?.authCookie)
+        } finally {
+            fixture.service.closeAndJoin()
+            fixture.client.close()
+        }
+    }
+
+    @Test
+    fun expiredSelectedCookieContinuesToTwoFactorWithoutSigningOutPreviousAccount() = runTest {
+        val previous = cachedAccount()
+        val selected = previous.copy(userId = "usr_other", username = "other-user", authCookie = "expired-other")
+        var requestCount = 0
+        val fixture = fixture { request ->
+            requestCount++
+            if (requestCount == 1) {
+                respond("expired", HttpStatusCode.Unauthorized)
+            } else {
+                assertFalse(request.headers[HttpHeaders.Cookie].orEmpty().contains("auth=expired-other"))
+                assertTrue(request.headers[HttpHeaders.Authorization].orEmpty().startsWith("Basic "))
+                jsonResponse("""{"requiresTwoFactorAuth":["totp"]}""")
+            }
+        }
+        try {
+            fixture.accountDao.saveAccountInfo(selected)
+            fixture.accountDao.saveAccountInfo(previous)
+            SharedFlowCentre.emitAuthenticated(previous)
+
+            assertIs<AuthState.NeedTTFA>(fixture.service.beginAccountLogin(selected.userId))
+
+            assertNull(SharedFlowCentre.currentSession.value)
+            assertEquals(selected.userId, fixture.service.accountDto().userId)
+            assertNull(fixture.accountDao.accountDtoByUserName(selected.username)?.authCookie)
+            assertEquals(previous.authCookie, fixture.accountDao.accountDtoByUserName(previous.username)?.authCookie)
+            fixture.service.logout()
+            assertEquals(previous.authCookie, fixture.accountDao.accountDtoByUserName(previous.username)?.authCookie)
+        } finally {
+            fixture.service.closeAndJoin()
+            fixture.client.close()
+        }
+    }
+
+    @Test
+    fun failedQuickSwitchCannotLeavePreviousSessionUsingSelectedCookies() = runTest {
+        val previous = cachedAccount()
+        val selected = previous.copy(userId = "usr_other", username = "other-user", authCookie = "other-auth")
+        val fixture = fixture { throw IllegalStateException("offline") }
+        try {
+            fixture.accountDao.saveAccountInfo(selected)
+            fixture.accountDao.saveAccountInfo(previous)
+            SharedFlowCentre.emitAuthenticated(previous)
+
+            assertFailsWith<IllegalStateException> { fixture.service.beginAccountLogin(selected.userId) }
+
+            assertNull(SharedFlowCentre.currentSession.value)
+            assertNull(fixture.service.currentUserState.value)
+            assertEquals(previous.authCookie, fixture.accountDao.accountDtoByUserName(previous.username)?.authCookie)
+            assertEquals(selected.authCookie, fixture.accountDao.accountDtoByUserName(selected.username)?.authCookie)
+        } finally {
+            fixture.service.closeAndJoin()
+            fixture.client.close()
+        }
+    }
+
+    @Test
+    fun quickSwitchRejectsCookieResponseForAnotherAccount() = runTest {
+        val previous = cachedAccount()
+        val selected = previous.copy(userId = "usr_other", username = "other-user", authCookie = "other-auth")
+        val fixture = fixture { jsonResponse(currentUserJson(previous)) }
+        try {
+            fixture.accountDao.saveAccountInfo(selected)
+            fixture.accountDao.saveAccountInfo(previous)
+            SharedFlowCentre.emitAuthenticated(previous)
+
+            assertFailsWith<IllegalArgumentException> { fixture.service.beginAccountLogin(selected.userId) }
+
+            assertNull(SharedFlowCentre.currentSession.value)
+            assertNull(fixture.service.currentUserState.value)
+            assertEquals(previous.userId, fixture.accountDao.currentAccountDtoOrNull()?.userId)
+        } finally {
+            fixture.service.closeAndJoin()
+            fixture.client.close()
+        }
+    }
+
     private data class Fixture(
         val service: AuthService,
         val accountDao: AccountDao,

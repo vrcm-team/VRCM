@@ -90,11 +90,6 @@ class HomeScreenModel(
         shellState.clearOverlays()
     }
 
-    fun logout() {
-        clearOverlays()
-        viewModelScope.launch { authService.logout() }
-    }
-
     init {
         refreshCurrentUser()
         viewModelScope.launch {
