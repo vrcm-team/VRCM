@@ -1,6 +1,5 @@
 package io.github.vrcmteam.vrcm.presentation.screens.settings
 
-import androidx.lifecycle.ViewModelStore
 import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.playermoderation.data.PlayerModerationData
@@ -9,6 +8,7 @@ import io.github.vrcmteam.vrcm.service.PlayerModerationCleanupResponse
 import io.github.vrcmteam.vrcm.service.PlayerModerationCleanupSource
 import io.github.vrcmteam.vrcm.service.data.AccountDto
 import io.github.vrcmteam.vrcm.testing.MainDispatcherTest
+import io.github.vrcmteam.vrcm.testing.clearAndJoin
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.runBlocking
@@ -209,11 +209,8 @@ private fun moderation(
     type = type,
 )
 
-private fun close(model: PlayerModerationListScreenModel) {
-    ViewModelStore().apply {
-        put("test", model)
-        clear()
-    }
+private suspend fun close(model: PlayerModerationListScreenModel) {
+    model.clearAndJoin()
 }
 
 private suspend fun awaitUntil(predicate: () -> Boolean) {

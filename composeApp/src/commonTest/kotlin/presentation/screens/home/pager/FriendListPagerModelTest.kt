@@ -1,6 +1,5 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 
-import androidx.lifecycle.ViewModelStore
 import com.russhwolf.settings.MapSettings
 import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.AccountWebSocketEvent
@@ -36,6 +35,7 @@ import io.github.vrcmteam.vrcm.storage.data.FriendListCache
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardAssetStore
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardConfigDao
 import io.github.vrcmteam.vrcm.testing.MainDispatcherTest
+import io.github.vrcmteam.vrcm.testing.clearAndJoin
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandleScope
@@ -179,10 +179,7 @@ class FriendListPagerModelTest : MainDispatcherTest() {
             assertEquals(renewedSession.token, friendService.friendStateSnapshot.value.sessionToken)
         } finally {
             profileScope.cancel()
-            ViewModelStore().apply {
-                put("friend-list-pager", model)
-                clear()
-            }
+            model.clearAndJoin()
             friendService.dispose()
             favoriteService.dispose()
             SharedFlowCentre.emitLogout()
@@ -293,10 +290,7 @@ class FriendListPagerModelTest : MainDispatcherTest() {
             assertEquals(0, nonFriendProfileRequests)
         } finally {
             profileScope.cancel()
-            ViewModelStore().apply {
-                put("friend-list-pager", model)
-                clear()
-            }
+            model.clearAndJoin()
             friendService.dispose()
             favoriteService.dispose()
             SharedFlowCentre.emitLogout()
@@ -325,6 +319,7 @@ class FriendListPagerModelTest : MainDispatcherTest() {
         val accountAProfileJob = CompletableDeferred<Job>()
         val accountANetworkStarted = CompletableDeferred<Unit>()
         val releaseAccountANetwork = CompletableDeferred<Unit>()
+        val releaseAccountBNetwork = CompletableDeferred<Unit>()
         val client = accountSwitchClient(
             json = json,
             accountAUserId = accountA.userId,
@@ -334,6 +329,7 @@ class FriendListPagerModelTest : MainDispatcherTest() {
             accountAProfileJob = accountAProfileJob,
             accountANetworkStarted = accountANetworkStarted,
             releaseAccountANetwork = releaseAccountANetwork,
+            releaseAccountBNetwork = releaseAccountBNetwork,
         )
         val friendListCacheStore = InMemoryFriendListCacheStore()
         val favoriteListCacheStore = InMemoryFavoriteListCacheStore()
@@ -403,9 +399,11 @@ class FriendListPagerModelTest : MainDispatcherTest() {
             SharedFlowCentre.emitAuthenticated(accountB)
             val sessionB = assertNotNull(SharedFlowCentre.currentSession.value)
             awaitUntil {
-                friendService.friendState.value.isEmpty() &&
+                friendService.friendStateSnapshot.value.sessionToken == sessionB.token &&
+                    friendService.friendState.value.isEmpty() &&
                     activeModel.friendDirectoryFriends.value.isEmpty()
             }
+            releaseAccountBNetwork.complete(Unit)
             emitFriendUntilObserved(
                 friendService,
                 sessionB,
@@ -426,11 +424,9 @@ class FriendListPagerModelTest : MainDispatcherTest() {
             profileScope.cancel()
             releaseAccountAProfile.complete(Unit)
             releaseAccountANetwork.complete(Unit)
+            releaseAccountBNetwork.complete(Unit)
             model?.let { activeModel ->
-                ViewModelStore().apply {
-                    put("friend-list-pager", activeModel)
-                    clear()
-                }
+                activeModel.clearAndJoin()
             }
             friendService.dispose()
             favoriteService.dispose()
@@ -1028,12 +1024,9 @@ class FriendListPagerModelTest : MainDispatcherTest() {
         val profileScope: CoroutineScope,
         val client: HttpClient,
     ) {
-        fun close() {
+        suspend fun close() {
             profileScope.cancel()
-            ViewModelStore().apply {
-                put("friend-list-pager-removal", model)
-                clear()
-            }
+            model.clearAndJoin()
             friendService.dispose()
             favoriteService.dispose()
             client.close()
@@ -1153,6 +1146,7 @@ private fun accountSwitchClient(
     accountAProfileJob: CompletableDeferred<Job>,
     accountANetworkStarted: CompletableDeferred<Unit>,
     releaseAccountANetwork: CompletableDeferred<Unit>,
+    releaseAccountBNetwork: CompletableDeferred<Unit>,
 ) = HttpClient(MockEngine) {
     engine {
         addHandler { request ->
@@ -1169,7 +1163,11 @@ private fun accountSwitchClient(
                             withContext(NonCancellable) { releaseAccountANetwork.await() }
                             emptyList()
                         }
-                        else -> listOf(accountBFriend)
+                        else -> {
+                            // Keep the empty account-switch state observable until the test has checked it.
+                            releaseAccountBNetwork.await()
+                            listOf(accountBFriend)
+                        }
                     }
                     jsonResponse(json.encodeToString(friends))
                 }

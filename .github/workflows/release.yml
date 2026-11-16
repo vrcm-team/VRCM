@@ -6,17 +6,18 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Existing release tag, e.g. 1.2.0 (without v)'
-        required: true
+        description: 'Existing release tag; leave empty to validate main without publication'
+        required: false
         type: string
       publish:
         description: 'Publish the release after all packages and notes are verified'
         type: boolean
         default: true
-      android_only:
-        description: 'Build only the Android APK; skip other platforms and publication'
-        type: boolean
-        default: false
+      platform:
+        description: 'Build all platforms, or rebuild one platform without publication'
+        type: choice
+        options: [all, android, windows, apple]
+        default: all
       prerelease:
         description: 'Mark a new release as a preview'
         type: boolean
@@ -36,11 +37,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: release-${{ inputs.tag || github.ref_name }}${{ inputs.android_only && '-android' || '' }}
+  group: release-${{ inputs.tag || github.ref_name }}${{ inputs.platform && inputs.platform != 'all' && format('-{0}', inputs.platform) || '' }}
   cancel-in-progress: false
 
 env:
-  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+  RELEASE_TAG: ${{ inputs.tag || (github.event_name == 'push' && github.ref_name) || '' }}
   # Public certificate fingerprint, verified against the historical 1.1.4 APK.
   ANDROID_SIGNING_CERT_SHA256: 6f7db55d319ae6487ef69c82c676e92bbf1e91c170afa368fbe9e2cb8d3ff12b
 
@@ -62,7 +63,7 @@ jobs:
           node-version: '24'
       - name: Test release orchestration
         run: node --test scripts/tests/release-ci.test.mjs
-      - name: Validate tag, versions and release state
+      - name: Validate build source, versions and release state
         id: metadata
         env:
           GH_TOKEN: ${{ github.token }}
@@ -70,6 +71,7 @@ jobs:
         run: |
           args=()
           if [[ "$ALLOW_EXISTING" == true ]]; then args+=(--allow-existing); fi
+          if [[ -z "$RELEASE_TAG" ]]; then args+=(--build-only); fi
           node scripts/release-ci.mjs prepare --tag "$RELEASE_TAG" \
             --output "$RUNNER_TEMP/release-tools/metadata.json" "${args[@]}"
           cp scripts/release-ci.mjs "$RUNNER_TEMP/release-tools/"
@@ -81,6 +83,7 @@ jobs:
           retention-days: 7
 
   android:
+    if: ${{ !inputs.platform || inputs.platform == 'all' || inputs.platform == 'android' }}
     needs: prepare
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -148,6 +151,15 @@ jobs:
       - name: Remove signing material
         if: always()
         run: rm -f local.properties "$RUNNER_TEMP/vrcm-release.jks" "$RUNNER_TEMP/vrcm-signing-cert.pem"
+      - name: Collect Android test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-test-reports
+          path: |
+            composeApp/build/reports/tests/testGithubDebugUnitTest/
+            composeApp/build/test-results/testGithubDebugUnitTest/
+          retention-days: 7
       - uses: actions/upload-artifact@v7
         with:
           name: release-packages-android
@@ -156,7 +168,7 @@ jobs:
           retention-days: 7
 
   windows:
-    if: ${{ !inputs.android_only }}
+    if: ${{ !inputs.platform || inputs.platform == 'all' || inputs.platform == 'windows' }}
     needs: prepare
     runs-on: windows-latest
     timeout-minutes: 90
@@ -179,6 +191,15 @@ jobs:
             --no-daemon --console=plain --stacktrace --max-workers=1 `
             '-Dorg.gradle.jvmargs=-Xmx2048M -Dfile.encoding=UTF-8' '-Pkotlin.daemon.jvmargs=-Xmx4096M'
           if ($LASTEXITCODE -ne 0) { throw 'Desktop tests or release build failed.' }
+      - name: Collect Desktop test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-test-reports
+          path: |
+            composeApp/build/reports/tests/desktopTest/
+            composeApp/build/test-results/desktopTest/
+          retention-days: 7
       - name: Build the existing Inno Setup installer
         shell: pwsh
         run: |
@@ -206,7 +227,7 @@ jobs:
           retention-days: 7
 
   apple:
-    if: ${{ !inputs.android_only }}
+    if: ${{ !inputs.platform || inputs.platform == 'all' || inputs.platform == 'apple' }}
     needs: prepare
     runs-on: macos-latest
     timeout-minutes: 120
@@ -236,9 +257,10 @@ jobs:
           find composeApp/build/compose/binaries/main-release -type f -name '*.dmg' -exec cp {} "artifacts/VRCM-v$VERSION.dmg" \;
       - name: Archive iOS and reuse the existing ad-hoc IPA packager
         env:
-          # Xcode invokes gradlew internally, so pass the runner's memory limits through its environment.
+          # Kotlin/Native runs inside Gradle, so its Release optimizer needs a larger Gradle heap.
+          # kotlin.daemon.jvmargs only controls the separate JVM compiler, not the Native linker.
           GRADLE_OPTS: >-
-            -Dorg.gradle.jvmargs="-Xmx2048M -Dfile.encoding=UTF-8"
+            -Dorg.gradle.jvmargs="-Xmx6144M -Dfile.encoding=UTF-8"
             -Dorg.gradle.project.kotlin.daemon.jvmargs=-Xmx4096M
             -Dorg.gradle.workers.max=1 -Dorg.gradle.daemon=false
         run: |
@@ -258,7 +280,7 @@ jobs:
           retention-days: 7
 
   publish:
-    if: ${{ !inputs.android_only }}
+    if: ${{ (github.event_name == 'push' || inputs.tag != '') && (!inputs.platform || inputs.platform == 'all') }}
     needs: [prepare, android, windows, apple]
     runs-on: ubuntu-latest
     timeout-minutes: 20

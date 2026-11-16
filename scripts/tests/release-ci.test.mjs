@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import test from 'node:test';
-import { readMetadata, verifyArtifacts, assertUploadedAssets, assertReleaseWritable, validateGeneratedNotes, generateNotes } from '../release-ci.mjs';
+import { readMetadata, verifyArtifacts, assertUploadedAssets, assertReleaseWritable, validateGeneratedNotes, generateNotes, publishRelease } from '../release-ci.mjs';
 
 // The public Markdown contract used by the historical 1.1.3/1.1.4 releases.
 const HISTORICAL_NOTES = `## 新增
@@ -79,6 +79,38 @@ test('release metadata comes from the tag, not later edits in the checkout', t =
   assert.equal(metadata.version, '1.2.3');
   assert.equal(metadata.code, '7');
   assert.equal(metadata.sha, git('rev-parse', 'refs/tags/1.2.3'));
+});
+
+test('build-only validation uses committed main without requiring a tag or release notes', t => {
+  const { root, git } = repository(t);
+  git('tag', '-d', '1.2.3');
+  git('rm', 'docs/releases/1.2.3.md');
+  git('commit', '-m', 'test: source before release preparation');
+  git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+  fs.writeFileSync(path.join(root, 'gradle/libs.versions.toml'), 'app-version = "9.9.9"\napp-code = "99"\n');
+  const metadata = readMetadata(root, '', { buildOnly: true });
+  assert.equal(metadata.sha, git('rev-parse', 'HEAD'));
+  assert.equal(metadata.version, '1.2.3');
+  assert.equal(metadata.tag, '');
+  assert.equal(metadata.buildOnly, true);
+});
+
+test('build-only validation rejects another branch or inconsistent platform versions', t => {
+  const { root, git } = repository(t, { 'installer/VRCM.iss': '#define AppVersion "1.2.2"\n' });
+  assert.throws(() => readMetadata(root, '', { buildOnly: true }), /installer\/VRCM\.iss/);
+  fs.writeFileSync(path.join(root, 'unreviewed.txt'), 'unreviewed source');
+  git('add', '.');
+  git('commit', '-m', 'test: source outside main');
+  assert.throws(() => readMetadata(root, '', { buildOnly: true }), /current origin\/main/);
+  assert.throws(() => readMetadata(root, '1.2.3', { buildOnly: true }), /does not accept a release tag/);
+});
+
+test('build-only metadata cannot generate notes or publish, even if a tag is supplied later', async t => {
+  const { root } = repository(t);
+  t.mock.method(globalThis, 'fetch', async () => { throw new Error('Build-only validation must not access release APIs.'); });
+  const metadata = { ...readMetadata(root, '', { buildOnly: true }), tag: '1.2.3' };
+  await assert.rejects(generateNotes(root, metadata, [], 'unused', 'deepseek-flash', 'high'), /Build-only metadata/);
+  await assert.rejects(publishRelease(root, metadata, [], 'unused', true, false), /Build-only metadata/);
 });
 
 test('an installer with a different version stops the release', t => {

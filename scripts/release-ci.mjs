@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// GitHub CD support. Build inputs always come from the immutable release tag.
+// GitHub CD support. Release inputs come from tags; build-only validation uses main.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -29,34 +29,42 @@ function declarations(text, pattern, expected, label) {
 }
 
 /** Validate the committed version, including both Xcode configurations. */
-export function readMetadata(root, tag) {
-  if (!/^\d+\.\d+\.\d+$/.test(tag) || tag.trim() !== tag) {
+export function readMetadata(root, tag, { buildOnly = false } = {}) {
+  if (buildOnly && tag) throw new Error('Build-only validation does not accept a release tag.');
+  if (!buildOnly && (!/^\d+\.\d+\.\d+$/.test(tag) || tag.trim() !== tag)) {
     throw new Error('Use the existing VRCM tag format, e.g. 1.2.0 (without v).');
   }
-  const sha = git(root, 'rev-parse', '--verify', `refs/tags/${tag}^{commit}`);
+  const sha = git(root, 'rev-parse', '--verify', buildOnly ? 'HEAD^{commit}' : `refs/tags/${tag}^{commit}`);
+  if (buildOnly && sha !== git(root, 'rev-parse', '--verify', 'origin/main^{commit}')) {
+    throw new Error('Build-only validation must use the current origin/main commit.');
+  }
   const ancestry = spawnSync('git', ['merge-base', '--is-ancestor', sha, 'origin/main'], { cwd: root });
   if (ancestry.status !== 0) throw new Error('The release tag must point to a commit already on origin/main.');
   const files = Object.fromEntries(Object.entries(VERSION_FILES).map(([name, file]) => [name, git(root, 'show', `${sha}:${file}`)]));
-  declarations(files.catalog, /^app-version\s*=\s*"([^"]+)"/gm, tag, VERSION_FILES.catalog);
+  const version = buildOnly ? /^app-version\s*=\s*"(\d+\.\d+\.\d+)"/m.exec(files.catalog)?.[1] : tag;
+  if (!version) throw new Error('app-version must use the existing VRCM version format.');
+  declarations(files.catalog, /^app-version\s*=\s*"([^"]+)"/gm, version, VERSION_FILES.catalog);
   const code = /^app-code\s*=\s*"(\d+)"/m.exec(files.catalog)?.[1];
   if (!code || !Number.isSafeInteger(Number(code)) || Number(code) < 1 || Number(code) > 2100000000) {
     throw new Error('app-code must be a valid positive Android versionCode.');
   }
-  declarations(files.runtime, /^\s*const val APP_VERSION\s*=\s*"([^"]+)"/gm, tag, VERSION_FILES.runtime);
-  declarations(files.installer, /^#define AppVersion\s+"([^"]+)"/gm, tag, VERSION_FILES.installer);
-  declarations(files.project, /MARKETING_VERSION\s*=\s*([^;\s]+)\s*;/g, tag, 'Xcode MARKETING_VERSION');
+  declarations(files.runtime, /^\s*const val APP_VERSION\s*=\s*"([^"]+)"/gm, version, VERSION_FILES.runtime);
+  declarations(files.installer, /^#define AppVersion\s+"([^"]+)"/gm, version, VERSION_FILES.installer);
+  declarations(files.project, /MARKETING_VERSION\s*=\s*([^;\s]+)\s*;/g, version, 'Xcode MARKETING_VERSION');
   declarations(files.project, /CURRENT_PROJECT_VERSION\s*=\s*([^;\s]+)\s*;/g, code, 'Xcode CURRENT_PROJECT_VERSION');
   for (const [key, setting] of [['CFBundleShortVersionString', 'MARKETING_VERSION'], ['CFBundleVersion', 'CURRENT_PROJECT_VERSION']]) {
     const pattern = new RegExp(`<key>${key}</key>\\s*<string>\\$\\(${setting}\\)</string>`);
     if (!pattern.test(files.plist)) throw new Error(`${key} must reference the Xcode build setting ${setting}.`);
   }
-  const detailsPath = `docs/releases/${tag}.md`;
-  const details = spawnSync('git', ['show', `${sha}:${detailsPath}`], { cwd: root, encoding: 'utf8' });
-  if (details.status !== 0 || !details.stdout.trim()) {
-    throw new Error(`Missing or empty release details: ${detailsPath}. Prepare the document before tagging.`);
+  if (!buildOnly) {
+    const detailsPath = `docs/releases/${tag}.md`;
+    const details = spawnSync('git', ['show', `${sha}:${detailsPath}`], { cwd: root, encoding: 'utf8' });
+    if (details.status !== 0 || !details.stdout.trim()) {
+      throw new Error(`Missing or empty release details: ${detailsPath}. Prepare the document before tagging.`);
+    }
   }
-  return { tag, version: tag, code, sha, assets: [
-    `VRCM-v${tag}.apk`, `VRCM-v${tag}-setup.exe`, `VRCM-v${tag}.dmg`, `VRCM-v${tag}.ipa`,
+  return { tag, version, code, sha, buildOnly, assets: [
+    `VRCM-v${version}.apk`, `VRCM-v${version}-setup.exe`, `VRCM-v${version}.dmg`, `VRCM-v${version}.ipa`,
   ] };
 }
 
@@ -158,6 +166,7 @@ async function previousRelease(root, metadata, api) {
 }
 
 export async function generateNotes(root, metadata, artifacts, output, model, effort) {
+  if (metadata.buildOnly || !metadata.tag) throw new Error('Build-only metadata cannot generate release notes or publish.');
   if (!['none', 'low', 'high', 'max'].includes(effort)) throw new Error('Thinking effort must be none, low, high or max.');
   const api = githubClient();
   const details = `详情 / Details: <https://github.com/${api.repository}/tree/main/docs/releases/${metadata.version}.md>`;
@@ -213,7 +222,8 @@ export function assertUploadedAssets(expected, uploaded) {
   }
 }
 
-async function publishRelease(root, metadata, artifacts, notes, allowExisting, prerelease) {
+export async function publishRelease(root, metadata, artifacts, notes, allowExisting, prerelease) {
+  if (metadata.buildOnly || !metadata.tag) throw new Error('Build-only metadata cannot generate release notes or publish.');
   const api = githubClient();
   parseManualNotes(fs.readFileSync(notes, 'utf8'), `详情 / Details: <https://github.com/${api.repository}/tree/main/docs/releases/${metadata.version}.md>`);
   let ref = await api.request(`/git/ref/tags/${encodeURIComponent(metadata.tag)}`);
@@ -240,16 +250,17 @@ async function main() {
     root: { type: 'string', default: '.' }, tag: { type: 'string' }, output: { type: 'string' },
     metadata: { type: 'string' }, artifacts: { type: 'string' }, notes: { type: 'string' },
     'allow-existing': { type: 'boolean', default: false }, prerelease: { type: 'boolean', default: false },
+    'build-only': { type: 'boolean', default: false },
     model: { type: 'string', default: 'deepseek-flash' }, effort: { type: 'string', default: 'high' },
   } });
   const root = path.resolve(values.root);
   if (command === 'prepare') {
-    const metadata = readMetadata(root, values.tag || '');
-    assertReleaseWritable(await existingRelease(githubClient(), metadata.tag), values['allow-existing']);
+    const metadata = readMetadata(root, values.tag || '', { buildOnly: values['build-only'] });
+    if (!metadata.buildOnly) assertReleaseWritable(await existingRelease(githubClient(), metadata.tag), values['allow-existing']);
     fs.mkdirSync(path.dirname(values.output), { recursive: true });
     fs.writeFileSync(values.output, `${JSON.stringify(metadata, null, 2)}\n`);
     for (const key of ['tag', 'version', 'code', 'sha']) writeOutput(key, metadata[key]);
-    summary(`Release source: **${metadata.tag}** (${metadata.sha}), versionCode **${metadata.code}**`);
+    summary(`${metadata.buildOnly ? 'Build-only source' : 'Release source'}: **${metadata.tag || 'main'}** (${metadata.sha}), versionCode **${metadata.code}**`);
     return;
   }
   if (!['notes', 'publish'].includes(command)) throw new Error('Expected prepare, notes or publish.');

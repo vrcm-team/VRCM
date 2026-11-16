@@ -24,14 +24,16 @@ git push origin 1.2.0
 推送 tag 会自动发布。也可在 Actions → Release 手动输入已有 tag：
 
 - `publish=false`：只验证、打包和生成公告，下载工作流 Artifacts 检查结果，不创建或更新 Release。
-- `android_only=true`：只校验版本并构建正式签名 Android APK，跳过 Windows、Apple 和发布任务；产物保存在 `release-packages-android` Artifact。
+- `platform=android`、`windows` 或 `apple`：只校验版本并构建指定平台，跳过其他平台和发布任务；产物保存在对应的 `release-packages-*` Artifact。默认 `all` 保持完整发布流程。
 - `prerelease=true`：新建为预览版；更新已有版本时保留其预览/正式状态。
 - `allow_existing=true`：明确允许替换已公开版本的同名附件和公告。默认禁止覆盖历史正式版本。
 - `model`、`effort`：可选的 DeepSeek 模型和思考强度，默认为仓库 Variables `RELEASE_NOTES_MODEL`、`RELEASE_NOTES_EFFORT`，未设置时使用 `deepseek-flash`、`high`。
 
 该流程面向包含现有安装器和 IPA 打包脚本的新版本 tag。引入这些文件之前的历史 tag 不能保证原样重建；不要为重建旧版本强制改写 tag。
 
-需要修复已有 tag 的构建环境并单独重建 Android 时，将工作流运行分支选为含修复的 `main`，`tag` 填写原版本，设置 `android_only=true` 和 `publish=false`。应用源码仍从原 tag 检出；重跑旧任务会继续使用旧工作流，不能应用 `main` 中的环境修复。独立构建不会修改原运行的结果或自动续接其发布任务。
+需要修复已有 tag 的构建环境并单独重建某个平台时，将工作流运行分支选为含修复的 `main`，`tag` 填写原版本，选择对应 `platform` 并设置 `publish=false`。应用源码仍从原 tag 检出；重跑旧任务会继续使用旧工作流，不能应用 `main` 中的环境修复。独立构建不会修改原运行的结果或自动续接其发布任务。
+
+需要先验证源码修复、再准备新版本时，选择运行分支 `main` 并留空 `tag`。此模式只接受当前 `origin/main` 提交，仍校验各平台版本一致，并执行相同的正式打包任务；无论 `publish` 取值如何都不会生成公告或发布 Release。构建全部通过后再调整版本、提交和创建新 tag。Android 和 Desktop 的测试报告在失败时也会上传为 Artifact。
 
 ## 正式 Android 签名
 

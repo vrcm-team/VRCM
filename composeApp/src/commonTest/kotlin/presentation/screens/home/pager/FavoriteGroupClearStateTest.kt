@@ -1,6 +1,5 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 
-import androidx.lifecycle.ViewModelStore
 import com.russhwolf.settings.MapSettings
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.di.supports.PersistentCookiesStorage
@@ -31,6 +30,7 @@ import io.github.vrcmteam.vrcm.storage.data.FavoritedWorldGroup
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardAssetStore
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardConfigDao
 import io.github.vrcmteam.vrcm.testing.MainDispatcherTest
+import io.github.vrcmteam.vrcm.testing.clearAndJoin
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandleScope
@@ -234,10 +234,7 @@ private class ClearFixture(
 
     suspend fun close() {
         requests.releaseFirstDelete.complete(Unit)
-        ViewModelStore().apply {
-            put("favorite-group-clear", model)
-            clear()
-        }
+        model.clearAndJoin()
         friendService.dispose()
         favoriteService.dispose()
         profileScope.cancel()

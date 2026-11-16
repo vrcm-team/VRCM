@@ -1,7 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelStore
 import com.russhwolf.settings.MapSettings
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.di.supports.PersistentCookiesStorage
@@ -21,6 +20,7 @@ import io.github.vrcmteam.vrcm.storage.InMemoryUserProfileCacheStore
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardAssetStore
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardConfigDao
 import io.github.vrcmteam.vrcm.testing.MainDispatcherTest
+import io.github.vrcmteam.vrcm.testing.clearAndJoin
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandler
@@ -656,17 +656,14 @@ private class SearchModelFixture(
     val model: SearchListPagerModel,
     private val client: HttpClient,
 ) {
-    fun close() {
+    suspend fun close() {
         clearViewModel(model)
         client.close()
     }
 }
 
-private fun clearViewModel(viewModel: ViewModel) {
-    ViewModelStore().apply {
-        put("test", viewModel)
-        clear()
-    }
+private suspend fun clearViewModel(viewModel: ViewModel) {
+    viewModel.clearAndJoin()
 }
 
 private suspend fun createFixture(
