@@ -4,7 +4,10 @@ import androidx.lifecycle.ViewModelStore
 import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.AuthenticatedAccount
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
-import io.github.vrcmteam.vrcm.service.DeviceAuthApprover
+import io.github.vrcmteam.vrcm.network.api.auth.data.DeviceAuthInfoData
+import io.github.vrcmteam.vrcm.network.api.auth.data.DeviceAuthGeolocationData
+import io.github.vrcmteam.vrcm.service.DeviceAuthGateway
+import io.github.vrcmteam.vrcm.service.SessionBoundResponse
 import io.github.vrcmteam.vrcm.service.data.AccountDto
 import io.github.vrcmteam.vrcm.testing.MainDispatcherTest
 import kotlinx.coroutines.CompletableDeferred
@@ -261,17 +264,156 @@ class QrScannerModelTest : MainDispatcherTest() {
         assertEquals(QrScanState.Scanning, f.model.state.value)
     }
 
+    @Test
+    fun approvalWaitsForDetailsAndAnExplicitClickWhileIgnoringCompetingActions() = runBlocking {
+        val result = CompletableDeferred<Result<DeviceAuthInfoData>>()
+        var loads = 0
+        val f = fixture(infoLoader = { code, session ->
+            assertEquals("F36XWSHN", code)
+            loads++
+            SessionBoundResponse(result.await(), session)
+        })
+        f.model.onScanned(deviceLink)
+        assertIs<QrScanState.LoadingDeviceInfo>(f.model.state.value)
+        f.model.approve()
+        f.model.retryDeviceInfo()
+        f.model.onScanned("https://vrchat.com/home/device?code=U4RQANX4")
+        f.model.chooseImage()
+        f.model.scanAgain()
+        assertNull(f.model.showMyCode())
+        assertIs<QrScanState.LoadingDeviceInfo>(f.model.state.value)
+        assertEquals(1, loads)
+        assertTrue(f.requests.tryReceive().isFailure)
+        result.complete(Result.success(deviceInfo))
+        yield()
+        val confirmation = assertIs<QrScanState.DeviceConfirmation>(f.model.state.value)
+        assertEquals(deviceInfo, confirmation.info)
+        assertEquals("F36XWSHN", confirmation.code)
+        assertTrue(f.requests.tryReceive().isFailure)
+        f.model.approve()
+        f.requests.receive().complete(Result.success(Unit))
+        yield()
+        assertEquals(QrScanState.Approved, f.model.state.value)
+    }
+
+    @Test
+    fun detailsFailureRequiresExplicitReloadBeforeApproval() = runBlocking {
+        var loads = 0
+        val f = fixture(infoLoader = { _, session ->
+            loads++
+            SessionBoundResponse(if (loads == 1) Result.failure(IllegalStateException("offline"))
+                else Result.success(deviceInfo), session)
+        })
+        f.model.onScanned(deviceLink)
+        val failure = assertIs<QrScanState.Failure>(f.model.state.value)
+        assertEquals(ScanFailure.DeviceInfo, failure.reason)
+        assertNull(failure.confirmation)
+        f.model.approve()
+        assertTrue(f.requests.tryReceive().isFailure)
+        assertEquals(1, loads)
+        f.model.retryDeviceInfo()
+        assertEquals(deviceInfo, assertIs<QrScanState.DeviceConfirmation>(f.model.state.value).info)
+        assertEquals(2, loads)
+        assertTrue(f.requests.tryReceive().isFailure)
+    }
+
+    @Test
+    fun expiredDetailsRequireANewScanAndCannotBeApprovedOrRetried() {
+        var loads = 0
+        val f = fixture(infoLoader = { _, session ->
+            loads++
+            SessionBoundResponse(Result.failure(VRCApiException("Not Found", 404, "expired")), session)
+        })
+        f.model.onScanned(deviceLink)
+        assertEquals(QrScanState.Failure(ScanFailure.Expired), f.model.state.value)
+        f.model.approve()
+        f.model.retryDeviceInfo()
+        assertEquals(1, loads)
+        assertTrue(f.requests.tryReceive().isFailure)
+        f.model.scanAgain()
+        assertEquals(QrScanState.Scanning, f.model.state.value)
+    }
+
+    @Test
+    fun leavingScreenCancelsPendingDetails() = runBlocking {
+        val cancelled = CompletableDeferred<Unit>()
+        val f = fixture(infoLoader = { _, _ ->
+            try { CompletableDeferred<SessionBoundResponse<DeviceAuthInfoData>>().await() }
+            finally { cancelled.complete(Unit) }
+        })
+        f.model.onScanned(deviceLink)
+        stores.single().clear()
+        cancelled.await()
+        assertIs<QrScanState.LoadingDeviceInfo>(f.model.state.value)
+        assertTrue(f.requests.tryReceive().isFailure)
+    }
+
+    @Test
+    fun staleDetailsCannotBeShownEvenAfterSigningBackIntoTheSameAccount() = runBlocking {
+        val result = CompletableDeferred<Unit>()
+        val f = fixture(infoLoader = { _, session ->
+            result.await()
+            SessionBoundResponse(Result.success(deviceInfo), session)
+        })
+        f.model.onScanned(deviceLink)
+        f.sessions.value = account("usr_other", 2)
+        f.sessions.value = account("usr_owner", 3)
+        result.complete(Unit)
+        yield()
+        assertEquals(QrScanState.Failure(ScanFailure.SessionChanged), f.model.state.value)
+        f.model.approve()
+        assertTrue(f.requests.tryReceive().isFailure)
+    }
+
+    @Test
+    fun refreshedAuthenticationFromDetailsIsUsedForApproval() = runBlocking {
+        val refreshed = CompletableDeferred<AccountSessionToken>()
+        val f = fixture(infoLoader = { _, _ ->
+            SessionBoundResponse(Result.success(deviceInfo), refreshed.await())
+        })
+        f.model.onScanned(deviceLink)
+        f.sessions.value = account("usr_owner", 2)
+        refreshed.complete(f.sessions.value!!.token)
+        yield()
+        assertEquals(f.sessions.value!!.token, assertIs<QrScanState.DeviceConfirmation>(f.model.state.value).session)
+        f.model.approve()
+        f.requests.receive().complete(Result.success(Unit))
+        yield()
+        assertEquals(QrScanState.Approved, f.model.state.value)
+    }
+
+    @Test
+    fun retryingDetailsAfterAccountChangeCannotRequestAnotherAccountsLogin() {
+        var loads = 0
+        val f = fixture(infoLoader = { _, session ->
+            loads++
+            SessionBoundResponse(Result.failure(IllegalStateException("offline")), session)
+        })
+        f.model.onScanned(deviceLink)
+        f.sessions.value = account("usr_other", 2)
+        f.model.retryDeviceInfo()
+        assertEquals(QrScanState.Failure(ScanFailure.SessionChanged), f.model.state.value)
+        assertEquals(1, loads)
+        assertTrue(f.requests.tryReceive().isFailure)
+    }
+
     private fun batch(vararg values: String) = QrScanBatch(values.map { QrDetection(it, 0.5f, 0.5f) })
 
-    private fun fixture(imageDecoder: QrImageDecoder = QrImageDecoder { batch() }): Fixture {
+    private fun fixture(imageDecoder: QrImageDecoder = QrImageDecoder { batch() },
+        infoLoader: suspend (String, AccountSessionToken) -> SessionBoundResponse<DeviceAuthInfoData>? =
+            { _, session -> SessionBoundResponse(Result.success(deviceInfo), session) }): Fixture {
         val sessions = MutableStateFlow<AuthenticatedAccount?>(account("usr_owner", 1))
         val requests = Channel<CompletableDeferred<Result<Unit>>>(Channel.UNLIMITED)
-        val approver = DeviceAuthApprover { code, token ->
-            assertEquals("F36XWSHN", code)
-            assertEquals("usr_owner", token.userId)
-            CompletableDeferred<Result<Unit>>().also { requests.send(it) }.await()
+        val gateway = object : DeviceAuthGateway {
+            override suspend fun info(userCode: String, session: AccountSessionToken) = infoLoader(userCode, session)
+            override suspend fun approve(userCode: String, session: AccountSessionToken): SessionBoundResponse<Unit> {
+                assertEquals("F36XWSHN", userCode)
+                assertEquals("usr_owner", session.userId)
+                val result = CompletableDeferred<Result<Unit>>().also { requests.send(it) }.await()
+                return SessionBoundResponse(result, session)
+            }
         }
-        val model = QrScannerModel(approver, sessions, imageDecoder)
+        val model = QrScannerModel(gateway, sessions, imageDecoder)
         stores += ViewModelStore().apply { put("scanner", model) }
         return Fixture(model, sessions, requests)
     }
@@ -284,4 +426,6 @@ class QrScannerModelTest : MainDispatcherTest() {
     )
 
     private val deviceLink = "https://vrchat.com/home/device?code=F36XWSHN&source=app"
+    private val deviceInfo = DeviceAuthInfoData(1792964421294,
+        DeviceAuthGeolocationData(city = "Toronto", country = "CA", region = "Ontario", regionCode = "ON"))
 }

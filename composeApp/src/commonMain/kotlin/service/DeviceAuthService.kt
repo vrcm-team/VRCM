@@ -1,8 +1,8 @@
 package io.github.vrcmteam.vrcm.service
 
 import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
-import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
+import io.github.vrcmteam.vrcm.network.api.auth.data.DeviceAuthInfoData
 import io.ktor.http.URLProtocol
 import io.ktor.http.Url
 
@@ -16,23 +16,23 @@ internal fun parseDeviceAuthCode(value: String): String? {
     return code.takeIf { Regex("[A-Z0-9]{8}").matches(it) }
 }
 
-/** Approvals are bound to the account that inspected the QR code. */
-internal fun interface DeviceAuthApprover {
-    suspend fun approve(userCode: String, session: AccountSessionToken): Result<Unit>
+/** Details and approval stay bound to the inspecting account, including authentication refreshes. */
+internal interface DeviceAuthGateway {
+    suspend fun info(userCode: String, session: AccountSessionToken): SessionBoundResponse<DeviceAuthInfoData>?
+    suspend fun approve(userCode: String, session: AccountSessionToken): SessionBoundResponse<Unit>?
 }
 
 internal class DeviceAuthService(
     private val authApi: AuthApi,
     private val authService: AuthService,
-) : DeviceAuthApprover {
-    override suspend fun approve(userCode: String, session: AccountSessionToken): Result<Unit> {
-        val response = authService.runSessionBoundCatching(session) {
+) : DeviceAuthGateway {
+    override suspend fun info(userCode: String, session: AccountSessionToken) =
+        authService.runSessionBoundCatching(session) {
+            authApi.deviceAuthInfo(userCode)
+        }
+
+    override suspend fun approve(userCode: String, session: AccountSessionToken) =
+        authService.runSessionBoundCatching(session) {
             authApi.approveDevice(userCode)
         }
-        return if (response != null && SharedFlowCentre.isCurrentSession(response.sessionToken)) {
-            response.result
-        } else {
-            Result.failure(IllegalStateException("Authentication session changed"))
-        }
-    }
 }

@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.presentation.designsystem.*
@@ -22,6 +23,10 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.readBoundedBytes
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 internal val LocalScannedLinkHandler = staticCompositionLocalOf<(String) -> Unit> { {} }
 
@@ -44,6 +49,7 @@ internal fun ScanLaunchHandler(inbox: ScanLaunchInbox, links: OfficialLinkInbox,
 @Serializable
 object QrScannerScreen : AppRoute {
     @Composable
+    @OptIn(ExperimentalTime::class)
     override fun Content() {
         val navigator = currentNavigator
         val model: QrScannerModel = koinViewModel()
@@ -51,6 +57,7 @@ object QrScannerScreen : AppRoute {
         val locale = strings
         val openLink = LocalScannedLinkHandler.current
         val busy = state is QrScanState.Approving
+        val loadingInfo = state is QrScanState.LoadingDeviceInfo
         val imagePicker = rememberFilePickerLauncher(type = FileKitType.Image) { file ->
             if (file == null) model.imageSelectionCancelled()
             else model.readImage { file.readBoundedBytes(QR_IMAGE_MAX_BYTES) }
@@ -91,7 +98,7 @@ object QrScannerScreen : AppRoute {
             } else controls()
         }
 
-        if (state is QrScanState.DeviceConfirmation || state is QrScanState.Approving ||
+        if (loadingInfo || state is QrScanState.DeviceConfirmation || state is QrScanState.Approving ||
             state is QrScanState.Failure || state == QrScanState.Approved
         ) {
             val confirmation = when (val current = state) {
@@ -104,14 +111,35 @@ object QrScannerScreen : AppRoute {
             AppAlert(
                 onDismissRequest = { if (!busy) navigator.pop() },
                 icon = { AppIcon(AppIcons.QrCodeScanner, null) },
-                title = { AppText(if (confirmation != null || state == QrScanState.Approved) locale.deviceAuthTitle else locale.scanQrCode) },
+                title = { AppText(if (loadingInfo || confirmation != null || failure?.reason == ScanFailure.DeviceInfo ||
+                    state == QrScanState.Approved) locale.deviceAuthTitle else locale.scanQrCode) },
                 text = {
                     Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         if (confirmation != null) {
                             AppText(locale.deviceAuthMessage)
-                            AppText(locale.deviceAuthCode.replace("%s", confirmation.code), style = AppTheme.type.title2)
+                            val info = confirmation.info
+                            val createdAt = remember(info.createdAt) {
+                                Instant.fromEpochMilliseconds(info.createdAt).toLocalDateTime(TimeZone.currentSystemDefault())
+                                    .let { "${it.date} ${it.time.toString().substringBefore('.')}" }
+                            }
+                            val details = listOf(
+                                locale.deviceAuthCreatedAt to createdAt,
+                                locale.deviceAuthCountry to info.geolocation?.country,
+                                locale.deviceAuthRegion to (info.geolocation?.region?.takeIf { it.isNotBlank() }
+                                    ?: info.geolocation?.regionCode),
+                                locale.deviceAuthCity to info.geolocation?.city,
+                            )
+                            details.forEach { (label, value) ->
+                                Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
+                                    AppText(label, style = AppTheme.type.footnote, color = AppTheme.colors.secondaryLabel)
+                                    AppText(value?.takeIf { it.isNotBlank() } ?: locale.unknown)
+                                }
+                            }
                         }
-                        if (busy) AppActivityIndicator()
+                        if (loadingInfo) AppText(locale.deviceAuthInfoLoading)
+                        if (busy || loadingInfo) {
+                            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { AppActivityIndicator() }
+                        }
                         if (state == QrScanState.Approved) AppText(locale.deviceAuthApproved)
                         failure?.let {
                             AppText(
@@ -120,6 +148,7 @@ object QrScannerScreen : AppRoute {
                                     ScanFailure.ImageRead -> locale.scanImageFailed
                                     ScanFailure.ImageNoCode -> locale.scanImageNoCode
                                     ScanFailure.UnsupportedCode -> locale.scanUnsupportedCode
+                                    ScanFailure.DeviceInfo -> locale.deviceAuthInfoFailed
                                     ScanFailure.Approval -> locale.deviceAuthFailed
                                     ScanFailure.Expired -> locale.deviceAuthExpired
                                     ScanFailure.SessionChanged -> locale.deviceAuthSessionChanged
@@ -131,10 +160,11 @@ object QrScannerScreen : AppRoute {
                 },
                 confirmButton = {
                     AppButton(
-                        enabled = !busy,
+                        enabled = !busy && !loadingInfo,
                         style = AppButtonStyle.Prominent,
                         onClick = {
                             when {
+                                failure?.reason == ScanFailure.DeviceInfo -> model.retryDeviceInfo()
                                 confirmation != null -> model.approve()
                                 failure?.reason == ScanFailure.Camera -> model.chooseImage()
                                 state == QrScanState.Approved -> navigator.pop()
@@ -143,7 +173,9 @@ object QrScannerScreen : AppRoute {
                         },
                     ) {
                         AppText(when {
+                            loadingInfo -> locale.deviceAuthApprove
                             busy -> locale.loading
+                            failure?.reason == ScanFailure.DeviceInfo -> locale.retry
                             confirmation != null -> if (failure != null) locale.retry else locale.deviceAuthApprove
                             failure?.reason == ScanFailure.Camera -> locale.scanAlbum
                             state == QrScanState.Approved -> locale.confirm
