@@ -273,6 +273,11 @@ jobs:
     timeout-minutes: 120
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
+      # Kotlin/Native runs inside Gradle; the JVM compiler has a separate daemon.
+      GRADLE_OPTS: >-
+        -Dorg.gradle.jvmargs="-Xmx8192M -Dfile.encoding=UTF-8"
+        -Dorg.gradle.project.kotlin.daemon.jvmargs=-Xmx4096M
+        -Dorg.gradle.workers.max=1 -Dorg.gradle.daemon=false
     steps:
       - uses: actions/checkout@v7
         with:
@@ -283,18 +288,18 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v6
-      - name: Archive iOS and reuse the existing ad-hoc IPA packager
-        env:
-          # Kotlin/Native runs inside Gradle, so its Release optimizer needs a larger Gradle heap.
-          # kotlin.daemon.jvmargs only controls the separate JVM compiler, not the Native linker.
-          GRADLE_OPTS: >-
-            -Dorg.gradle.jvmargs="-Xmx8192M -Dfile.encoding=UTF-8"
-            -Dorg.gradle.project.kotlin.daemon.jvmargs=-Xmx4096M
-            -Dorg.gradle.workers.max=1 -Dorg.gradle.daemon=false
+      - name: Build the optimized iOS Release framework before starting Xcode
         run: |
           set -euo pipefail
           echo "Runner memory: $(sysctl -n hw.memsize) bytes"
           chmod +x gradlew
+          # Stream Native diagnostics directly and release its Gradle heap before Xcode starts.
+          # Xcode's embed task reuses this same framework through Gradle's up-to-date checks.
+          ./gradlew :composeApp:linkReleaseFrameworkIosArm64 \
+            --no-daemon --console=plain --stacktrace --max-workers=1
+      - name: Archive iOS and reuse the existing ad-hoc IPA packager
+        run: |
+          set -euo pipefail
           xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp \
             -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/VRCM.xcarchive" \

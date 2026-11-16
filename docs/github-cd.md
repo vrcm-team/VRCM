@@ -68,7 +68,7 @@ git push origin 1.2.0
 | macOS ARM | Compose release DMG | `VRCM-v<版本>.dmg` |
 | macOS Intel（14 GB 内存） | Xcode 无签名 archive、既有 ad-hoc IPA 脚本 | `VRCM-v<版本>.ipa` |
 
-iOS Release 的 Kotlin/Native 链接在 Gradle 进程内执行，使用 8 GB 堆，因此与仅有 7 GB 内存的 ARM runner 分开。`platform=apple` 同时构建 DMG 和 IPA，分别上传 `release-packages-macos`、`release-packages-ios`。Intel 只是 iOS 构建宿主，`iphoneos` 产物仍面向 iPhone ARM64；DMG 继续使用 ARM runner。
+iOS Release 的 Kotlin/Native 链接在 Gradle 进程内执行，使用 8 GB 堆，因此与仅有 7 GB 内存的 ARM runner 分开。先独立执行 `linkReleaseFrameworkIosArm64`，直接输出编译日志并在 Xcode 启动前释放该次 Gradle 进程的内存；Xcode 的嵌入任务通过 Gradle 的增量检查复用同一份 Framework。`platform=apple` 同时构建 DMG 和 IPA，分别上传 `release-packages-macos`、`release-packages-ios`。Intel 只是 iOS 构建宿主，`iphoneos` 产物仍面向 iPhone ARM64；DMG 继续使用 ARM runner。
 
 Android 仅发布 `github` flavor，不上传 Google Play AAB。macOS 安装包遵循 runner 的 CPU 架构；iOS IPA 沿用项目的侧载打包方式，不是 App Store 分发或开发者账号签名。Windows EXE 和 DMG 沿用现有打包配置，不新增代码签名或公证凭据。
 
