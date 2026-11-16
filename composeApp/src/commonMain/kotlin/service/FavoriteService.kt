@@ -12,9 +12,11 @@ import io.github.vrcmteam.vrcm.storage.FavoriteLocalDao
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.toCollection
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import org.koin.core.logger.Logger
 
 internal class FavoriteGroupCache {
     private val flows = FavoriteType.entries.associateWith {
@@ -117,6 +119,7 @@ internal data class FavoriteGroupUpdate(
 class FavoriteService(
     private val favoriteApi: FavoriteApi,
     private val favoriteLocalDao: FavoriteLocalDao,
+    private val logger: Logger? = null,
 ) {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -131,10 +134,28 @@ class FavoriteService(
     private var _favoriteLimits: FavoriteLimits? = null
 
     init {
-        serviceScope.launch {
-            SharedFlowCentre.currentSession.collect { session ->
+        serviceScope.launch(Dispatchers.IO) {
+            SharedFlowCentre.currentSession.collectLatest { session ->
                 cacheMutex.withLock {
                     synchronizeFavoritesOwnerLocked(session?.token)
+                    // 限制接口按账号加载，登出或切换账号后不能继续使用上一个账号的结果。
+                    _favoriteLimits = null
+                }
+                if (session == null) return@collectLatest
+                val limits = try {
+                    favoriteApi.getFavoriteLimits()
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    // 收藏限制只是界面上的能力提示，未登录、网络不可用或会话过期时使用默认值；
+                    // 不能让这个可选请求的 401 冒泡到应用启动协程。
+                    logger?.warn("Unable to refresh favorite limits: ${error.message.orEmpty()}")
+                    return@collectLatest
+                }
+                cacheMutex.withLock {
+                    if (SharedFlowCentre.isCurrentSession(session.token)) {
+                        _favoriteLimits = limits
+                    }
                 }
             }
         }
@@ -151,23 +172,8 @@ class FavoriteService(
         }
     }
 
-
     fun favoritesByGroup(favoriteType: FavoriteType): StateFlow<Map<FavoriteGroupData, List<FavoriteData>>> =
         favoritesByGroupCache.flow(favoriteType)
-
-
-    init {
-        serviceScope.launch(Dispatchers.IO) {
-            loadFavoriteLimits()
-        }
-    }
-
-    /**
-     * 加载收藏限制信息
-     */
-    private suspend fun loadFavoriteLimits() {
-        _favoriteLimits = favoriteApi.getFavoriteLimits()
-    }
 
     /**
      * 获取指定类型的收藏组最大数量

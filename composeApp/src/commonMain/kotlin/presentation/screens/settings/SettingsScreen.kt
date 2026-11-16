@@ -554,7 +554,7 @@ private fun PrivacyDataSections(platform: AppPlatform) {
                         isClearingCache = true
                         try {
                             diskCache?.clear()
-                            accountCacheManager.clearAll()
+                            accountCacheManager.clearAll(includeStatistics = false)
                             groupProfileCacheStore.clearAll()
                             worldProfileCacheStore.clearAll()
                             // 普通清缓存只删远端装饰副本；身份牌配置与相册照片保留。
@@ -567,6 +567,8 @@ private fun PrivacyDataSections(platform: AppPlatform) {
                     }
                 },
             )
+            SettingsRowDivider()
+            StatisticsTransferRows(enabled = !isClearingCache)
         }
         AppSectionFooter(strings.settingsCacheDescription)
     }

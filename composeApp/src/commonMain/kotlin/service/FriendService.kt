@@ -405,7 +405,8 @@ class FriendService(
         try {
             (offline?.run(friendsApi::friendsFlow) ?: friendsApi.allFriendsFlow())
                 .retry(1) {
-                    if (it is VRCApiException) authService.doReTryAuth() else false
+                    it is VRCApiException && it.code == HttpStatusCode.Unauthorized.value &&
+                        authService.doReTryAuth()
                 }
                 .catch { e ->
                     succeeded = false

@@ -54,7 +54,7 @@ class VrcmDatabaseMigrationTest {
             }
 
             BundledSQLiteDriver().open(databaseFile.absolutePathString()).use { connection ->
-                assertEquals(5L, connection.queryLong("PRAGMA user_version"))
+                assertEquals(6L, connection.queryLong("PRAGMA user_version"))
                 assertEquals(
                     mapOf(
                         "index_friend_activity_events_ownerUserId_friendUserId_occurredAtMillis" to

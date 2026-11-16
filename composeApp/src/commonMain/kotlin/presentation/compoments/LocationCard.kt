@@ -13,8 +13,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.network.api.attributes.BlueprintType
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
@@ -23,10 +25,15 @@ import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppSurface
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
+import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.navigation.rememberContainerTransformToken
+import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreen
+import io.github.vrcmteam.vrcm.presentation.screens.group.data.GroupProfileVo
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.HomeInstanceVo
+import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
+import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import androidx.compose.ui.graphics.Color
 
@@ -48,6 +55,20 @@ fun LocationCard(
     val sharedSuffixKey = rememberContainerTransformToken(
         "location:${location.location}:${instants.worldId}",
     ) ?: LocalSharedSuffixKey.current
+    val navigator = currentNavigator
+    val onClickOwner: (HomeInstanceVo.Owner) -> Unit = { owner ->
+        when (owner.type) {
+            BlueprintType.User -> navigator push UserProfileScreen(
+                userProfileVO = UserProfileVo(id = owner.id, displayName = owner.displayName),
+                sharedSuffixKey = sharedSuffixKey,
+            )
+            BlueprintType.Group -> navigator push GroupProfileScreen(
+                groupProfileVo = GroupProfileVo(groupId = owner.id, name = owner.displayName),
+                sharedSuffixKey = sharedSuffixKey,
+            )
+            else -> Unit
+        }
+    }
     AppSurface(
         modifier = modifier
             .fillMaxWidth(),
@@ -140,7 +161,13 @@ fun LocationCard(
                     Spacer(modifier = Modifier.weight(1f))
                     // 房间好友头像/房间持有者与房间人数比
                     // 没有好友在场（群组房间）时直接显示房主，不然这行是空的
-                    MemberInfoRow(isSelected || friendList.isEmpty(), friendList, instants, travelingIds)
+                    MemberInfoRow(
+                        showUser = isSelected || friendList.isEmpty(),
+                        friendList = friendList,
+                        instants = instants,
+                        travelingIds = travelingIds,
+                        onClickOwner = onClickOwner.takeIf { isSelected },
+                    )
                 }
             }
             AnimatedVisibility(isSelected) {
@@ -179,11 +206,12 @@ fun LocationCard(
  * 房间好友头像/房间持有者与房间人数比
  */
 @Composable
-private inline fun MemberInfoRow(
+private fun MemberInfoRow(
     showUser: Boolean,
     friendList: List<State<IUser>>,
     instants: HomeInstanceVo,
     travelingIds: Set<String> = emptySet(),
+    onClickOwner: ((HomeInstanceVo.Owner) -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier
@@ -239,12 +267,18 @@ private inline fun MemberInfoRow(
                     }
                 } else {
                     val owner = instants.owner ?: return@AnimatedContent
+                    val isOwnerClickable = onClickOwner != null &&
+                        (owner.type == BlueprintType.User || owner.type == BlueprintType.Group)
+                    val ownerColor = if (isOwnerClickable) AppTheme.colors.tint else AppTheme.colors.tertiaryLabel
                     Row(
                         modifier = Modifier.fillMaxHeight().background(
                             AppTheme.colors.fill,
                             AppShapes.m
                         )
                             .clip(AppShapes.m)
+                            .enableIf(isOwnerClickable) {
+                                clickable(role = Role.Button) { onClickOwner?.invoke(owner) }
+                            }
                             .padding(horizontal = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -252,7 +286,7 @@ private inline fun MemberInfoRow(
                             modifier = Modifier.size(16.dp),
                             imageVector = owner.iconVector,
                             contentDescription = "OwnerIcon",
-                            tint = AppTheme.colors.tertiaryLabel
+                            tint = ownerColor
                         )
                         Spacer(modifier = Modifier.width(2.dp))
                         AppText(
@@ -260,7 +294,7 @@ private inline fun MemberInfoRow(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             style = AppTheme.type.caption2Emphasized,
-                            color = AppTheme.colors.tertiaryLabel
+                            color = ownerColor
                         )
                     }
                 }

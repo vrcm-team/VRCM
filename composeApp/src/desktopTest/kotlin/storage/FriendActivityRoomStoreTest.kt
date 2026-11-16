@@ -5,6 +5,7 @@ import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import com.russhwolf.settings.MapSettings
 import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.AuthenticatedAccount
+import io.github.vrcmteam.vrcm.presentation.screens.activity.FriendActivityTimelineFilter
 import io.github.vrcmteam.vrcm.service.FriendActivityAccessType
 import io.github.vrcmteam.vrcm.service.FriendActivityBatch
 import io.github.vrcmteam.vrcm.service.FriendActivityEventType
@@ -43,6 +44,51 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class FriendActivityRoomStoreTest {
+    @Test
+    fun recordedNameAndAvatarChangesAppearInSeparateTimelineCategories() = runTest {
+        withStore { store ->
+            val session = AuthenticatedAccount(
+                account = AccountDto(userId = "usr_owner"),
+                token = AccountSessionToken("usr_owner", 1L),
+            )
+            val baseline = observation().copy(
+                displayName = "Original",
+                location = "offline",
+                status = "offline",
+                avatarImageUrl = "https://example.com/avatar-before.png",
+            )
+            val changed = baseline.copy(
+                displayName = "Renamed",
+                avatarImageUrl = "https://example.com/avatar-after.png",
+            )
+            trackFriendActivity(
+                session = session,
+                snapshots = flow {
+                    listOf(baseline, changed, changed.copy(profileImageUrl = "new-profile-icon"))
+                        .forEachIndexed { index, friend ->
+                            emit(FriendActivityInputSnapshot(
+                                token = session.token,
+                                friends = listOf(friend),
+                                selfLocation = null,
+                                observedAtMillis = (index + 1) * 1_000L,
+                            ))
+                        }
+                },
+                store = store,
+            )
+
+            val profile = store.observeAllEvents("usr_owner", FriendActivityTimelineFilter.Profile.eventTypes, 20).first()
+            assertEquals(listOf(FriendActivityEventType.DisplayNameChanged.name), profile.map { it.type })
+            assertEquals("Original", profile.single().previousValue)
+            assertEquals("Renamed", profile.single().currentValue)
+            val avatars = store.observeAllEvents("usr_owner", FriendActivityTimelineFilter.Avatar.eventTypes, 20).first()
+            assertEquals(listOf(FriendActivityEventType.AvatarChanged.name), avatars.map { it.type })
+            assertEquals(baseline.avatarImageUrl, avatars.single().previousValue)
+            assertEquals(changed.avatarImageUrl, avatars.single().currentValue)
+            assertEquals(2, store.observeEvents("usr_owner", baseline.userId).first().size)
+        }
+    }
+
     @Test
     fun filteredKeysetTimelineStaysCompleteAcrossDeepSameTimestampPagesAndHeadUpdates() = runTest {
         withStore { store ->
@@ -334,9 +380,11 @@ class FriendActivityRoomStoreTest {
                 nowMillis = 31_000L,
             )
 
-            store.discardIncompleteSessions("usr_owner")
+            store.finalizeIncompleteSessions("usr_owner")
 
-            assertEquals(emptyList(), store.sessions("usr_owner", observation.userId))
+            val recoveredSession = store.sessions("usr_owner", observation.userId).single()
+            assertEquals(31_000L, recoveredSession.endedAtMillis)
+            assertEquals(30_000L, recoveredSession.durationMillis)
             val summary = store.summary("usr_owner", observation.userId)
             assertEquals(0, summary?.meetingCount)
             assertEquals(30_000L, summary?.togetherDurationMillis)
@@ -880,7 +928,7 @@ class FriendActivityRoomStoreTest {
     }
 
     @Test
-    fun accountCacheClearAlsoRemovesRoomActivity() = runTest {
+    fun cacheClearPreservesStatisticsWhileRemovingAccountDeletesThem() = runTest {
         withStore { store ->
             val token = store.activateAccount("usr_owner")
             store.record(
@@ -900,6 +948,10 @@ class FriendActivityRoomStoreTest {
                 ),
             )
 
+            val before = store.statisticsSnapshot("usr_owner")
+            manager.clearAll(includeStatistics = false)
+            assertEquals(before, store.statisticsSnapshot("usr_owner"))
+            assertTrue(store.record(token, listOf(observation()), FriendActivityBatch(), 2_000L))
             manager.clearAccount("usr_owner")
 
             assertNull(store.summary("usr_owner", "usr_friend"))

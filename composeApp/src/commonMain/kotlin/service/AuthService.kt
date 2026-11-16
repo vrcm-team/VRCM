@@ -13,6 +13,7 @@ import io.github.vrcmteam.vrcm.network.api.auth.data.Presence
 import io.github.vrcmteam.vrcm.network.api.profile.ProfileAppearanceApi
 import io.github.vrcmteam.vrcm.network.api.profile.data.ProfileAppearanceData
 import io.github.vrcmteam.vrcm.network.api.users.data.UserData
+import io.github.vrcmteam.vrcm.network.api.users.data.CurrentUpdateUserData
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.network.websocket.data.content.UserContent
@@ -350,7 +351,10 @@ class AuthService(
         }
     }
 
-    suspend fun applyOwnProfileRefresh(user: UserData): CurrentUserData? =
+    suspend fun applyOwnProfileRefresh(
+        user: UserData,
+        publicProfile: ProfileAppearanceData? = null,
+    ): CurrentUserData? =
         homeWorldMutationGate.withLock {
             synchronized(currentUserLock) {
                 val existing = currentUser ?: return@synchronized null
@@ -394,10 +398,34 @@ class AuthService(
                         bannerType = user.bannerType ?: existing.bannerType,
                         bannerUrl = user.bannerUrl ?: existing.bannerUrl,
                         presence = updatedPresence,
-                    )
+                    ).let { merged -> publicProfile?.let(merged::mergePublicProfile) ?: merged }
                 )
             }
         }
+
+    /** Publishes accepted profile edits only to the account that made the request. */
+    internal suspend fun applyProfileUpdate(
+        sessionToken: AccountSessionToken,
+        profile: ProfileAppearanceData?,
+        user: CurrentUpdateUserData?,
+    ): CurrentUserData? = authMutex.withLock {
+        synchronized(currentUserLock) {
+            if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@synchronized null
+            val existing = currentUser?.takeIf { it.id == sessionToken.userId }
+                ?: return@synchronized null
+            if ((profile != null && profile.id != existing.id) || (user != null && user.id != existing.id)) {
+                return@synchronized null
+            }
+            val merged = profile?.let(existing::mergePublicProfile) ?: existing
+            publishCurrentUserLocked(
+                if (user == null) merged else merged.copy(
+                    status = user.status,
+                    statusDescription = user.statusDescription,
+                    pronouns = user.pronouns ?: merged.pronouns,
+                ),
+            )
+        }
+    }
 
     fun applySocketUserUpdate(user: UserContent) {
         synchronized(currentUserLock) {
@@ -539,14 +567,17 @@ class AuthService(
     }
 
     private suspend fun doReTryAuthLocked(expectedUserId: String? = null): Boolean {
-        val accountInfo = accountDao.currentAccountDtoOrNull() ?: return false
-        if (expectedUserId != null && accountInfo.userId != expectedUserId) return false
-        val password = accountInfo.password ?: return false
-        return loginLocked(accountInfo.username, password) is AuthState.Authed
+        val sessionToken = SharedFlowCentre.currentSession.value?.token ?: return false
+        if (expectedUserId != null && sessionToken.userId != expectedUserId) return false
+        return recoverExpiredSessionLocked(sessionToken)
     }
 
-    override suspend fun recoverExpiredSession(sessionToken: AccountSessionToken) = authMutex.withLock {
-        if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@withLock
+    override suspend fun recoverExpiredSession(sessionToken: AccountSessionToken) {
+        authMutex.withLock { recoverExpiredSessionLocked(sessionToken) }
+    }
+
+    private suspend fun recoverExpiredSessionLocked(sessionToken: AccountSessionToken): Boolean {
+        if (!SharedFlowCentre.isCurrentSession(sessionToken)) return false
 
         val account = accountDao.currentAccountDtoOrNull()
             ?.takeIf { it.userId == sessionToken.userId }
@@ -554,10 +585,10 @@ class AuthService(
         if (account == null || password == null) {
             clearAuthCookie(sessionToken.userId)
             invalidateCurrentSessionLocked()
-            return@withLock
+            return false
         }
 
-        // Pipeline rejected this cookie. Keep the two-factor cookie available for the
+        // The server rejected this cookie. Keep the two-factor cookie available for the
         // credential request, but do not send the rejected auth cookie again.
         val rejectedAuthCookie = cookiesStorage.cookieValue(AUTH_COOKIE)
         cookiesStorage.removeCookie(AUTH_COOKIE)
@@ -588,6 +619,7 @@ class AuthService(
             clearAuthCookie(account.userId)
             invalidateCurrentSessionLocked()
         }
+        return authState is AuthState.Authed
     }
 
     internal suspend fun <T> runSessionBoundCatching(
@@ -750,6 +782,9 @@ class AuthService(
 internal fun CurrentUserData.mergePublicProfile(profile: ProfileAppearanceData): CurrentUserData = copy(
     bio = profile.bio ?: bio,
     bioLinks = profile.bioLinks ?: bioLinks,
+    tags = profile.languages?.let { languages ->
+        tags.filterNot { it.startsWith("language_") } + languages.map { "language_$it" }
+    } ?: tags,
     displayName = profile.displayName?.takeIf(String::isNotBlank) ?: displayName,
     profileIconUrl = profile.iconUrl?.takeIf(String::isNotBlank) ?: profileIconUrl,
     userIcon = profile.iconUrl?.takeIf(String::isNotBlank) ?: userIcon,

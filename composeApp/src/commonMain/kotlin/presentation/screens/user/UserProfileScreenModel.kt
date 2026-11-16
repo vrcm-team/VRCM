@@ -28,6 +28,7 @@ import io.github.vrcmteam.vrcm.network.api.playermoderation.PlayerChatboxModerat
 import io.github.vrcmteam.vrcm.network.api.playermoderation.PlayerModerationApi
 import io.github.vrcmteam.vrcm.network.api.playermoderation.data.PlayerModerationType
 import io.github.vrcmteam.vrcm.network.api.profile.ProfileAppearanceApi
+import io.github.vrcmteam.vrcm.network.api.profile.data.UpdateProfileData
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 import io.github.vrcmteam.vrcm.network.api.users.data.mergeCurrentUserProfile
@@ -188,11 +189,11 @@ internal class UserProfileLoadCoordinator {
     }
 }
 
-/** State of the current social-link update request. */
-data class BioLinksUpdateState(
+/** Result and progress of the current profile edit, shared by all editable fields. */
+data class ProfileUpdateState(
     val isSaving: Boolean = false,
     val completedRequestId: Long = 0,
-    val savedLinks: List<String>? = null,
+    val savedProfile: UserProfileVo? = null,
 )
 
 /** UI projection of the current account's server-backed privacy setting. */
@@ -216,30 +217,30 @@ internal fun resolveBoopPrivacyUiState(
     )
 }
 
-internal class BioLinksUpdateStateMachine {
-    private val _state = MutableStateFlow(BioLinksUpdateState())
-    val state: StateFlow<BioLinksUpdateState> = _state.asStateFlow()
+internal class ProfileUpdateStateMachine {
+    private val _state = MutableStateFlow(ProfileUpdateState())
+    val state: StateFlow<ProfileUpdateState> = _state.asStateFlow()
 
     fun tryStart(): Boolean {
         val current = _state.value
         if (current.isSaving) return false
         return _state.compareAndSet(
             expect = current,
-            update = current.copy(isSaving = true, savedLinks = null),
+            update = current.copy(isSaving = true, savedProfile = null),
         )
     }
 
-    fun complete(savedLinks: List<String>) = finish(savedLinks)
+    fun complete(savedProfile: UserProfileVo) = finish(savedProfile)
 
-    fun fail() = finish(savedLinks = null)
+    fun fail() = finish(savedProfile = null)
 
-    private fun finish(savedLinks: List<String>?) {
+    private fun finish(savedProfile: UserProfileVo?) {
         val current = _state.value
         if (!current.isSaving) return
         _state.value = current.copy(
             isSaving = false,
             completedRequestId = current.completedRequestId + 1,
-            savedLinks = savedLinks,
+            savedProfile = savedProfile,
         )
     }
 }
@@ -726,9 +727,9 @@ class UserProfileScreenModel internal constructor(
     private var cachedUserData: UserData? = null
     private var createdWorldDetailRevisions = emptyMap<String, WorldDetailRevision>()
     private val profileCacheRestored = CompletableDeferred<Unit>()
-    private val bioLinksUpdateStateMachine = BioLinksUpdateStateMachine()
-    internal val bioLinksUpdateState: StateFlow<BioLinksUpdateState> =
-        bioLinksUpdateStateMachine.state
+    private val profileUpdateStateMachine = ProfileUpdateStateMachine()
+    internal val profileUpdateState: StateFlow<ProfileUpdateState> =
+        profileUpdateStateMachine.state
     internal val boopPrivacyState: StateFlow<BoopPrivacyUiState> = combine(
         authService.currentUserState,
         SharedFlowCentre.currentSession,
@@ -1035,7 +1036,7 @@ class UserProfileScreenModel internal constructor(
                             }.getOrNull()
                             val mergedUserData = user.mergePublicProfile(publicProfile)
                             val currentUser = if (mergedUserData.id == cacheOwnerUserId) {
-                                authService.applyOwnProfileRefresh(mergedUserData)
+                                authService.applyOwnProfileRefresh(mergedUserData, publicProfile)
                             } else {
                                 null
                             }
@@ -1172,39 +1173,6 @@ class UserProfileScreenModel internal constructor(
         SharedFlowCentre.toastText.emit(ToastText.Error(message))
     }
 
-    fun updateBioLinks(
-        bioLinks: List<String>,
-        successMessage: String,
-    ) {
-        if (!bioLinksUpdateStateMachine.tryStart()) return
-        val targetUserId = userState.id
-        val linksToSave = bioLinks.take(MAX_PROFILE_BIO_LINKS)
-
-        viewModelScope.launch(Dispatchers.IO) {
-            authService.reTryAuthCatching {
-                usersApi.updateUserInfo(
-                    userId = targetUserId,
-                    updateUserInfoData = UpdateUserInfoData(bioLinks = linksToSave),
-                )
-            }.mapCatching { updatedUser ->
-                check(updatedUser.id == targetUserId) {
-                    "Profile update returned a different user"
-                }
-                updatedUser
-            }.onSuccess { updatedUser ->
-                if (_userState.value.id == targetUserId) {
-                    _userState.value = _userState.value.copy(bioLinks = updatedUser.bioLinks)
-                }
-                bioLinksUpdateStateMachine.complete(updatedUser.bioLinks)
-                SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
-                refreshUser(targetUserId, forceRefresh = true)
-            }.onFailure { error ->
-                bioLinksUpdateStateMachine.fail()
-                handleError(error)
-            }
-        }
-    }
-
     fun updateBoopPrivacy(
         isEnabled: Boolean,
         successMessage: String,
@@ -1326,57 +1294,78 @@ class UserProfileScreenModel internal constructor(
 
     fun updateUserProfile(
         bio: String? = null,
+        bioLinks: List<String>? = null,
         status: UserStatus? = null,
         statusDescription: String? = null,
         pronouns: String? = null,
         languages: List<String>? = null,
-        successMessage: String = "Profile updated",
+        successMessage: String,
+        failureMessage: String,
     ) {
+        val sessionToken = currentProfileSessionToken()
+            ?.takeIf { it.userId == userState.id } ?: return
+        if (bio == null && bioLinks == null && languages == null &&
+            status == null && statusDescription == null && pronouns == null
+        ) return
+        if (!profileUpdateStateMachine.tryStart()) return
+
         viewModelScope.launch(Dispatchers.IO) {
-            // 更新基本信息
-            authService.reTryAuthCatching {
-                usersApi.updateUserInfo(
-                    userId = userState.id,
-                    updateUserInfoData = UpdateUserInfoData(
-                        bio = bio,
-                        status = status,
-                        statusDescription = statusDescription,
-                        pronouns = pronouns,
-                    )
-                )
-            }.onFailure {
-                handleError(it)
-                return@launch
-            }
-
-            // 更新语言 tags
-            if (languages != null) {
-                val currentLangs = userState.tags
-                    .filter { it.startsWith("language_") }
-                    .map { it.removePrefix("language_") }
-                val toAdd = languages.filter { it !in currentLangs }
-                val toRemove = currentLangs.filter { it !in languages }
-
-                if (toAdd.isNotEmpty()) {
-                    authService.reTryAuthCatching {
-                        usersApi.addTags(userState.id, toAdd.map { "language_$it" })
-                    }.onFailure {
-                        handleError(it)
-                        return@launch
-                    }
+            var completed = false
+            try {
+                val response = authService.runSessionBoundCatching(sessionToken) {
+                    val profile = if (bio != null || bioLinks != null || languages != null) {
+                        profileAppearanceApi.update(
+                            userId = sessionToken.userId,
+                            data = UpdateProfileData(
+                                bio = bio,
+                                bioLinks = bioLinks?.take(MAX_PROFILE_BIO_LINKS),
+                                languages = languages,
+                            ),
+                        )
+                    } else null
+                    val user = if (status != null || statusDescription != null || pronouns != null) {
+                        usersApi.updateUserInfo(
+                            userId = sessionToken.userId,
+                            updateUserInfoData = UpdateUserInfoData(
+                                status = status,
+                                statusDescription = statusDescription,
+                                pronouns = pronouns,
+                            ),
+                        ).also { updated ->
+                            check(updated.id == sessionToken.userId) {
+                                "Profile update returned a different user"
+                            }
+                            check(status == null || updated.status == status) {
+                                "Profile update did not apply the requested status"
+                            }
+                            check(statusDescription == null || updated.statusDescription == statusDescription) {
+                                "Profile update did not apply the requested status description"
+                            }
+                            check(pronouns == null || updated.pronouns == pronouns) {
+                                "Profile update did not apply the requested pronouns"
+                            }
+                        }
+                    } else null
+                    profile to user
+                } ?: return@launch
+                if (!SharedFlowCentre.isCurrentSession(response.sessionToken)) return@launch
+                val result = response.result
+                result.exceptionOrNull()?.let { error ->
+                    handleActionError(error, failureMessage)
+                    return@launch
                 }
-                if (toRemove.isNotEmpty()) {
-                    authService.reTryAuthCatching {
-                        usersApi.removeTags(userState.id, toRemove.map { "language_$it" })
-                    }.onFailure {
-                        handleError(it)
-                        return@launch
-                    }
-                }
+                val (profile, user) = result.getOrThrow()
+                val currentUser = authService.applyProfileUpdate(response.sessionToken, profile, user)
+                    ?: return@launch
+                val savedProfile = UserProfileVo(currentUser).withSelfIdentity()
+                _userState.value = savedProfile
+                completed = true
+                profileUpdateStateMachine.complete(savedProfile)
+                SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
+                refreshUser(sessionToken.userId, forceRefresh = true)
+            } finally {
+                if (!completed) profileUpdateStateMachine.fail()
             }
-
-            SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
-            refreshUser(userState.id, forceRefresh = true)
         }
     }
 

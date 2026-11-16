@@ -1,15 +1,16 @@
 package io.github.vrcmteam.vrcm.presentation.screens.user
 
+import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-class BioLinksUpdateStateMachineTest {
+class ProfileUpdateStateMachineTest {
     @Test
     fun duplicateStartIsRejectedAndFailureAllowsRetry() {
-        val stateMachine = BioLinksUpdateStateMachine()
+        val stateMachine = ProfileUpdateStateMachine()
 
         assertTrue(stateMachine.tryStart())
         assertFalse(stateMachine.tryStart())
@@ -19,20 +20,20 @@ class BioLinksUpdateStateMachineTest {
 
         assertFalse(stateMachine.state.value.isSaving)
         assertEquals(1, stateMachine.state.value.completedRequestId)
-        assertNull(stateMachine.state.value.savedLinks)
+        assertNull(stateMachine.state.value.savedProfile)
         assertTrue(stateMachine.tryStart())
     }
 
     @Test
-    fun completionPublishesTheServerAcceptedLinks() {
-        val stateMachine = BioLinksUpdateStateMachine()
-        val serverLinks = listOf("https://example.com/normalized")
+    fun completionPublishesTheServerAcceptedProfile() {
+        val stateMachine = ProfileUpdateStateMachine()
+        val savedProfile = UserProfileVo(id = "usr_self", bio = "Saved", bioLinks = listOf("https://example.com/normalized"))
 
         assertTrue(stateMachine.tryStart())
-        stateMachine.complete(serverLinks)
+        stateMachine.complete(savedProfile)
 
         assertFalse(stateMachine.state.value.isSaving)
         assertEquals(1, stateMachine.state.value.completedRequestId)
-        assertEquals(serverLinks, stateMachine.state.value.savedLinks)
+        assertEquals(savedProfile, stateMachine.state.value.savedProfile)
     }
 }

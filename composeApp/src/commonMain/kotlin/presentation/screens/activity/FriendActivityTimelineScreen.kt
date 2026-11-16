@@ -423,6 +423,7 @@ internal fun FriendActivityTimelineFilter.label(): String = when (this) {
     FriendActivityTimelineFilter.Presence -> strings.friendActivityFilterPresence
     FriendActivityTimelineFilter.Location -> strings.friendActivityFilterLocation
     FriendActivityTimelineFilter.Profile -> strings.friendActivityFilterProfile
+    FriendActivityTimelineFilter.Avatar -> strings.friendActivityFilterAvatar
     FriendActivityTimelineFilter.Meetup -> strings.friendActivityFilterMeetup
 }
 

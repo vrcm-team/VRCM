@@ -12,6 +12,7 @@ data class ProfileAppearanceData(
     /** Public profile fields returned by the same endpoint. */
     val bio: String? = null,
     val bioLinks: List<String>? = null,
+    val languages: List<String>? = null,
     val displayName: String? = null,
     val iconUrl: String? = null,
     val pronouns: String? = null,

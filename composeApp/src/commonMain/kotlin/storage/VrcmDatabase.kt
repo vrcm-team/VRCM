@@ -15,14 +15,16 @@ import androidx.room.RoomDatabaseConstructor
         FriendActivityEventEntity::class,
         FriendActivitySessionEntity::class,
         CachedBlobEntity::class,
+        ImportedStatisticsRowEntity::class,
     ],
-    version = 5,
+    version = 6,
     autoMigrations = [
         AutoMigration(from = 1, to = 2),
         AutoMigration(from = 2, to = 3),
         // 3 引入过 user_profile_caches 专表，4 统一到 cached_blobs，专表删除。
         AutoMigration(from = 3, to = 4, spec = DropUserProfileCacheTable::class),
         AutoMigration(from = 4, to = 5),
+        AutoMigration(from = 5, to = 6),
     ],
     exportSchema = true,
 )
