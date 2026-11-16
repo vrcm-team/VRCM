@@ -255,16 +255,44 @@ jobs:
           [[ "$count" == 1 ]] || { echo 'Expected exactly one DMG.'; exit 1; }
           mkdir -p artifacts
           find composeApp/build/compose/binaries/main-release -type f -name '*.dmg' -exec cp {} "artifacts/VRCM-v$VERSION.dmg" \;
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-packages-macos
+          path: artifacts/*.dmg
+          if-no-files-found: error
+          retention-days: 7
+
+  ios:
+    if: ${{ !inputs.platform || inputs.platform == 'all' || inputs.platform == 'apple' }}
+    needs: prepare
+    # The standard Intel runner has 14 GB RAM; the ARM runner has only 7 GB.
+    # iphoneos still targets ARM64, independently of the host architecture.
+    runs-on: macos-15-intel
+    timeout-minutes: 120
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v6
       - name: Archive iOS and reuse the existing ad-hoc IPA packager
         env:
           # Kotlin/Native runs inside Gradle, so its Release optimizer needs a larger Gradle heap.
           # kotlin.daemon.jvmargs only controls the separate JVM compiler, not the Native linker.
           GRADLE_OPTS: >-
-            -Dorg.gradle.jvmargs="-Xmx6144M -Dfile.encoding=UTF-8"
+            -Dorg.gradle.jvmargs="-Xmx8192M -Dfile.encoding=UTF-8"
             -Dorg.gradle.project.kotlin.daemon.jvmargs=-Xmx4096M
             -Dorg.gradle.workers.max=1 -Dorg.gradle.daemon=false
         run: |
           set -euo pipefail
+          echo "Runner memory: $(sysctl -n hw.memsize) bytes"
+          chmod +x gradlew
           xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp \
             -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/VRCM.xcarchive" \
@@ -272,16 +300,14 @@ jobs:
           bash iosApp/package-ipa.sh "$RUNNER_TEMP/VRCM.xcarchive" "$GITHUB_WORKSPACE/artifacts/VRCM-v$VERSION.ipa"
       - uses: actions/upload-artifact@v7
         with:
-          name: release-packages-apple
-          path: |
-            artifacts/*.dmg
-            artifacts/*.ipa
+          name: release-packages-ios
+          path: artifacts/*.ipa
           if-no-files-found: error
           retention-days: 7
 
   publish:
     if: ${{ (github.event_name == 'push' || inputs.tag != '') && (!inputs.platform || inputs.platform == 'all') }}
-    needs: [prepare, android, windows, apple]
+    needs: [prepare, android, windows, apple, ios]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
