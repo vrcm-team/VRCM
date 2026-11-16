@@ -28,19 +28,27 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
-import kotlinx.coroutines.yield
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okio.Path.Companion.toPath
 import okio.fakefilesystem.FakeFileSystem
 import org.koin.core.logger.EmptyLogger
+import kotlin.coroutines.CoroutineContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -414,11 +422,26 @@ class PlayerVoiceModerationControllerTest {
 
     @Test
     fun unauthorizedPairedUpdateRetriesTransitionAndCommitsRenewedToken() = runTest {
+        val delegate = StandardTestDispatcher(testScheduler)
+        var pausedObserver: Job? = null
+        val queuedObserverTasks = mutableListOf<Runnable>()
+        val dispatcher = object : CoroutineDispatcher() {
+            override fun dispatch(context: CoroutineContext, block: Runnable) {
+                if (context[Job] === pausedObserver) queuedObserverTasks += block
+                else delegate.dispatch(context, block)
+            }
+        }
+        fun resumeObserver() {
+            pausedObserver = null
+            val tasks = queuedObserverTasks.toList()
+            queuedObserverTasks.clear()
+            tasks.forEach(Runnable::run)
+        }
         var playerModerationGets = 0
         var removals = 0
         var creations = 0
         var authUserGets = 0
-        val fixture = fixture(this) { request ->
+        val fixture = fixture(this, dispatcher) { request ->
             when (request.url.encodedPath) {
                 "/api/1/auth/user/playermoderations" -> when (request.method) {
                     HttpMethod.Get -> {
@@ -449,6 +472,9 @@ class PlayerVoiceModerationControllerTest {
 
         try {
             awaitReady(fixture.controller) { it.isMuted }
+            runCurrent()
+            // Deliver the renewal notification after the successful mutation has been committed.
+            pausedObserver = fixture.controllerJob.children.single()
             val initialToken = SharedFlowCentre.currentSession.value!!.token
             val successes = mutableListOf<Boolean>()
             var failures = 0
@@ -457,8 +483,11 @@ class PlayerVoiceModerationControllerTest {
             val ready = awaitReady(fixture.controller) {
                 !it.isMuted && it.sessionToken != initialToken
             }
+            resumeObserver()
+            runCurrent()
 
             assertEquals(SharedFlowCentre.currentSession.value!!.token, ready.sessionToken)
+            assertFalse(assertIs<PlayerVoiceModerationState.Ready>(fixture.controller.state.value).isMuted)
             assertEquals(listOf(false), successes)
             assertEquals(0, failures)
             assertEquals(1, playerModerationGets)
@@ -466,29 +495,25 @@ class PlayerVoiceModerationControllerTest {
             assertEquals(2, creations)
             assertEquals(2, authUserGets)
         } finally {
+            resumeObserver()
             fixture.close()
         }
     }
 
-    private suspend fun TestScope.awaitReady(
+    private suspend fun awaitReady(
         controller: PlayerVoiceModerationController,
         predicate: (PlayerVoiceModerationState.Ready) -> Boolean,
-    ): PlayerVoiceModerationState.Ready = withTimeout(3_000) {
-        while (true) {
-            runCurrent()
-            val ready = controller.state.value as? PlayerVoiceModerationState.Ready
-            if (ready != null && predicate(ready)) return@withTimeout ready
-            yield()
+    ): PlayerVoiceModerationState.Ready = withContext(Dispatchers.Default) {
+        withTimeout(3_000) {
+            controller.state.filterIsInstance<PlayerVoiceModerationState.Ready>().first(predicate)
         }
-        error("Unreachable")
     }
 
-    private suspend fun TestScope.awaitUnavailable(
+    private suspend fun awaitUnavailable(
         controller: PlayerVoiceModerationController,
-    ) = withTimeout(3_000) {
-        while (controller.state.value !is PlayerVoiceModerationState.Unavailable) {
-            runCurrent()
-            yield()
+    ) = withContext(Dispatchers.Default) {
+        withTimeout(3_000) {
+            controller.state.first { it is PlayerVoiceModerationState.Unavailable }
         }
     }
 
@@ -499,21 +524,26 @@ class PlayerVoiceModerationControllerTest {
         val controllerJob: Job,
     ) {
         suspend fun close() {
+            controllerJob.cancelAndJoin()
             SharedFlowCentre.emitLogout()
-            controllerJob.cancel()
             client.close()
         }
     }
 
     private suspend fun fixture(
-        scope: CoroutineScope,
+        scope: TestScope,
+        dispatcher: CoroutineDispatcher = StandardTestDispatcher(scope.testScheduler),
         handler: MockRequestHandler,
     ): Fixture {
         SharedFlowCentre.emitLogout()
         val account = fixtureAccount()
         val cookies = PersistentCookiesStorage(EmptyLogger())
         val client = HttpClient(MockEngine) {
-            engine { addHandler(handler) }
+            engine {
+                // Keep mock requests on the test scheduler so renewal ordering is controlled.
+                this.dispatcher = UnconfinedTestDispatcher(scope.testScheduler)
+                addHandler(handler)
+            }
             defaultRequest { url("https://api.vrchat.cloud/api/1/") }
             install(ContentNegotiation) {
                 json(Json { ignoreUnknownKeys = true })
@@ -541,7 +571,7 @@ class PlayerVoiceModerationControllerTest {
         SharedFlowCentre.emitAuthenticated(account)
         val controllerJob = SupervisorJob()
         val controllerScope = CoroutineScope(
-            scope.coroutineContext.minusKey(Job) + controllerJob,
+            scope.coroutineContext.minusKey(Job) + controllerJob + dispatcher,
         )
         return Fixture(
             account = account,

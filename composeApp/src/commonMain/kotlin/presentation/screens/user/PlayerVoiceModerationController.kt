@@ -76,6 +76,13 @@ internal class PlayerVoiceModerationController(
                 val nextToken = session?.token
                 if (nextToken != observedToken) {
                     observedToken = nextToken
+                    // A successful response can adopt the renewed session before this observer runs.
+                    val ready = _state.value as? PlayerVoiceModerationState.Ready
+                    if (ready != null && ready.sessionToken == nextToken &&
+                        ready.targetUserId == targetUserId.value
+                    ) {
+                        return@collect
+                    }
                     requestRefresh()
                 }
             }
