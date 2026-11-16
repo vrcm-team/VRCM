@@ -1,5 +1,5 @@
 #define AppName "VRCM"
-#define AppVersion "1.1.4"
+#define AppVersion "1.1.5"
 #define SourceDir "..\composeApp\build\compose\binaries\main-release\app\VRCM"
 
 [Setup]
