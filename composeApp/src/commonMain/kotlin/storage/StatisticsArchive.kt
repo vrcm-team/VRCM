@@ -6,6 +6,7 @@ import androidx.sqlite.execSQL
 import io.github.vrcmteam.vrcm.service.FriendActivityEventType
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import okio.Buffer
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
@@ -54,11 +55,11 @@ internal class StatisticsArchive(private val driver: SQLiteDriver) {
                 }
             }
             val native = if ("vrcm_statistics" in names) {
-                db.prepare("SELECT version, payload FROM vrcm_statistics WHERE owner_user_id = ?").use { query ->
+                db.prepare("SELECT version, length(CAST(payload AS BLOB)) FROM vrcm_statistics WHERE owner_user_id = ?").use { query ->
                     query.bindText(1, ownerUserId)
                     if (!query.step()) null else {
                         if (query.getLong(0) != 1L) fail(StatisticsTransferFailure.UnsupportedVersion)
-                        json.decodeFromString<StatisticsSnapshot>(query.getText(1)).also(::validate)
+                        json.decodeFromString<StatisticsSnapshot>(db.readNativePayload(ownerUserId, query.getLong(1))).also(::validate)
                     }
                 }
             } else null
@@ -92,6 +93,26 @@ internal class StatisticsArchive(private val driver: SQLiteDriver) {
             if (result.isEmpty) fail(StatisticsTransferFailure.Empty)
             result
         }
+    }
+
+    private fun SQLiteConnection.readNativePayload(ownerUserId: String, byteCount: Long): String {
+        val payload = Buffer()
+        // Android 的 CursorWindow 容纳不了完整的大快照；按字节读取，合并后再解码 UTF-8。
+        prepare("SELECT substr(CAST(payload AS BLOB), ?, ?) FROM vrcm_statistics WHERE owner_user_id = ?").use { query ->
+            var offset = 0L
+            while (offset < byteCount) {
+                query.bindLong(1, offset + 1L)
+                query.bindLong(2, minOf(NATIVE_PAYLOAD_CHUNK_BYTES, byteCount - offset))
+                query.bindText(3, ownerUserId)
+                if (!query.step() || query.isNull(0)) fail(StatisticsTransferFailure.InvalidFile)
+                val chunk = query.getBlob(0)
+                if (chunk.isEmpty()) fail(StatisticsTransferFailure.InvalidFile)
+                payload.write(chunk)
+                offset += chunk.size
+                query.reset()
+            }
+        }
+        return payload.readUtf8()
     }
 
     private fun rowsForExport(snapshot: StatisticsSnapshot): Map<String, List<Map<String, String?>>> {
@@ -337,6 +358,9 @@ private fun userPrefix(owner: String): String {
     if (!Regex("usr_[A-Za-z0-9_-]+").matches(owner)) throw StatisticsTransferException(StatisticsTransferFailure.InvalidFile)
     return owner.replace("-", "").replace("_", "")
 }
+
+// 每次查询返回至多 256 KiB，给系统默认约 2 MiB 的 CursorWindow 留出空间。
+private const val NATIVE_PAYLOAD_CHUNK_BYTES = 256L * 1024L
 
 // 与 VRCX src/services/database/index.js 的列序一致，DBMerger 依赖此顺序。
 private val TABLES = listOf(
