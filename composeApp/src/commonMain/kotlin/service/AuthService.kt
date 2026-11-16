@@ -107,6 +107,35 @@ class AuthService(
 
     fun accountDtoOrNull(): AccountDto? = accountDao.currentAccountDtoOrNull()
 
+    /** 停止旧会话但保留各账号凭据；已保存账号优先用 Cookie 快捷登录。 */
+    suspend fun beginAccountLogin(userId: String? = null): AuthState? = authMutex.withLock {
+        val account = userId?.let { id ->
+            requireNotNull(accountDao.accountDtoList().firstOrNull { it.userId == id }) {
+                "Saved account is unavailable"
+            }
+        }
+        invalidateCurrentSessionLocked()
+        cookiesStorage.removeCookie(AUTH_COOKIE)
+        cookiesStorage.removeCookie(TWO_FACTOR_AUTH_COOKIE)
+        currentAccountDto = account ?: AccountDto()
+        if (account == null) return@withLock null
+
+        if (!account.authCookie.isNullOrBlank()) {
+            applyAuthCookie(account.username)
+            val response = authApi.userRes()
+            when (response.status) {
+                HttpStatusCode.OK -> {
+                    emitAuthed(account.password, response, expectedUserId = account.userId).getOrThrow()
+                    return@withLock AuthState.Authed
+                }
+                HttpStatusCode.Unauthorized -> clearAuthCookie(account.userId)
+                else -> response.checkSuccess<CurrentUserData>().let { error("Unexpected response: $it") }
+            }
+        }
+        val password = account.password?.takeIf(String::isNotEmpty) ?: return@withLock null
+        loginLocked(account.username, password, expectedUserId = account.userId)
+    }
+
     suspend fun restoreAuth(): AuthState? = authMutex.withLock {
         restoreAuthLocked()
     }
@@ -421,9 +450,13 @@ class AuthService(
     private suspend fun emitAuthed(
         password: String? = null,
         response: HttpResponse? = null,
+        expectedUserId: String? = null,
     ): Result<Unit> = runCatching {
         (response ?: authApi.userRes()).let {
             val userData = enrichCurrentUser(it.checkSuccess<CurrentUserData>())
+            require(expectedUserId == null || userData.id == expectedUserId) {
+                "Authenticated account does not match the selected account"
+            }
             val accountDto = AccountDto(
                 userId = userData.id,
                 username = userData.username,
@@ -456,6 +489,7 @@ class AuthService(
         password: String,
         restoreStoredCookies: Boolean = true,
         invalidateOnIncompleteAuth: Boolean = true,
+        expectedUserId: String? = null,
     ): AuthState {
         val activeUserId = SharedFlowCentre.currentSession.value?.account?.userId
         val targetUserId = accountDao.accountDtoByUserName(username)?.userId
@@ -464,7 +498,7 @@ class AuthService(
         return try {
             authApi.login(username, password).also {
                 if (it is AuthState.Authed) {
-                    emitAuthed(password).getOrThrow()
+                    emitAuthed(password, expectedUserId = expectedUserId).getOrThrow()
                 } else if (invalidateOnIncompleteAuth) {
                     invalidateCurrentSessionLocked()
                 }

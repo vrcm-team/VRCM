@@ -34,85 +34,99 @@ import kotlinx.serialization.Serializable
 object AuthScreen : AppRoute {
     @Composable
     override fun Content() {
-        val currentNavigator = currentNavigator
-        val authScreenModel: AuthScreenModel = koinViewModel()
-        var showAccountMenu by remember { mutableStateOf(false) }
-        LaunchedEffect(Unit) {
-            authScreenModel.tryAuth()
-        }
-        val authUIState = authScreenModel.uiState
-        BoxWithConstraints(
-            contentAlignment = Alignment.Center,
+        AuthContent()
+    }
+}
+
+/** 独立登录入口不恢复上一个账号，确保添加账号和二次验证能延续同一次登录操作。 */
+@Serializable
+data class AccountLoginScreen(val userId: String? = null) : AppRoute {
+    @Composable
+    override fun Content() {
+        AuthContent(accountLogin = true, accountUserId = userId)
+    }
+}
+
+@Composable
+private fun AuthContent(accountLogin: Boolean = false, accountUserId: String? = null) {
+    val currentNavigator = currentNavigator
+    val authScreenModel: AuthScreenModel = koinViewModel()
+    var showAccountMenu by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (accountLogin) authScreenModel.beginAccountLogin(accountUserId) else authScreenModel.tryAuth()
+    }
+    val authUIState = authScreenModel.uiState
+    BoxWithConstraints(
+        contentAlignment = Alignment.Center,
+    ) {
+        AuthFold(
+            authUIState = authUIState,
+            clickIcon = if (authUIState.cardState == AuthCardPage.Login && !authUIState.btnIsLoading)
+                { { showAccountMenu = true }} else  null
+            ,
+            iconYOffset = maxHeight.times(-0.2f),
+            cardHeightDp = maxHeight.times(0.42f),
         ) {
-            AuthFold(
-                authUIState = authUIState,
-                clickIcon = if (authUIState.cardState == AuthCardPage.Login && !authUIState.btnIsLoading)
-                    { { showAccountMenu = true }} else  null
-                ,
-                iconYOffset = maxHeight.times(-0.2f),
-                cardHeightDp = maxHeight.times(0.42f),
-            ) {
-                AuthCard(
-                    cardState = authUIState.cardState,
-                ) { state ->
-                    when (state) {
-                        AuthCardPage.Loading -> {
-                            Box(modifier = Modifier.fillMaxSize()) {
-                                AppActivityIndicator(
-                                    modifier = Modifier
-                                        .size(60.dp)
-                                        .align(Alignment.Center),
-                                    color = AppTheme.colors.tint
-                                )
-                            }
+            AuthCard(
+                cardState = authUIState.cardState,
+            ) { state ->
+                when (state) {
+                    AuthCardPage.Loading -> {
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            AppActivityIndicator(
+                                modifier = Modifier
+                                    .size(60.dp)
+                                    .align(Alignment.Center),
+                                color = AppTheme.colors.tint
+                            )
                         }
+                    }
 
-                        AuthCardPage.Login -> {
-                            NavCard(strings.authLoginTitle) {
-                                LoginCardInput(
-                                    uiState = authUIState,
-                                    onUsernameChange = authScreenModel::onUsernameChange,
-                                    onPasswordChange = authScreenModel::onPasswordChange,
-                                    onClick = authScreenModel::login
-                                )
-                            }
+                    AuthCardPage.Login -> {
+                        NavCard(strings.authLoginTitle) {
+                            LoginCardInput(
+                                uiState = authUIState,
+                                onUsernameChange = authScreenModel::onUsernameChange,
+                                onPasswordChange = authScreenModel::onPasswordChange,
+                                onClick = authScreenModel::login
+                            )
                         }
+                    }
 
-                        AuthCardPage.EmailCode, AuthCardPage.TFACode, AuthCardPage.TTFACode -> {
-                            NavCard(strings.authVerifyTitle, barContent = {
-                                ReturnIcon {
-                                    authScreenModel.cancelJob()
-                                    authScreenModel.returnToLogin()
-                                }
-                            }) {
-                                VerifyCardInput(
-                                    uiState = authUIState,
-                                    onVerifyCodeChange = authScreenModel::onVerifyCodeChange,
-                                    onSwitchTwoFactorMethod = authScreenModel::switchTwoFactorMethod,
-                                    onClick = authScreenModel::verify
-                                )
+                    AuthCardPage.EmailCode, AuthCardPage.TFACode, AuthCardPage.TTFACode -> {
+                        NavCard(strings.authVerifyTitle, barContent = {
+                            ReturnIcon {
+                                authScreenModel.cancelJob()
+                                authScreenModel.returnToLogin()
                             }
+                        }) {
+                            VerifyCardInput(
+                                uiState = authUIState,
+                                onVerifyCodeChange = authScreenModel::onVerifyCodeChange,
+                                onSwitchTwoFactorMethod = authScreenModel::switchTwoFactorMethod,
+                                onClick = authScreenModel::verify
+                            )
                         }
+                    }
 
-                        AuthCardPage.Authed -> {
-                            LaunchedEffect(Unit) {
-                                currentNavigator replace AuthAnimeScreen(true)
-                            }
-                            Box(modifier = Modifier.fillMaxSize())
+                    AuthCardPage.Authed -> {
+                        LaunchedEffect(Unit) {
+                            currentNavigator replace AuthAnimeScreen(true)
                         }
+                        Box(modifier = Modifier.fillMaxSize())
                     }
                 }
             }
         }
-        AccountBottomSheet(
-            showAccountMenu = showAccountMenu,
-            onDismissRequest = { showAccountMenu = false },
-            findAccountList = authScreenModel::accountDtoList,
-            onAccountChange = authScreenModel::onAccountChange,
-            removeAccount = authScreenModel::removeAccount,
-            authUIState = authUIState
-        )
     }
+    AccountBottomSheet(
+        showAccountMenu = showAccountMenu,
+        onDismissRequest = { showAccountMenu = false },
+        findAccountList = authScreenModel::accountDtoList,
+        onAccountChange = authScreenModel::onAccountChange,
+        removeAccount = authScreenModel::removeAccount,
+        authUIState = authUIState
+    )
 }
 
 @Composable

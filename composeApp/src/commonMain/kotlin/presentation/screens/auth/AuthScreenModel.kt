@@ -115,6 +115,26 @@ class AuthScreenModel(
         }
     }
 
+    fun beginAccountLogin(userId: String?) {
+        val account = authService.accountDtoList().firstOrNull { it.userId == userId }
+        _uiState.value = AuthUIState(
+            userId = account?.userId.orEmpty(),
+            iconUrl = account?.iconUrl,
+            username = account?.username.orEmpty(),
+            password = account?.password.orEmpty(),
+        )
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                onCardStateChange(authService.beginAccountLogin(userId).toCardPage())
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Exception) {
+                onCardStateChange(AuthCardPage.Login)
+                Result.failure<Unit>(error).onAuthFailure()
+            }
+        }
+    }
+
     fun returnToLogin() {
         viewModelScope.launch {
             authService.logout()

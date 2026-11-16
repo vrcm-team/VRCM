@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -91,6 +92,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.dialog.LogoutConfirmati
 import io.github.vrcmteam.vrcm.presentation.settings.LocalResolvedDarkTheme
 import io.github.vrcmteam.vrcm.presentation.settings.LocalSettingsState
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LanguageTag
+import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.settings.rememberNotificationPermissionRequester
 import io.github.vrcmteam.vrcm.presentation.settings.theme.ThemeColor
@@ -106,75 +108,137 @@ import io.github.vrcmteam.vrcm.storage.GroupProfileCacheStore
 import io.github.vrcmteam.vrcm.storage.WorldProfileCacheStore
 import io.github.vrcmteam.vrcm.storage.meetup.DecorationTemplateCacheDao
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardAssetStore
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
 import presentation.compoments.UpdateDialog
 import presentation.screens.auth.data.VersionVo
 
-/**
- * 设置页：外观（语言 / 主题模式 / 主题色）、通知、剪贴板、缓存与版本、退出登录。
- *
- * 通知相关的分节只在支持好友动态通知的平台（Android）显示。
- */
+/** 设置首页只展示分类入口，具体设置保留在各自的详情页。 */
 @Serializable
 object SettingsScreen : AppDetailRoute {
-
     @Composable
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
         val platform = koinInject<AppPlatform>()
-        var currentSettings by LocalSettingsState.current
+        val authService = koinInject<AuthService>()
+        val currentUser by authService.currentUserState.collectAsState()
+        SettingsPage(strings.drawerSettings) {
+            SettingsGroup {
+                SettingsCategoryRow(
+                    title = strings.settingsAccountSecurity,
+                    description = currentUser?.displayName?.takeIf(String::isNotBlank)
+                        ?: strings.settingsAccountSummary,
+                    icon = AppIcons.AccountCircle,
+                ) { navigator push SettingsCategoryScreen(SettingsCategory.AccountSecurity) }
+            }
+            SettingsGroup(title = strings.settingsPreferences) {
+                SettingsCategoryRow(strings.settingsAppearance, strings.settingsAppearanceSummary, AppIcons.Settings) {
+                    navigator push SettingsCategoryScreen(SettingsCategory.Appearance)
+                }
+                if (platform.supportsFriendActivityNotifications) {
+                    SettingsRowDivider()
+                    SettingsCategoryRow(strings.settingsNotifications, strings.settingsNotificationsSummary, AppIcons.Notifications) {
+                        navigator push SettingsCategoryScreen(SettingsCategory.Notifications)
+                    }
+                }
+            }
+            SettingsGroup(title = strings.settingsApplication) {
+                SettingsCategoryRow(strings.settingsPrivacyData, strings.settingsPrivacyDataSummary, AppIcons.Shield) {
+                    navigator push SettingsCategoryScreen(SettingsCategory.PrivacyData)
+                }
+                SettingsRowDivider()
+                SettingsCategoryRow(strings.settingsAbout, strings.settingsAboutSummary, AppIcons.QuestionMark) {
+                    navigator push SettingsCategoryScreen(SettingsCategory.About)
+                }
+            }
+        }
+    }
+}
 
-        // 手机上首页被本页盖住时不在组合里，收不到退出登录事件，所以由本页自己回到登录页。
-        LaunchedEffect(Unit) {
-            SharedFlowCentre.logout.collect {
+/** 可恢复的设置分类，提醒名单与通知开关使用同一份设置状态。 */
+@Serializable
+enum class SettingsCategory {
+    AccountSecurity, Appearance, Notifications, PrivacyData, About, FriendFilter;
+
+    fun title(strings: LocaleStrings): String = when (this) {
+        AccountSecurity -> strings.settingsAccountSecurity
+        Appearance -> strings.settingsAppearance
+        Notifications -> strings.settingsNotifications
+        PrivacyData -> strings.settingsPrivacyData
+        About -> strings.settingsAbout
+        FriendFilter -> strings.notificationSectionFilter
+    }
+}
+
+@Serializable
+data class SettingsCategoryScreen(val category: SettingsCategory) : AppDetailRoute {
+    @Composable
+    override fun Content() {
+        val platform = koinInject<AppPlatform>()
+        SettingsPage(category.title(strings)) {
+            when (category) {
+                SettingsCategory.AccountSecurity -> AccountSecurityContent()
+                SettingsCategory.Appearance -> AppearanceSections()
+                SettingsCategory.Notifications -> if (platform.supportsFriendActivityNotifications) NotificationSections(platform)
+                SettingsCategory.PrivacyData -> PrivacyDataSections(platform)
+                SettingsCategory.About -> AboutSection(platform)
+                SettingsCategory.FriendFilter -> if (platform.supportsFriendActivityNotifications) FriendFilterSections()
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsCategoryRow(title: String, description: String, icon: ImageVector, onClick: () -> Unit) {
+    AppRow(
+        title = title,
+        subtitle = description,
+        leading = { AppIcon(icon, contentDescription = null, tint = AppTheme.colors.tint) },
+        chevron = true,
+        onClick = onClick,
+    )
+}
+
+@Composable
+private fun SettingsPage(title: String, content: @Composable ColumnScope.() -> Unit) {
+    val navigator = LocalNavigator.currentOrThrow
+
+    // 手机上首页被本页盖住时不在组合里，收不到退出登录事件，所以由本页自己回到登录页。
+    LaunchedEffect(Unit) {
+        SharedFlowCentre.logout.collect {
+            if (navigator.lastItem == SettingsScreen || navigator.lastItem is SettingsCategoryScreen) {
                 navigator replaceAll AuthAnimeScreen(false)
             }
         }
+    }
 
-        AppScaffold(
-            topBar = {
-                AppNavBar(
-                    title = { AppText(strings.drawerSettings) },
-                    navigationIcon = {
-                        AppIconButton(onClick = { navigator.pop() }) {
-                            AppIcon(
-                                painter = rememberVectorPainter(AppIcons.ArrowBackIosNew),
-                                contentDescription = "back",
-                            )
-                        }
-                    },
-                )
-            },
-        ) { padding ->
-            // 分节数量固定且很少，用普通滚动列：版本检查结果等行内状态不会因为滚出屏幕而丢失。
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    // 骨架的留白放在滚动区里面：内容从导航栏和系统导航条下面滚过去（Edge-to-Edge）
-                    .padding(padding)
-                    .padding(horizontal = AppSpacing.page, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp),
-            ) {
-                AppearanceSections()
-                if (platform.supportsFriendActivityNotifications) {
-                    NotificationSections(platform)
-                }
-                SettingsGroup {
-                    SettingsSwitchRow(
-                        title = strings.stettingClipboardReading,
-                        description = null,
-                        checked = currentSettings.clipboardReadingEnabled,
-                    ) { enabled ->
-                        currentSettings = currentSettings.copy(clipboardReadingEnabled = enabled)
+    AppScaffold(
+        topBar = {
+            AppNavBar(
+                title = { AppText(title) },
+                navigationIcon = {
+                    AppIconButton(onClick = { navigator.pop() }) {
+                        AppIcon(
+                            painter = rememberVectorPainter(AppIcons.ArrowBackIosNew),
+                            contentDescription = strings.back,
+                        )
                     }
-                }
-                AboutSection(platform)
-                LogoutButton()
-            }
-        }
+                },
+            )
+        },
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                // 骨架的留白放在滚动区里面：内容从导航栏和系统导航条下面滚过去（Edge-to-Edge）
+                .padding(padding)
+                .padding(horizontal = AppSpacing.page, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+            content = content,
+        )
     }
 }
 
@@ -259,41 +323,8 @@ private fun ThemeColorSwatches(
 /** 通知：好友上下线、筛选、收件箱、服务状态与后台监测。只在支持通知的平台组合。 */
 @Composable
 private fun NotificationSections(platform: AppPlatform) {
-    val favoriteService = koinInject<FavoriteService>()
-    val friendService = koinInject<FriendService>()
+    val navigator = LocalNavigator.currentOrThrow
     var currentSettings by LocalSettingsState.current
-    var showFriendOverrides by remember { mutableStateOf(false) }
-
-    LaunchedEffect(favoriteService) { favoriteService.loadFavoriteByGroup(FavoriteType.Friend) }
-    val favoriteGroups by favoriteService.favoritesByGroup(FavoriteType.Friend).collectAsState()
-    val friends by friendService.friendState.collectAsState()
-    val favoriteUserIds = remember(favoriteGroups) {
-        favoriteGroups.values.flatten().map { it.favoriteId }.distinct()
-    }
-    val friendOverrideItems = remember(favoriteUserIds, friends) {
-        favoriteUserIds.mapNotNull { userId ->
-            friends[userId]?.displayName
-                ?.takeIf(String::isNotBlank)
-                ?.let { displayName -> FriendOverrideItem(userId, displayName) }
-        }
-    }
-
-    if (showFriendOverrides) {
-        FriendOverridesBottomSheet(
-            friends = friendOverrideItems,
-            overrides = currentSettings.friendPresenceFilter.userOverrides,
-            onDismiss = { showFriendOverrides = false },
-            onChange = { userId, next ->
-                val overrides = currentSettings.friendPresenceFilter.userOverrides.toMutableMap()
-                if (next == null) overrides -= userId else overrides[userId] = next
-                currentSettings = currentSettings.copy(
-                    friendPresenceFilter = currentSettings.friendPresenceFilter.copy(
-                        userOverrides = overrides,
-                    ),
-                )
-            },
-        )
-    }
 
     SettingsGroup(title = strings.notificationSectionFriendPresence) {
         NotificationPermissionSwitchRow(
@@ -313,53 +344,14 @@ private fun NotificationSections(platform: AppPlatform) {
         ) {
             currentSettings = currentSettings.copy(friendOfflineNotificationsEnabled = it)
         }
-    }
-
-    if (currentSettings.friendPresenceNotificationsEnabled ||
-        currentSettings.friendOfflineNotificationsEnabled
-    ) {
-        // 黑名单 / 白名单是二选一：用分段控件，说明放在节脚
-        Column {
-            AppSectionHeader(strings.notificationSectionFilter)
-            val modes = PresenceFilterMode.entries
-            AppSegmentedControl(
-                options = modes.map { mode ->
-                    when (mode) {
-                        PresenceFilterMode.Blacklist -> strings.notificationFilterBlacklist
-                        PresenceFilterMode.Whitelist -> strings.notificationFilterWhitelist
-                    }
-                },
-                selectedIndex = modes.indexOf(currentSettings.friendPresenceFilter.mode),
-                onSelect = { index ->
-                    currentSettings = currentSettings.copy(
-                        friendPresenceFilter = currentSettings.friendPresenceFilter.copy(mode = modes[index]),
-                    )
-                },
-            )
-            AppSectionFooter(strings.notificationFilterDescription)
-        }
-        SettingsGroup(title = strings.notificationFilterGroups) {
-            favoriteGroups.keys.forEach { group ->
-                val selected = group.id in currentSettings.friendPresenceFilter.groupIds
-                SettingsSwitchRow(
-                    title = group.displayName.ifBlank { group.name },
-                    description = null,
-                    checked = selected,
-                ) { checked ->
-                    val ids = currentSettings.friendPresenceFilter.groupIds.toMutableSet()
-                    if (checked) ids += group.id else ids -= group.id
-                    currentSettings = currentSettings.copy(
-                        friendPresenceFilter = currentSettings.friendPresenceFilter.copy(groupIds = ids),
-                    )
-                }
-                SettingsRowDivider()
-            }
-            SettingsNavigationRow(
-                title = strings.notificationFilterFriends,
-                description = strings.notificationFilterFriendsDescription,
-                onClick = { showFriendOverrides = true },
-            )
-        }
+        SettingsRowDivider()
+        val presenceEnabled = currentSettings.friendPresenceNotificationsEnabled || currentSettings.friendOfflineNotificationsEnabled
+        SettingsNavigationRow(
+            title = strings.notificationSectionFilter,
+            description = if (presenceEnabled) strings.settingsNotificationFilterSummary else strings.settingsNotificationFilterDisabled,
+            enabled = presenceEnabled,
+            onClick = { navigator push SettingsCategoryScreen(SettingsCategory.FriendFilter) },
+        )
     }
 
     SettingsGroup(title = strings.notificationSectionInbox) {
@@ -407,16 +399,183 @@ private fun NotificationSections(platform: AppPlatform) {
     }
 }
 
-/** 缓存、版本检查与项目主页。 */
+/** 收藏分组与单个好友共用的提醒规则，只在独立详情页展开。 */
 @Composable
-private fun AboutSection(platform: AppPlatform) {
-    val versionService = koinInject<VersionService>()
+private fun FriendFilterSections() {
+    val favoriteService = koinInject<FavoriteService>()
+    val friendService = koinInject<FriendService>()
+    var currentSettings by LocalSettingsState.current
+    var showFriendOverrides by remember { mutableStateOf(false) }
+    var isLoadingGroups by remember { mutableStateOf(true) }
+    var groupsError by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    val loadGroups: suspend () -> Unit = {
+        isLoadingGroups = true
+        groupsError = null
+        try {
+            val result = favoriteService.loadFavoriteByGroup(FavoriteType.Friend)
+            val error = result.exceptionOrNull()
+            if (error is CancellationException) throw error
+            result.onApiFailure("Favorite groups") { groupsError = it }
+        } finally {
+            isLoadingGroups = false
+        }
+    }
+    LaunchedEffect(favoriteService) { loadGroups() }
+    val favoriteGroups by favoriteService.favoritesByGroup(FavoriteType.Friend).collectAsState()
+    val friends by friendService.friendState.collectAsState()
+    val favoriteUserIds = remember(favoriteGroups) {
+        favoriteGroups.values.flatten().map { it.favoriteId }.distinct()
+    }
+    val friendOverrideItems = remember(favoriteUserIds, friends) {
+        favoriteUserIds.mapNotNull { userId ->
+            friends[userId]?.displayName
+                ?.takeIf(String::isNotBlank)
+                ?.let { displayName -> FriendOverrideItem(userId, displayName) }
+        }
+    }
+
+    if (showFriendOverrides) {
+        FriendOverridesBottomSheet(
+            friends = friendOverrideItems,
+            overrides = currentSettings.friendPresenceFilter.userOverrides,
+            onDismiss = { showFriendOverrides = false },
+            onChange = { userId, next ->
+                val overrides = currentSettings.friendPresenceFilter.userOverrides.toMutableMap()
+                if (next == null) overrides -= userId else overrides[userId] = next
+                currentSettings = currentSettings.copy(
+                    friendPresenceFilter = currentSettings.friendPresenceFilter.copy(
+                        userOverrides = overrides,
+                    ),
+                )
+            },
+        )
+    }
+
+    if (currentSettings.friendPresenceNotificationsEnabled ||
+        currentSettings.friendOfflineNotificationsEnabled
+    ) {
+        // 黑名单 / 白名单是二选一：用分段控件，说明放在节脚
+        Column {
+            AppSectionHeader(strings.notificationSectionFilter)
+            val modes = PresenceFilterMode.entries
+            AppSegmentedControl(
+                options = modes.map { mode ->
+                    when (mode) {
+                        PresenceFilterMode.Blacklist -> strings.notificationFilterBlacklist
+                        PresenceFilterMode.Whitelist -> strings.notificationFilterWhitelist
+                    }
+                },
+                selectedIndex = modes.indexOf(currentSettings.friendPresenceFilter.mode),
+                onSelect = { index ->
+                    currentSettings = currentSettings.copy(
+                        friendPresenceFilter = currentSettings.friendPresenceFilter.copy(mode = modes[index]),
+                    )
+                },
+            )
+            AppSectionFooter(strings.notificationFilterDescription)
+        }
+        if (isLoadingGroups) {
+            AppActivityIndicator()
+        }
+        groupsError?.let { message ->
+            Column {
+                AppSectionFooter(message)
+                AppButton(
+                    onClick = { scope.launch { loadGroups() } },
+                    enabled = !isLoadingGroups,
+                    style = AppButtonStyle.Plain,
+                ) { AppText(strings.retry) }
+            }
+        }
+        SettingsGroup(title = strings.notificationFilterGroups) {
+            favoriteGroups.keys.forEach { group ->
+                val selected = group.id in currentSettings.friendPresenceFilter.groupIds
+                SettingsSwitchRow(
+                    title = group.displayName.ifBlank { group.name },
+                    description = null,
+                    checked = selected,
+                ) { checked ->
+                    val ids = currentSettings.friendPresenceFilter.groupIds.toMutableSet()
+                    if (checked) ids += group.id else ids -= group.id
+                    currentSettings = currentSettings.copy(
+                        friendPresenceFilter = currentSettings.friendPresenceFilter.copy(groupIds = ids),
+                    )
+                }
+                SettingsRowDivider()
+            }
+            SettingsNavigationRow(
+                title = strings.notificationFilterFriends,
+                description = strings.notificationFilterFriendsDescription,
+                onClick = { showFriendOverrides = true },
+            )
+        }
+    } else {
+        AppSectionFooter(strings.settingsNotificationFilterDisabled)
+    }
+}
+
+/** 剪贴板隐私、政策与本地缓存。 */
+@Composable
+private fun PrivacyDataSections(platform: AppPlatform) {
+    var currentSettings by LocalSettingsState.current
+    SettingsGroup {
+        SettingsSwitchRow(
+            title = strings.stettingClipboardReading,
+            description = null,
+            checked = currentSettings.clipboardReadingEnabled,
+        ) { currentSettings = currentSettings.copy(clipboardReadingEnabled = it) }
+        SettingsRowDivider()
+        AppRow(
+            title = strings.stettingPrivacyPolicy,
+            chevron = true,
+            onClick = { platform.openUrl(AppConst.APP_PRIVACY_POLICY_URL) },
+        )
+    }
     val imageLoader = koinInject<ImageLoader>()
     val accountCacheManager = koinInject<AccountCacheManager>()
     val groupProfileCacheStore = koinInject<GroupProfileCacheStore>()
     val worldProfileCacheStore = koinInject<WorldProfileCacheStore>()
     val decorationTemplateCacheDao = koinInject<DecorationTemplateCacheDao>()
     val meetupCardAssetStore = koinInject<MeetupCardAssetStore>()
+    val scope = rememberCoroutineScope()
+    Column {
+        SettingsGroup {
+            val diskCache = imageLoader.diskCache
+            var size by remember(diskCache) { mutableStateOf(diskCache?.size ?: 0L) }
+            var isClearingCache by remember { mutableStateOf(false) }
+            AppRow(
+                title = strings.stettingClearCache,
+                value = diskCache?.let { "${size.bytesToMb()}/${it.maxSize.bytesToMb()}MB" },
+                enabled = !isClearingCache,
+                onClick = {
+                    scope.launch {
+                        isClearingCache = true
+                        try {
+                            diskCache?.clear()
+                            accountCacheManager.clearAll()
+                            groupProfileCacheStore.clearAll()
+                            worldProfileCacheStore.clearAll()
+                            // 普通清缓存只删远端装饰副本；身份牌配置与相册照片保留。
+                            decorationTemplateCacheDao.clearAll()
+                            meetupCardAssetStore.clearDecorationCache()
+                            size = 0
+                        } finally {
+                            isClearingCache = false
+                        }
+                    }
+                },
+            )
+        }
+        AppSectionFooter(strings.settingsCacheDescription)
+    }
+}
+
+/** 版本、项目主页与联系信息。 */
+@Composable
+private fun AboutSection(platform: AppPlatform) {
+    val versionService = koinInject<VersionService>()
     val scope = rememberCoroutineScope()
     var version by remember { mutableStateOf(VersionVo()) }
     // 不能直接version.not()因为默认为false会导致一点开就显示
@@ -443,32 +602,6 @@ private fun AboutSection(platform: AppPlatform) {
         }
     }
     SettingsGroup {
-        val diskCache = imageLoader.diskCache
-        var size by remember(diskCache) { mutableStateOf(diskCache?.size ?: 0L) }
-        var isClearingCache by remember { mutableStateOf(false) }
-        AppRow(
-            title = strings.stettingClearCache,
-            value = diskCache?.let { "${size.bytesToMb()}/${it.maxSize.bytesToMb()}MB" },
-            enabled = !isClearingCache,
-            onClick = {
-                scope.launch {
-                    isClearingCache = true
-                    try {
-                        diskCache?.clear()
-                        accountCacheManager.clearAll()
-                        groupProfileCacheStore.clearAll()
-                        worldProfileCacheStore.clearAll()
-                        // 普通清缓存只删远端装饰副本；身份牌配置与相册照片保留。
-                        decorationTemplateCacheDao.clearAll()
-                        meetupCardAssetStore.clearDecorationCache()
-                        size = 0
-                    } finally {
-                        isClearingCache = false
-                    }
-                }
-            },
-        )
-        SettingsRowDivider()
         AppRow(
             title = strings.stettingVersion,
             value = if (isLatestVersion) "${AppConst.APP_VERSION} (${strings.stettingAlreadyLatest})" else AppConst.APP_VERSION,
@@ -497,12 +630,6 @@ private fun AboutSection(platform: AppPlatform) {
         )
         SettingsRowDivider()
         AppRow(
-            title = strings.stettingPrivacyPolicy,
-            chevron = true,
-            onClick = { platform.openUrl(AppConst.APP_PRIVACY_POLICY_URL) },
-        )
-        SettingsRowDivider()
-        AppRow(
             title = strings.stettingContact,
             value = AppConst.APP_CONTACT_EMAIL,
             chevron = true,
@@ -518,16 +645,18 @@ private fun AboutSection(platform: AppPlatform) {
 }
 
 @Composable
-private fun LogoutButton() {
+internal fun LogoutButton() {
     val authService = koinInject<AuthService>()
     val scope = rememberCoroutineScope()
     var showConfirmation by remember { mutableStateOf(false) }
+    var isLoggingOut by remember { mutableStateOf(false) }
     // 设置页惯用的破坏性操作行：独占一组、红字居中
     AppGroup {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable(
+                    enabled = !isLoggingOut,
                     interactionSource = null,
                     indication = LocalIndication.current,
                     role = Role.Button,
@@ -537,7 +666,7 @@ private fun LogoutButton() {
             contentAlignment = Alignment.Center,
         ) {
             AppText(
-                text = strings.stettingLogout,
+                text = if (isLoggingOut) strings.loading else strings.stettingLogout,
                 style = AppTheme.type.body,
                 color = AppTheme.colors.destructive,
             )
@@ -548,7 +677,20 @@ private fun LogoutButton() {
             onDismissRequest = { showConfirmation = false },
             onConfirm = {
                 showConfirmation = false
-                scope.launch { authService.logout() }
+                isLoggingOut = true
+                scope.launch {
+                    try {
+                        authService.logout()
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (error: Exception) {
+                        Result.failure<Unit>(error).onApiFailure("Logout") {
+                            SharedFlowCentre.toastText.emit(ToastText.Error(it))
+                        }
+                    } finally {
+                        isLoggingOut = false
+                    }
+                }
             },
         )
     }
@@ -643,7 +785,7 @@ private fun StatusRow(label: String, value: String, actionLabel: String, onActio
 
 /** 一节设置：可选的节标题 + 一张分组卡片，行与行之间用 [SettingsRowDivider]。 */
 @Composable
-private fun SettingsGroup(
+internal fun SettingsGroup(
     title: String? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -654,7 +796,7 @@ private fun SettingsGroup(
 }
 
 @Composable
-private fun SettingsRowDivider() {
+internal fun SettingsRowDivider() {
     AppDivider(modifier = Modifier.padding(start = AppSpacing.row))
 }
 
@@ -724,10 +866,12 @@ private fun SettingsNavigationRow(
     title: String,
     description: String,
     onClick: () -> Unit,
+    enabled: Boolean = true,
 ) {
     AppRow(
         title = title,
         subtitle = description,
+        enabled = enabled,
         chevron = true,
         onClick = onClick,
     )

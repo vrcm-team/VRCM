@@ -127,7 +127,9 @@ object HomeScreen : AppListRoute {
             SharedFlowCentre.logout.collect {
                 model.clearOverlays()
                 model.currentUser = null
-                navigator replaceAll AuthAnimeScreen(false)
+                if (navigator.items.contains(HomeScreen)) {
+                    navigator replaceAll AuthAnimeScreen(false)
+                }
             }
         }
         LaunchedEffect(model.drawerVisible) {

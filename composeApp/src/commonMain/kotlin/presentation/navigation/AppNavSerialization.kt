@@ -4,6 +4,7 @@ import androidx.navigation3.runtime.NavKey
 import androidx.savedstate.serialization.SavedStateConfiguration
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthScreen
+import io.github.vrcmteam.vrcm.presentation.screens.auth.AccountLoginScreen
 import io.github.vrcmteam.vrcm.presentation.screens.auth.StartupAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.activity.FriendActivityTimelineScreen
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
@@ -20,6 +21,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardEditorRoute
 import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationScreen
 import io.github.vrcmteam.vrcm.presentation.screens.search.GlobalSearchScreen
 import io.github.vrcmteam.vrcm.presentation.screens.settings.SettingsScreen
+import io.github.vrcmteam.vrcm.presentation.screens.settings.SettingsCategoryScreen
 import io.github.vrcmteam.vrcm.presentation.screens.settings.RewardCodeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.settings.InviteMessageSlotsScreen
 import io.github.vrcmteam.vrcm.presentation.screens.settings.PlayerModerationListScreen
@@ -39,6 +41,7 @@ internal val appSavedStateConfiguration = SavedStateConfiguration {
         polymorphic(NavKey::class) {
             subclass(StartupAnimeScreen::class, StartupAnimeScreen.serializer())
             subclass(AuthScreen::class, AuthScreen.serializer())
+            subclass(AccountLoginScreen::class, AccountLoginScreen.serializer())
             subclass(AuthAnimeScreen::class, AuthAnimeScreen.serializer())
             subclass(HomeScreen::class, HomeScreen.serializer())
             subclass(InventoryScreen::class, InventoryScreen.serializer())
@@ -60,6 +63,7 @@ internal val appSavedStateConfiguration = SavedStateConfiguration {
             subclass(MeetupCardDisplayRoute::class, MeetupCardDisplayRoute.serializer())
             subclass(MeetupCardEditorRoute::class, MeetupCardEditorRoute.serializer())
             subclass(SettingsScreen::class, SettingsScreen.serializer())
+            subclass(SettingsCategoryScreen::class, SettingsCategoryScreen.serializer())
             subclass(RewardCodeScreen::class, RewardCodeScreen.serializer())
             subclass(InviteMessageSlotsScreen::class, InviteMessageSlotsScreen.serializer())
             subclass(PlayerModerationListScreen::class, PlayerModerationListScreen.serializer())

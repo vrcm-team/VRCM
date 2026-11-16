@@ -3,6 +3,7 @@ package io.github.vrcmteam.vrcm.presentation.navigation
 import androidx.navigation3.runtime.NavKey
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthScreen
+import io.github.vrcmteam.vrcm.presentation.screens.auth.AccountLoginScreen
 import io.github.vrcmteam.vrcm.presentation.screens.auth.StartupAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.activity.FriendActivityTimelineScreen
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
@@ -20,6 +21,8 @@ import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardEditorRoute
 import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationScreen
 import io.github.vrcmteam.vrcm.presentation.screens.search.GlobalSearchScreen
 import io.github.vrcmteam.vrcm.presentation.screens.settings.SettingsScreen
+import io.github.vrcmteam.vrcm.presentation.screens.settings.SettingsCategory
+import io.github.vrcmteam.vrcm.presentation.screens.settings.SettingsCategoryScreen
 import io.github.vrcmteam.vrcm.presentation.screens.settings.RewardCodeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.settings.InviteMessageSlotsScreen
 import io.github.vrcmteam.vrcm.presentation.screens.settings.PlayerModerationListScreen
@@ -44,6 +47,7 @@ class AppNavKeySerializationTest {
         val routes = listOf(
             StartupAnimeScreen,
             AuthScreen,
+            AccountLoginScreen(userId = "usr_test"),
             AuthAnimeScreen(isAuthed = true),
             HomeScreen,
             InventoryScreen,
@@ -69,6 +73,7 @@ class AppNavKeySerializationTest {
             MeetupCardDisplayRoute(ownerUserId = "usr_test"),
             MeetupCardEditorRoute(ownerUserId = "usr_test"),
             SettingsScreen,
+            SettingsCategoryScreen(SettingsCategory.AccountSecurity),
             RewardCodeScreen,
             InviteMessageSlotsScreen,
             PlayerModerationListScreen,
