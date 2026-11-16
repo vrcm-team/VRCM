@@ -10,6 +10,7 @@ import io.github.vrcmteam.vrcm.service.PlayerModerationCleanupResponse
 import io.github.vrcmteam.vrcm.service.PlayerModerationCleanupSource
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.Job
@@ -153,7 +154,8 @@ internal class PlayerModerationListScreenModel(
         ) {
             return
         }
-        refreshJob = viewModelScope.launch(Dispatchers.IO) {
+        // Save the Job before a fast response can renew the session and wake its observer.
+        refreshJob = viewModelScope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
             var operationToken = token
             try {
                 val response = source.getAll(token)
@@ -176,6 +178,7 @@ internal class PlayerModerationListScreenModel(
                 }
             }
         }
+        refreshJob?.start()
     }
 
     fun selectFilter(type: String?) {
@@ -261,7 +264,7 @@ internal class PlayerModerationListScreenModel(
             return
         }
 
-        cleanupJob = viewModelScope.launch(Dispatchers.IO) {
+        cleanupJob = viewModelScope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
             var operationToken = token
             try {
                 val authoritative = source.get(operationToken, type)
@@ -333,6 +336,7 @@ internal class PlayerModerationListScreenModel(
                 }
             }
         }
+        cleanupJob?.start()
     }
 
     private fun publishAvailable(
