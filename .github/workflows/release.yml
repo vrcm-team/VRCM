@@ -9,6 +9,10 @@ on:
         description: 'Existing release tag; leave empty to validate main without publication'
         required: false
         type: string
+      build_run:
+        description: 'Reuse verified packages from a completed run of this tag; skip all builds'
+        required: false
+        type: string
       publish:
         description: 'Publish the release after all packages and notes are verified'
         type: boolean
@@ -35,6 +39,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: release-${{ inputs.tag || github.ref_name }}${{ inputs.platform && inputs.platform != 'all' && format('-{0}', inputs.platform) || '' }}
@@ -75,6 +80,19 @@ jobs:
           node scripts/release-ci.mjs prepare --tag "$RELEASE_TAG" \
             --output "$RUNNER_TEMP/release-tools/metadata.json" "${args[@]}"
           cp scripts/release-ci.mjs "$RUNNER_TEMP/release-tools/"
+      - name: Validate the completed build run for publication recovery
+        if: inputs.build_run != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_RUN: ${{ inputs.build_run }}
+          PLATFORM: ${{ inputs.platform }}
+        run: |
+          [[ "$PLATFORM" == all ]] || { echo 'Publication recovery requires platform=all.'; exit 1; }
+          node scripts/release-ci.mjs verify-build \
+            --metadata "$RUNNER_TEMP/release-tools/metadata.json" --build-run "$BUILD_RUN"
+          # Recovery can use reviewed notes from main without moving the release tag.
+          manual=".github/release-notes/$RELEASE_TAG.md"
+          if [[ -f "$manual" ]]; then cp "$manual" "$RUNNER_TEMP/release-tools/manual-notes.md"; fi
       - uses: actions/upload-artifact@v7
         with:
           name: release-tools
@@ -83,7 +101,7 @@ jobs:
           retention-days: 7
 
   android:
-    if: ${{ !inputs.platform || inputs.platform == 'all' || inputs.platform == 'android' }}
+    if: ${{ !inputs.build_run && (!inputs.platform || inputs.platform == 'all' || inputs.platform == 'android') }}
     needs: prepare
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -170,7 +188,7 @@ jobs:
           retention-days: 7
 
   windows:
-    if: ${{ !inputs.platform || inputs.platform == 'all' || inputs.platform == 'windows' }}
+    if: ${{ !inputs.build_run && (!inputs.platform || inputs.platform == 'all' || inputs.platform == 'windows') }}
     needs: prepare
     runs-on: windows-latest
     timeout-minutes: 90
@@ -229,7 +247,7 @@ jobs:
           retention-days: 7
 
   apple:
-    if: ${{ !inputs.platform || inputs.platform == 'all' || inputs.platform == 'apple' }}
+    if: ${{ !inputs.build_run && (!inputs.platform || inputs.platform == 'all' || inputs.platform == 'apple') }}
     needs: prepare
     runs-on: macos-latest
     timeout-minutes: 120
@@ -265,7 +283,7 @@ jobs:
           retention-days: 7
 
   ios:
-    if: ${{ !inputs.platform || inputs.platform == 'all' || inputs.platform == 'apple' }}
+    if: ${{ !inputs.build_run && (!inputs.platform || inputs.platform == 'all' || inputs.platform == 'apple') }}
     needs: prepare
     # The standard Intel runner has 14 GB RAM; the ARM runner has only 7 GB.
     # iphoneos still targets ARM64, independently of the host architecture.
@@ -288,18 +306,11 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v6
-      - name: Build the optimized iOS Release framework before starting Xcode
+      - name: Archive iOS and reuse the existing ad-hoc IPA packager
         run: |
           set -euo pipefail
           echo "Runner memory: $(sysctl -n hw.memsize) bytes"
           chmod +x gradlew
-          # Stream Native diagnostics directly and release its Gradle heap before Xcode starts.
-          # Xcode's embed task reuses this same framework through Gradle's up-to-date checks.
-          ./gradlew :composeApp:linkReleaseFrameworkIosArm64 \
-            --no-daemon --console=plain --stacktrace --max-workers=1
-      - name: Archive iOS and reuse the existing ad-hoc IPA packager
-        run: |
-          set -euo pipefail
           xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp \
             -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/VRCM.xcarchive" \
@@ -313,12 +324,17 @@ jobs:
           retention-days: 7
 
   publish:
-    if: ${{ (github.event_name == 'push' || inputs.tag != '') && (!inputs.platform || inputs.platform == 'all') }}
+    if: >-
+      ${{ !cancelled() && needs.prepare.result == 'success' &&
+          (github.event_name == 'push' || inputs.tag != '') && (!inputs.platform || inputs.platform == 'all') &&
+          (inputs.build_run || (needs.android.result == 'success' && needs.windows.result == 'success' &&
+            needs.apple.result == 'success' && needs.ios.result == 'success')) }}
     needs: [prepare, android, windows, apple, ios]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       contents: write
+      actions: read
     steps:
       - uses: actions/checkout@v7
         with:
@@ -337,6 +353,8 @@ jobs:
           pattern: release-packages-*
           path: artifacts
           merge-multiple: true
+          run-id: ${{ inputs.build_run || github.run_id }}
+          github-token: ${{ github.token }}
       - name: Verify all packages and prepare bilingual release notes
         env:
           GH_TOKEN: ${{ github.token }}
@@ -344,9 +362,13 @@ jobs:
           AI_MODEL: ${{ inputs.model || vars.RELEASE_NOTES_MODEL || 'deepseek-flash' }}
           AI_EFFORT: ${{ inputs.effort || vars.RELEASE_NOTES_EFFORT || 'high' }}
         run: |
+          args=()
+          if [[ -f "$RUNNER_TEMP/release-tools/manual-notes.md" ]]; then
+            args+=(--notes "$RUNNER_TEMP/release-tools/manual-notes.md")
+          fi
           node "$RUNNER_TEMP/release-tools/release-ci.mjs" notes \
             --metadata "$RUNNER_TEMP/release-tools/metadata.json" --artifacts artifacts \
-            --output "$RUNNER_TEMP/release-notes.md" --model "$AI_MODEL" --effort "$AI_EFFORT"
+            --output "$RUNNER_TEMP/release-notes.md" --model "$AI_MODEL" --effort "$AI_EFFORT" "${args[@]}"
       - uses: actions/upload-artifact@v7
         with:
           name: release-notes-and-checksums

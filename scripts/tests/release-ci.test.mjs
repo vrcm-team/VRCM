@@ -3,8 +3,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import childProcess from 'node:child_process';
+import { syncBuiltinESMExports } from 'node:module';
 import test from 'node:test';
-import { readMetadata, verifyArtifacts, assertUploadedAssets, assertReleaseWritable, validateGeneratedNotes, generateNotes, publishRelease } from '../release-ci.mjs';
+import { readMetadata, verifyArtifacts, assertUploadedAssets, assertReleaseWritable, validateGeneratedNotes, generateNotes, publishRelease, validateBuildRun } from '../release-ci.mjs';
 
 // The public Markdown contract used by the historical 1.1.3/1.1.4 releases.
 const HISTORICAL_NOTES = `## 新增
@@ -171,6 +173,134 @@ test('failed drafts are resumable, published releases require explicit replaceme
   assert.doesNotThrow(() => assertReleaseWritable({ draft: false }, true));
 });
 
+function publishingFixture(t, { existingDraft = false, corruptUpload = false } = {}) {
+  const { root } = repository(t);
+  const metadata = readMetadata(root, '1.2.3');
+  const notes = path.join(root, 'notes.md');
+  fs.writeFileSync(notes, HISTORICAL_NOTES);
+  for (const name of metadata.assets) fs.writeFileSync(path.join(root, name), `Built package: ${name}`);
+  const artifacts = verifyArtifacts(root, metadata);
+  const makeDraft = () => ({ id: 42, tag_name: metadata.tag, draft: true, assets: [] });
+  let release = existingDraft ? makeDraft() : null;
+  t.mock.method(globalThis, 'fetch', async (url, options = {}) => {
+    const endpoint = new URL(url);
+    const method = options.method || 'GET';
+    if (endpoint.pathname.endsWith(`/git/ref/tags/${metadata.tag}`)) {
+      return Response.json({ object: { type: 'commit', sha: metadata.sha } });
+    }
+    if (endpoint.pathname.endsWith(`/releases/tags/${metadata.tag}`)) {
+      return Response.json({ message: 'Drafts are not available by tag' }, { status: 404 });
+    }
+    if (endpoint.pathname.endsWith('/releases') && method === 'GET') {
+      // A resumable draft may be behind a full page of older releases.
+      if (existingDraft && endpoint.searchParams.get('page') === '1') {
+        return Response.json(Array.from({ length: 100 }, (_, index) => ({ id: 100 + index, tag_name: `0.0.${index}` })));
+      }
+      return Response.json(release ? [release] : []);
+    }
+    if (endpoint.pathname.endsWith('/releases') && method === 'POST') {
+      if (release) return Response.json({ message: 'Release already exists' }, { status: 422 });
+      release = { ...makeDraft(), ...JSON.parse(options.body) };
+      return Response.json(release);
+    }
+    if (endpoint.pathname.endsWith('/releases/42') && release) {
+      if (method === 'PATCH') Object.assign(release, JSON.parse(options.body));
+      return Response.json(release);
+    }
+    throw new Error(`Unexpected publishing request: ${method} ${url}`);
+  });
+  const originalExec = childProcess.execFileSync;
+  const execMock = t.mock.method(childProcess, 'execFileSync', (command, args, options) => {
+    if (command !== 'gh') return originalExec(command, args, options);
+    if (args[0] !== 'release') throw new Error('Unexpected gh command');
+    if (args[1] === 'create') {
+      if (release) throw new Error('Release already exists');
+      release = makeDraft();
+    } else if (args[1] === 'edit') {
+      if (args.includes('--draft=false')) release.draft = false;
+    } else if (args[1] === 'upload') {
+      release.assets = artifacts.map(item => ({ name: item.name, size: item.size, digest: item.digest, state: 'uploaded' }));
+      if (corruptUpload) release.assets[0].digest = 'sha256:changed-on-server';
+    } else throw new Error('Unexpected gh release command');
+    return '';
+  });
+  syncBuiltinESMExports();
+  t.after(() => {
+    execMock.mock.restore();
+    syncBuiltinESMExports();
+  });
+  return { root, metadata, notes, artifacts, get release() { return release; } };
+}
+
+test('a fresh draft is verified by ID before it becomes public when lookup by tag returns 404', async t => {
+  const fixture = publishingFixture(t);
+  await publishRelease(fixture.root, fixture.metadata, fixture.artifacts, fixture.notes, false, false);
+  assert.equal(fixture.release.draft, false);
+  assert.equal(fixture.release.body, HISTORICAL_NOTES);
+  assert.deepEqual(fixture.release.assets.map(item => item.name), fixture.metadata.assets);
+});
+
+test('a draft found on a later release-list page is resumed without creating another release', async t => {
+  const fixture = publishingFixture(t, { existingDraft: true });
+  await publishRelease(fixture.root, fixture.metadata, fixture.artifacts, fixture.notes, false, false);
+  assert.equal(fixture.release.id, 42);
+  assert.equal(fixture.release.draft, false);
+  assert.equal(fixture.release.body, HISTORICAL_NOTES);
+});
+
+test('a draft stays private when its uploaded package fails integrity verification', async t => {
+  const fixture = publishingFixture(t, { corruptUpload: true });
+  await assert.rejects(publishRelease(fixture.root, fixture.metadata, fixture.artifacts, fixture.notes, false, false), /integrity verification/);
+  assert.equal(fixture.release.draft, true);
+});
+
+test('publication recovery accepts successful builds even when their final publish job failed', async t => {
+  const metadata = { tag: '1.2.3', sha: 'a'.repeat(40) };
+  t.mock.method(globalThis, 'fetch', async url => {
+    const endpoint = new URL(url).pathname;
+    if (endpoint.endsWith('/actions/runs/1234')) return Response.json({
+      status: 'completed', conclusion: 'failure', head_sha: metadata.sha, path: '.github/workflows/release.yml',
+    });
+    if (endpoint.endsWith('/actions/runs/1234/jobs')) return Response.json({ total_count: 6, jobs: [
+      ...['prepare', 'android', 'windows', 'apple', 'ios'].map(name => ({ name, conclusion: 'success' })),
+      { name: 'publish', conclusion: 'failure' },
+    ] });
+    throw new Error(`Unexpected recovery request: ${url}`);
+  });
+  await assert.doesNotReject(validateBuildRun(metadata, '1234'));
+});
+
+test('publication recovery rejects unfinished, unrelated, incomplete or unsuccessful builds', async t => {
+  const metadata = { tag: '1.2.3', sha: 'a'.repeat(40) };
+  const run = { status: 'completed', head_sha: metadata.sha, path: '.github/workflows/release.yml' };
+  const jobs = ['prepare', 'android', 'windows', 'apple', 'ios'].map(name => ({ name, conclusion: 'success' }));
+  for (const scenario of [
+    { name: 'unfinished run', run: { ...run, status: 'in_progress' } },
+    { name: 'different source commit', run: { ...run, head_sha: 'b'.repeat(40) } },
+    { name: 'different workflow', run: { ...run, path: '.github/workflows/test.yml' } },
+    { name: 'failed Android build', jobs: jobs.map(job => job.name === 'android' ? { ...job, conclusion: 'failure' } : job) },
+    { name: 'missing iOS build', jobs: jobs.filter(job => job.name !== 'ios') },
+    { name: 'ambiguous duplicate build', jobs: [...jobs, jobs[1]] },
+  ]) {
+    await t.test(scenario.name, async subtest => {
+      subtest.mock.method(globalThis, 'fetch', async url => {
+        if (new URL(url).pathname.endsWith('/jobs')) return Response.json({ total_count: (scenario.jobs || jobs).length, jobs: scenario.jobs || jobs });
+        return Response.json(scenario.run || run);
+      });
+      await assert.rejects(validateBuildRun(metadata, '1234'), /must be completed|did not complete/);
+    });
+  }
+});
+
+test('publication recovery requires a release tag and a numeric run ID before requesting packages', async t => {
+  t.mock.method(globalThis, 'fetch', async () => { throw new Error('Invalid recovery inputs must not access GitHub.'); });
+  await assert.rejects(validateBuildRun({ buildOnly: true, tag: '1.2.3' }, '1234'), /requires a release tag/);
+  await assert.rejects(validateBuildRun({ tag: '' }, '1234'), /requires a release tag/);
+  for (const runId of ['0', '-1', '1234/jobs', '1\n', '9007199254740992']) {
+    await assert.rejects(validateBuildRun({ tag: '1.2.3' }, runId), /Invalid build run ID/);
+  }
+});
+
 test('incomplete translations and malformed AI notes are rejected', () => {
   const notes = { new_zh: ['好友列表支持搜索。'], improvements_zh: [], fixes_zh: [], new_en: ['Search the friends list.'], improvements_en: [], fixes_en: [] };
   assert.doesNotThrow(() => validateGeneratedNotes(notes));
@@ -185,6 +315,20 @@ test('committed manual notes take precedence without requiring an AI or GitHub r
   const output = path.join(root, 'release-notes.md');
   await generateNotes(root, readMetadata(root, '1.2.3'), [], output, 'deepseek-flash', 'high');
   assert.equal(fs.readFileSync(output, 'utf8'), HISTORICAL_NOTES);
+});
+
+test('publication recovery can use corrected manual notes without moving or editing the original tag', async t => {
+  const { root, git } = repository(t, { '.github/release-notes/1.2.3.md': HISTORICAL_NOTES });
+  const metadata = readMetadata(root, '1.2.3');
+  const corrected = HISTORICAL_NOTES.replace('新增好友搜索。', '新增账号切换。').replace('Added friend search.', 'Added account switching.');
+  const manualNotes = path.join(temporary(t), 'manual-notes.md');
+  fs.writeFileSync(manualNotes, corrected);
+  t.mock.method(globalThis, 'fetch', async () => { throw new Error('Recovery notes must not require network access.'); });
+  const output = path.join(root, 'release-notes.md');
+  await generateNotes(root, metadata, [], output, 'deepseek-flash', 'high', { manualNotes });
+  assert.equal(fs.readFileSync(output, 'utf8'), corrected);
+  assert.equal(git('show', '1.2.3:.github/release-notes/1.2.3.md'), HISTORICAL_NOTES.trim());
+  assert.equal(git('rev-parse', '1.2.3'), metadata.sha);
 });
 
 test('manual notes with an extra download section cannot bypass the historical format', async t => {
