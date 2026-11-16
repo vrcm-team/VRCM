@@ -239,11 +239,9 @@ internal class PlayerModerationListScreenModel(
         expectedSessionToken: AccountSessionToken?,
     ) {
         val current = _state.value
-        if (current.isLoading || current.isClearing ||
-            refreshJob?.isActive == true || cleanupJob?.isActive == true
-        ) {
-            return
-        }
+        // Publishing a completed state enables the action before its coroutine returns.
+        // Use that same state to accept requests instead of the coroutine's completion timing.
+        if (current.isLoading || current.isClearing) return
         val token = expectedSessionToken
             ?.takeIf { it == current.sessionToken && SharedFlowCentre.isCurrentSession(it) }
             ?: return

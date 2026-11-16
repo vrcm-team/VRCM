@@ -1,6 +1,5 @@
 package io.github.vrcmteam.vrcm.presentation.screens.settings
 
-import androidx.lifecycle.ViewModelStore
 import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.playermoderation.data.PlayerModerationData
@@ -9,9 +8,13 @@ import io.github.vrcmteam.vrcm.service.PlayerModerationCleanupResponse
 import io.github.vrcmteam.vrcm.service.PlayerModerationCleanupSource
 import io.github.vrcmteam.vrcm.service.data.AccountDto
 import io.github.vrcmteam.vrcm.testing.MainDispatcherTest
+import io.github.vrcmteam.vrcm.testing.clearAndJoin
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -23,6 +26,36 @@ import kotlin.test.assertNull
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PlayerModerationCleanupModelTest : MainDispatcherTest() {
+    @Test
+    fun cleanupStartsAsSoonAsLoadedStateEnablesTheAction() = runBlocking {
+        SharedFlowCentre.emitAuthenticated(AccountDto(userId = "usr_account", username = "account"))
+        val source = FakePlayerModerationCleanupSource().apply {
+            allRecords = listOf(record("one", "usr_a", "block"))
+            typedRecords = allRecords
+            removeHandler = { token, _, _ ->
+                typedRecords = emptyList()
+                PlayerModerationCleanupResponse(Result.success(Unit), token)
+            }
+        }
+        val model = PlayerModerationListScreenModel(source)
+        // React during publication, before the refresh coroutine has returned.
+        val submit = launch(Dispatchers.Unconfined) {
+            model.state.first { it.hasLoaded && !it.isLoading }
+            model.clearSelected()
+        }
+        try {
+            model.loadIfNeeded()
+            submit.join()
+            awaitUntil { model.state.value.result != null }
+            assertEquals(listOf("usr_a"), source.removedTargets)
+            assertEquals(PlayerModerationCleanupResultKind.Success, model.state.value.result?.kind)
+        } finally {
+            submit.cancel()
+            close(model)
+            SharedFlowCentre.emitLogout()
+        }
+    }
+
     @Test
     fun loginWhileModelIsAliveAutomaticallyLoadsCurrentRecords() = runBlocking {
         SharedFlowCentre.emitLogout()
@@ -426,11 +459,8 @@ private fun record(id: String, target: String, type: String) = PlayerModerationD
     type = type,
 )
 
-private fun close(model: PlayerModerationListScreenModel) {
-    ViewModelStore().apply {
-        put("test", model)
-        clear()
-    }
+private suspend fun close(model: PlayerModerationListScreenModel) {
+    model.clearAndJoin()
 }
 
 private suspend fun awaitUntil(predicate: () -> Boolean) {
