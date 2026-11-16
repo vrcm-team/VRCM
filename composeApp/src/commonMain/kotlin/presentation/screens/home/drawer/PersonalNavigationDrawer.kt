@@ -16,7 +16,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -73,7 +72,6 @@ fun PersonalNavigationDrawer(
     onInventoryClick: () -> Unit,
     onNameplateClick: () -> Unit,
     onSettingsClick: () -> Unit,
-    onLogoutClick: () -> Unit,
     content: @Composable () -> Unit,
 ) {
     val drawerDescription = strings.personalDrawerTitle
@@ -131,9 +129,6 @@ fun PersonalNavigationDrawer(
                         }
                         AppGroup {
                             DrawerRow(AppIcons.Settings, AppRowIconColor.Gray, strings.drawerSettings, onSettingsClick)
-                        }
-                        AppGroup {
-                            LogoutRow(onLogoutClick)
                         }
                     }
                 }
@@ -332,25 +327,6 @@ private fun DrawerRow(
 @Composable
 private fun DrawerRowDivider() {
     AppDivider(Modifier.padding(start = AppRowIconDividerInset, end = AppSpacing.row))
-}
-
-/** 破坏性操作独占一组、红字居中（与设置页的退出登录一致）。 */
-@Composable
-private fun LogoutRow(onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(role = Role.Button, onClick = onClick)
-            .defaultMinSize(minHeight = AppSize.rowMinHeight)
-            .padding(horizontal = AppSpacing.row, vertical = 10.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        AppText(
-            text = strings.stettingLogout,
-            style = AppTheme.type.body,
-            color = AppTheme.colors.destructive,
-        )
-    }
 }
 
 @Composable

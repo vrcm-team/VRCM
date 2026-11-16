@@ -50,7 +50,6 @@ import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesHubTabRow
 import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesTab
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.dialog.UserStatusDialog
-import io.github.vrcmteam.vrcm.presentation.screens.home.dialog.LogoutConfirmationDialog
 import io.github.vrcmteam.vrcm.presentation.screens.home.drawer.PersonalDrawerUser
 import io.github.vrcmteam.vrcm.presentation.screens.home.drawer.PersonalNavigationDrawer
 import io.github.vrcmteam.vrcm.presentation.screens.home.drawer.drawerStatusSharedUserId
@@ -675,8 +674,6 @@ private fun HomePersonalDrawer(
     val currentUser = model.currentUser
     var currentDialog by LocationDialogContent.current
     var statusVisible by remember(currentUser?.id) { mutableStateOf(true) }
-    var showLogoutConfirmation by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
     val suffix = rememberContainerTransformToken("home-user:${model.userId}") ?: LocalSharedSuffixKey.current
     // 从抽屉跳转时不收起抽屉：返回首页时它还展开在原处；
     // 进出个人资料时，头像、名字、状态也就能在抽屉和详情页之间来回共享过渡
@@ -709,22 +706,8 @@ private fun HomePersonalDrawer(
         onInventoryClick = { navigator push InventoryScreen },
         onNameplateClick = { navigator push model.meetupCardStartRoute() },
         onSettingsClick = { navigator push SettingsScreen },
-        onLogoutClick = { showLogoutConfirmation = true },
         content = content,
     )
-    if (showLogoutConfirmation) {
-        LogoutConfirmationDialog(
-            onDismissRequest = { showLogoutConfirmation = false },
-            onConfirm = {
-                showLogoutConfirmation = false
-                scope.launch {
-                    drawerState.close()
-                    model.hideDrawer()
-                    model.logout()
-                }
-            },
-        )
-    }
 }
 
 private fun CurrentUserData.toPersonalDrawerUser() = PersonalDrawerUser(
