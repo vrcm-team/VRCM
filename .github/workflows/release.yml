@@ -144,7 +144,9 @@ jobs:
           [[ "${#apks[@]}" -eq 1 ]] || { echo 'Expected exactly one GitHub release APK.'; exit 1; }
           signer="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
           "$signer" verify --print-certs "${apks[0]}" > "$RUNNER_TEMP/apk-certificate.txt"
-          actual="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/apk-certificate.txt" | tr '[:upper:]' '[:lower:]')"
+          # Build Tools 37 uses "V2 Signer:" instead of the older "Signer #1" prefix.
+          # Every reported signer must resolve to the same formal certificate.
+          actual="$(sed -nE 's/^(Signer #[0-9]+|V[0-9.]+ Signer:) certificate SHA-256 digest: ([[:xdigit:]]{64})$/\2/p' "$RUNNER_TEMP/apk-certificate.txt" | tr '[:upper:]' '[:lower:]' | sort -u)"
           [[ "$actual" == "$ANDROID_SIGNING_CERT_SHA256" ]] || { echo 'The APK is not signed with the formal VRCM certificate.'; exit 1; }
           mkdir -p artifacts
           cp "${apks[0]}" "artifacts/VRCM-v$VERSION.apk"
