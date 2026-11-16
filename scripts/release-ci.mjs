@@ -121,7 +121,9 @@ async function requestJson(url, { token, method = 'GET', body, file, timeout = 3
     signal: AbortSignal.timeout(timeout),
   });
   if (!response.ok) {
-    const error = new Error(`${new URL(url).hostname}${new URL(url).pathname}: HTTP ${response.status}`);
+    const details = await response.json().catch(() => null);
+    const message = typeof details?.message === 'string' ? ` (${details.message.replace(/[\r\n]/g, ' ').slice(0, 500)})` : '';
+    const error = new Error(`${method} ${new URL(url).hostname}${new URL(url).pathname}: HTTP ${response.status}${message}`);
     error.status = response.status;
     throw error;
   }
@@ -268,12 +270,13 @@ export async function publishRelease(root, metadata, artifacts, notes, allowExis
   assertReleaseWritable(release, allowExisting);
   if (!release) {
     release = await api.request('/releases', { method: 'POST', body: {
-      tag_name: metadata.tag, target_commitish: metadata.sha, name: `v${metadata.version}`,
+      // The remote tag was already verified; do not request another commit or tag write.
+      tag_name: metadata.tag, name: `v${metadata.version}`,
       body: fs.readFileSync(notes, 'utf8'), draft: true, prerelease,
     } });
   } else {
     release = await api.request(`/releases/${release.id}`, { method: 'PATCH', body: {
-      tag_name: metadata.tag, target_commitish: metadata.sha, body: fs.readFileSync(notes, 'utf8'),
+      tag_name: metadata.tag, body: fs.readFileSync(notes, 'utf8'),
     } });
   }
   if (release.tag_name !== metadata.tag) throw new Error('The draft no longer references the validated release tag.');

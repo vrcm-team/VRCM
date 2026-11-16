@@ -210,6 +210,7 @@ function publishingFixture(t, { existingDraft = false, corruptUpload = false, up
       if (method === 'PATCH') {
         // Draft edits can return GitHub's internal untagged ID if the tag is omitted.
         const changes = JSON.parse(options.body);
+        if (changes.target_commitish) return Response.json({ message: 'Resource not accessible by integration' }, { status: 403 });
         release.tag_name = changes.tag_name || 'untagged-internal-id';
         Object.assign(release, changes);
       }
