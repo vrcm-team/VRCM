@@ -75,7 +75,7 @@ iOS Release 的 Kotlin/Native 链接在 Gradle 进程内执行，使用 8 GB 堆
 
 Android 仅发布 `github` flavor，不上传 Google Play AAB。macOS 安装包遵循 runner 的 CPU 架构；iOS IPA 沿用项目的侧载打包方式，不是 App Store 分发或开发者账号签名。Windows EXE 和 DMG 沿用现有打包配置，不新增代码签名或公证凭据。
 
-所有平台从同一个已校验的 tag commit 构建。四份安装包必须齐全且非空，才会生成公告和 `SHA256SUMS`。发布时先创建草稿，按 Release ID 上传、查询附件，并校验 GitHub 返回的大小和 SHA-256 摘要，全部通过才公开。tag 查询不返回草稿时，通过分页 Release 列表识别已有草稿，避免重复创建。更新草稿公告和公开草稿时显式保留版本标签，避免变为内部的 `untagged` 标识。恢复时复用大小和摘要均一致的已上传附件，仅替换不匹配的文件。失败的草稿可重跑恢复，不会暴露缺少附件的新 Release。
+所有平台从同一个已校验的 tag commit 构建。四份安装包必须齐全且非空，才会生成公告。发布时先创建草稿，按 Release ID 上传、查询附件，并校验 GitHub 返回的大小和 SHA-256 摘要，全部通过才公开。tag 查询不返回草稿时，通过分页 Release 列表识别已有草稿，避免重复创建。更新草稿公告和公开草稿时显式保留版本标签，避免变为内部的 `untagged` 标识。恢复时复用大小和摘要均一致的已上传附件，仅替换不匹配的文件。失败的草稿可重跑恢复，不会暴露缺少附件的新 Release。
 
 安装器升级标识、应用 ID、Manifest 和既有 Gradle 打包配置不在此流程中修改。本地 `scripts/codex-release.sh` 仍可按原方式使用。
 
@@ -85,7 +85,7 @@ Android 仅发布 `github` flavor，不上传 Google Play AAB。macOS 安装包�
 
 正文固定沿用历史 `1.1.3`、`1.1.4` 的版式，手写公告也必须通过同一格式校验：先是 `## 新增`、`## 优化`、`## 修复`，接着一行 `****************`，再是 `## New Features`、`## Optimizations`、`## Bug Fixes`，末尾为 `详情 / Details: <https://github.com/vrcm-team/VRCM/tree/main/docs/releases/<版本>.md>`。分类内使用单行 `- ` 列表，中英文条目逐项对应。
 
-公告不增加下载、校验和或完整变更区块；安装包和 `SHA256SUMS` 只作为 Release 附件。详情文档缺失或为空会在构建前失败，避免发布失效链接。CD 不依赖本地 Codex 登录。
+公告不增加下载、校验和或完整变更区块；Release 附件仅包含四个平台的安装包，不生成或上传独立的 `SHA256SUMS` 文件。安装包的 SHA-256 摘要仍记录在 Actions Summary，并用于发布前的完整性校验。详情文档缺失或为空会在构建前失败，避免发布失效链接。CD 不依赖本地 Codex 登录。
 
 DeepSeek 未配置、请求失败、输出被截断或结构校验不通过时，工作流停止发布，提示重试或在 tag 中提供符合格式的手写公告；不会回退为格式不同的 GitHub 默认变更记录。生成模式记录在 Actions Summary，发布前会再次校验最终正文格式。
 

@@ -316,14 +316,10 @@ async function main() {
   const metadata = JSON.parse(fs.readFileSync(values.metadata, 'utf8'));
   if (command === 'verify-build') return validateBuildRun(metadata, values['build-run'] || '');
   const artifacts = verifyArtifacts(path.resolve(values.artifacts), metadata);
-  const checksumFile = path.resolve(values.artifacts, 'SHA256SUMS');
-  fs.writeFileSync(checksumFile, artifacts.map(item => `${item.digest.slice(7)}  ${item.name}\n`).join(''));
   if (command === 'notes') {
     await generateNotes(root, metadata, artifacts, values.output, values.model, values.effort, { manualNotes: values.notes });
     for (const artifact of artifacts) summary(`- ${artifact.name}: ${artifact.size} bytes, ${artifact.digest}`);
   } else {
-    const stat = fs.statSync(checksumFile);
-    artifacts.push({ name: 'SHA256SUMS', file: checksumFile, size: stat.size, digest: `sha256:${crypto.createHash('sha256').update(fs.readFileSync(checksumFile)).digest('hex')}` });
     await publishRelease(root, metadata, artifacts, path.resolve(values.notes), values['allow-existing'], values.prerelease);
   }
 }

@@ -371,10 +371,8 @@ jobs:
             --output "$RUNNER_TEMP/release-notes.md" --model "$AI_MODEL" --effort "$AI_EFFORT" "${args[@]}"
       - uses: actions/upload-artifact@v7
         with:
-          name: release-notes-and-checksums
-          path: |
-            ${{ runner.temp }}/release-notes.md
-            artifacts/SHA256SUMS
+          name: release-notes
+          path: ${{ runner.temp }}/release-notes.md
           if-no-files-found: error
           retention-days: 7
       - name: Publish only after every artifact passes verification
