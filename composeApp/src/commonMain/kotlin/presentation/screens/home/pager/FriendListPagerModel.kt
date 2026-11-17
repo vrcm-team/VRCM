@@ -171,6 +171,7 @@ class FriendListPagerModel(
 
     // 缓存世界数据，以ID为键
     private val favoritedWorldMap: MutableMap<String, FavoritedWorld> = mutableStateMapOf()
+    private var worldDetailsLoaded = false
 
     private val _worldList = MutableStateFlow(emptyList<WorldData>())
     val worldList: StateFlow<List<WorldData>> = _worldList.asStateFlow()
@@ -186,6 +187,7 @@ class FriendListPagerModel(
 
     // 缓存模型数据，以ID为键
     private val favoritedAvatarMap: MutableMap<String, AvatarData> = mutableStateMapOf()
+    private var avatarDetailsLoaded = false
 
     private val _avatarList = MutableStateFlow(emptyList<AvatarData>())
     val avatarList: StateFlow<List<AvatarData>> = _avatarList.asStateFlow()
@@ -352,20 +354,34 @@ class FriendListPagerModel(
             }
         }
         viewModelScope.launch {
-            worldFavoriteGroupsFlow.collect { groups ->
+            worldFavoriteGroupsFlow.collectLatest { groups ->
                 retainExistingFavoriteSelections(
                     favoriteType = World,
                     availableIds = groups.values.flatten().mapTo(mutableSetOf(), FavoriteData::id),
                 )
+                findWorldList(searchTexts[1])
+                val token = activeSessionToken ?: return@collectLatest
+                val generation = accountGeneration
+                if (groups.isEmpty() || !worldDetailsLoaded || 1 in refreshingTabs.value) return@collectLatest
+                withContext(Dispatchers.IO) {
+                    synchronizeWorldFavorites(token, generation)
+                }
             }
         }
         viewModelScope.launch {
-            avatarFavoriteGroupsFlow.collect { groups ->
+            avatarFavoriteGroupsFlow.collectLatest { groups ->
                 retainExistingFavoriteSelections(
                     favoriteType = Avatar,
                     availableIds = groups.values.flatten()
                         .mapTo(mutableSetOf(), FavoriteData::favoriteId),
                 )
+                findAvatarList(searchTexts[2])
+                val token = activeSessionToken ?: return@collectLatest
+                val generation = accountGeneration
+                if (groups.isEmpty() || !avatarDetailsLoaded || 2 in refreshingTabs.value) return@collectLatest
+                withContext(Dispatchers.IO) {
+                    synchronizeAvatarFavorites(token, generation)
+                }
             }
         }
     }
@@ -427,8 +443,10 @@ class FriendListPagerModel(
             _favoriteGroupClearState.value = FavoriteGroupClearState()
             unresolvedFavoriteGroupClears.value = emptySet()
             favoritedWorldMap.clear()
+            worldDetailsLoaded = false
             createdWorldMap.clear()
             favoritedAvatarMap.clear()
+            avatarDetailsLoaded = false
             createdAvatarMap.clear()
             offlineStatusDescriptions.clear()
             val currentState = friendService.friendStateSnapshot.value
@@ -966,7 +984,7 @@ class FriendListPagerModel(
 
                 Avatar -> accountCacheManager.saveFavoriteAvatarsIfCurrent(
                     writeToken,
-                    favoritedAvatarMap.values.toList(),
+                    currentFavoritedAvatars(),
                 )
 
                 Friend -> Unit
@@ -1145,6 +1163,7 @@ class FriendListPagerModel(
                     cache = favoritedWorldMap,
                     worlds = cached.favoritedWorlds.flatMap { it.worlds },
                 )
+                worldDetailsLoaded = cached.worldsLoaded
                 _worldTotal.value = favoritedWorldMap.size
                 findWorldList(searchTexts[1])
             }
@@ -1152,6 +1171,7 @@ class FriendListPagerModel(
             Avatar -> {
                 favoritedAvatarMap.clear()
                 favoritedAvatarMap.putAll(cached.favoritedAvatars.associateBy { it.id })
+                avatarDetailsLoaded = cached.avatarsLoaded
                 _avatarTotal.value = favoritedAvatarMap.size
                 findAvatarList(searchTexts[2])
             }
@@ -1464,7 +1484,7 @@ class FriendListPagerModel(
             }
             _avatarTotal.value = favoritedAvatarMap.size
             findAvatarList(searchTexts[2])
-            FavoriteGroupClearPersistence.Avatars(favoritedAvatarMap.values.toList())
+            FavoriteGroupClearPersistence.Avatars(currentFavoritedAvatars())
         }
 
         Friend.value -> FavoriteGroupClearPersistence.None
@@ -1843,11 +1863,14 @@ class FriendListPagerModel(
         // 获取选中的世界分组
         val selectedGroup = worldGroupOptions.value.selectedGroup
 
+        // 收藏关系是分组的唯一来源；世界缓存只提供名称、封面等详情。
+        val currentWorlds = reconcileFavoritedWorlds(favoritedWorldMap.values.toList(), worldFavoriteGroupsFlow.value)
+        currentWorlds.forEach { world -> favoritedWorldMap[favoritedWorldCacheKey(world)] = world }
         // 从缓存中获取世界数据并过滤
         val filteredWorlds = if (selectedGroup != null) {
             // 如果选中了特定分组，按分组名过滤
             val groupName = selectedGroup.name
-            favoritedWorldMap.values
+            currentWorlds
                 .filter { world ->
                     world.favoriteGroup == groupName &&
                             (name.isEmpty() || world.name.lowercase().contains(name.lowercase())
@@ -1855,7 +1878,7 @@ class FriendListPagerModel(
                 }
         } else {
             // 如果没有选择特定分组，仅按名称过滤
-            favoritedWorldMap.values
+            currentWorlds
                 .filter { world ->
                     name.isEmpty() || world.name.lowercase().contains(name.lowercase())
                             || (world.id == "???" && world.favoriteId.orEmpty().lowercase().contains(name.lowercase()))
@@ -1874,8 +1897,8 @@ class FriendListPagerModel(
         } else {
             emptyList()
         }
-        _worldTotal.value = favoritedWorldMap.size
-        _worldContentTotal.value = (favoritedWorldMap.keys + createdWorldMap.keys).size
+        _worldTotal.value = currentWorlds.size
+        _worldContentTotal.value = (currentWorlds.map(::favoritedWorldCacheKey) + createdWorldMap.keys).toSet().size
     }
 
     /**
@@ -1885,17 +1908,18 @@ class FriendListPagerModel(
     private fun findAvatarList(name: String) {
         val selectedGroup = avatarGroupOptions.value.selectedGroup
 
+        val currentAvatars = currentFavoritedAvatars()
         // 从缓存中获取模型数据并过滤
         val filteredAvatars = if (selectedGroup != null) {
             val favoriteIds = avatarFavoriteGroupsFlow.value[selectedGroup]
                 ?.map { it.favoriteId }?.toSet() ?: emptySet()
-            favoritedAvatarMap.values
+            currentAvatars
                 .filter { avatar ->
                     favoriteIds.contains(avatar.id) &&
                             (name.isEmpty() || avatar.name.lowercase().contains(name.lowercase()) || avatar.id.lowercase().contains(name.lowercase()))
                 }
         } else {
-            favoritedAvatarMap.values
+            currentAvatars
                 .filter { avatar ->
                     name.isEmpty() || avatar.name.lowercase().contains(name.lowercase()) || avatar.id.lowercase().contains(name.lowercase())
                 }
@@ -1912,8 +1936,8 @@ class FriendListPagerModel(
         } else {
             emptyList()
         }
-        _avatarTotal.value = favoritedAvatarMap.size
-        _avatarContentTotal.value = (favoritedAvatarMap.keys + createdAvatarMap.keys).size
+        _avatarTotal.value = currentAvatars.size
+        _avatarContentTotal.value = (currentAvatars.map { it.id } + createdAvatarMap.keys).toSet().size
     }
 
     private suspend fun doRefreshCreatedWorldList(
@@ -1992,11 +2016,12 @@ class FriendListPagerModel(
             mergeFavoritedAvatars(remoteAvatars, localAvatars)
         }.onSuccess { avatars ->
             if (!acceptsAccount(sessionToken, generation)) return@onSuccess
+            val currentDetails = favoritedAvatarMap.values.toList()
             favoritedAvatarMap.clear()
-            favoritedAvatarMap.putAll(avatars.associateBy { it.id })
-            _avatarTotal.value = favoritedAvatarMap.size
+            favoritedAvatarMap.putAll(mergeFavoritedAvatars(avatars, currentDetails).associateBy { it.id })
+            avatarDetailsLoaded = true
             findAvatarList(searchTexts[2])
-            persistFavoritedAvatars(cacheWriteToken, sessionToken, generation, avatars)
+            synchronizeAvatarFavorites(sessionToken, generation, cacheWriteToken)
         }.onFailure {
             if (it is CancellationException) throw it
             if (acceptsAccount(sessionToken, generation)) {
@@ -2004,6 +2029,33 @@ class FriendListPagerModel(
                 showFavoriteError(favoriteLocale?.favoriteAvatarsLoadFailed, it)
             }
         }
+    }
+
+    private fun currentFavoritedAvatars(): List<AvatarData> {
+        val groups = avatarFavoriteGroupsFlow.value
+        if (groups.isEmpty()) return favoritedAvatarMap.values.toList()
+        val favoriteIds = groups.values.flatten().mapTo(mutableSetOf()) { it.favoriteId }
+        return favoritedAvatarMap.values.filter { it.id in favoriteIds }
+    }
+
+    private suspend fun synchronizeAvatarFavorites(
+        sessionToken: AccountSessionToken,
+        generation: Long,
+        cacheWriteToken: AccountCacheWriteToken = accountCacheManager.captureWriteToken(sessionToken.userId),
+    ) {
+        val favoriteIds = avatarFavoriteGroupsFlow.value.values.flatten().mapTo(mutableSetOf()) { it.favoriteId }
+        for (avatarId in favoriteIds - favoritedAvatarMap.keys) {
+            val result = authService.reTryAuthCatching { avatarsApi.getAvatarById(avatarId) }
+            if (!acceptsAccount(sessionToken, generation)) return
+            result.onSuccess { avatar -> favoritedAvatarMap[avatar.id] = avatar }
+                .onFailure { error ->
+                    _refreshErrors.update { it + (2 to error.message.orEmpty()) }
+                    showFavoriteError(favoriteLocale?.favoriteAvatarsLoadFailed, error)
+                }
+        }
+        if (!acceptsAccount(sessionToken, generation)) return
+        findAvatarList(searchTexts[2])
+        persistFavoritedAvatars(cacheWriteToken, sessionToken, generation, currentFavoritedAvatars())
     }
 
     private suspend fun fetchFavoritedAvatars(tag: String?): List<AvatarData> {
@@ -2053,15 +2105,18 @@ class FriendListPagerModel(
 
             if (!acceptsAccount(sessionToken, generation)) return
             val worlds = mergeFavoritedWorlds(remoteFavoritedWorlds, localFavoritedWorlds)
-            replaceFavoritedWorldCache(cache = favoritedWorldMap, worlds = worlds)
-            _worldTotal.value = favoritedWorldMap.size
-            findWorldList(searchTexts[1])
-            persistFavoritedWorlds(
-                cacheWriteToken,
-                sessionToken,
-                generation,
-                groupFavoritedWorlds(worlds, worldFavoriteGroupsFlow.value),
+            val receivedRecordIds = worlds.mapTo(mutableSetOf()) { it.favoriteId }
+            // A list response started before an edit may omit a newly added world or carry its old group.
+            replaceFavoritedWorldCache(
+                cache = favoritedWorldMap,
+                worlds = mergeFavoritedWorlds(
+                    worlds,
+                    favoritedWorldMap.values.filterNot { it.favoriteId in receivedRecordIds },
+                ),
             )
+            worldDetailsLoaded = true
+            findWorldList(searchTexts[1])
+            synchronizeWorldFavorites(sessionToken, generation, cacheWriteToken)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -2070,6 +2125,42 @@ class FriendListPagerModel(
                 showFavoriteError(favoriteLocale?.favoriteWorldsLoadFailed, e)
             }
         }
+    }
+
+    private suspend fun synchronizeWorldFavorites(
+        sessionToken: AccountSessionToken,
+        generation: Long,
+        cacheWriteToken: AccountCacheWriteToken = accountCacheManager.captureWriteToken(sessionToken.userId),
+    ) {
+        val favorites = worldFavoriteGroupsFlow.value.values.flatten().distinctBy { it.id }
+        val knownRecordIds = favoritedWorldMap.values.mapTo(mutableSetOf()) { it.favoriteId }
+        for (favorite in favorites) {
+            val key = if (favorite.favoriteId == "???") favorite.id else favorite.favoriteId
+            if (key in favoritedWorldMap || favorite.id in knownRecordIds) continue
+            val result = authService.reTryAuthCatching {
+                if (favorite.favoriteId == "???") {
+                    FavoritedWorld(id = "???", name = "???", favoriteId = favorite.id, favoriteGroup = favorite.tags.first())
+                } else {
+                    worldsApi.getWorldById(favorite.favoriteId)
+                        .toFavoritedWorldForLocal(favorite.tags.first(), favorite.favoriteId)
+                        .copy(favoriteId = favorite.id)
+                }
+            }
+            if (!acceptsAccount(sessionToken, generation)) return
+            result.onSuccess { world -> favoritedWorldMap[key] = world }
+                .onFailure { error ->
+                    _refreshErrors.update { it + (1 to error.message.orEmpty()) }
+                    showFavoriteError(favoriteLocale?.favoriteWorldsLoadFailed, error)
+                }
+        }
+        if (!acceptsAccount(sessionToken, generation)) return
+        findWorldList(searchTexts[1])
+        persistFavoritedWorlds(
+            cacheWriteToken,
+            sessionToken,
+            generation,
+            groupFavoritedWorlds(favoritedWorldMap.values.toList(), worldFavoriteGroupsFlow.value),
+        )
     }
 
     private fun acceptsAccount(sessionToken: AccountSessionToken, generation: Long): Boolean =
@@ -2251,11 +2342,32 @@ internal fun mergeFavoritedWorlds(
     localWorlds: List<FavoritedWorld>,
 ): List<FavoritedWorld> = (remoteWorlds + localWorlds).distinctBy(::favoritedWorldCacheKey)
 
+/** Joins cached world details with current membership, preserving distinct hidden favorite records. */
+internal fun reconcileFavoritedWorlds(
+    worlds: List<FavoritedWorld>,
+    favoriteGroups: Map<FavoriteGroupData, List<FavoriteData>>,
+): List<FavoritedWorld> {
+    if (favoriteGroups.isEmpty()) return worlds
+    val memberships = favoriteGroups.entries
+        .sortedBy { it.key.ownerId == "local" }
+        .flatMap { (group, favorites) -> favorites.map { group.name to it } }
+    val byWorldId = memberships.groupBy { it.second.favoriteId }
+    val byRecordId = memberships.associateBy { it.second.id }
+    return worlds.mapNotNull { world ->
+        val (groupName, favorite) = if (world.id == "???") {
+            byRecordId[world.favoriteId]
+        } else {
+            byWorldId[world.id]?.firstOrNull()
+        } ?: return@mapNotNull null
+        world.copy(favoriteId = favorite.id, favoriteGroup = groupName)
+    }
+}
+
 internal fun groupFavoritedWorlds(
     worlds: List<FavoritedWorld>,
     favoriteGroups: Map<FavoriteGroupData, List<FavoriteData>>,
 ): List<FavoritedWorldGroup> {
-    val worldsByGroup = worlds.groupBy { it.favoriteGroup }
+    val worldsByGroup = reconcileFavoritedWorlds(worlds, favoriteGroups).groupBy { it.favoriteGroup }
     val groups = favoriteGroups.keys
         .filter { it.type == World.value }
         .distinctBy { it.name }

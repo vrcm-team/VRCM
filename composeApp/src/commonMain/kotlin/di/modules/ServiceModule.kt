@@ -36,6 +36,7 @@ val serviceModule: Module = module {
     } bind WebSocketSessionRecovery::class
     single { UserProfileEnrichmentService(get()) }
     singleOf(::FavoriteService)
+    singleOf(::FavoriteEditService)
     singleOf(::FriendService)
     singleOf(::FriendActivityService)
     singleOf(::StatisticsTransferService)
