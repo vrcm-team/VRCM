@@ -147,13 +147,13 @@ data class UserProfileScreen(
         var bottomSheetIsVisible by remember {
             mutableStateOf(openActionMenuOnEntry && actionMenuEntranceGate.consume())
         }
-        val sheetState = rememberAppSheetState()
-        val actionMenuNestedScrollConnection =
-            rememberConsumeRemainingUpwardScrollConnection()
+        val sheetState = rememberAppSheetState(skipPartiallyExpanded = true)
         var openAlertDialog by remember { mutableStateOf(false) }
         var openEditProfileDialog by remember { mutableStateOf(false) }
         var openEditNoteDialog by remember { mutableStateOf(false) }
         var openBoopDialog by remember { mutableStateOf(false) }
+        var openUnfriendDialog by remember { mutableStateOf(false) }
+        var friendActionRunning by remember { mutableStateOf(false) }
         var pendingPlayerBlockChange by remember { mutableStateOf<Boolean?>(null) }
         var openReportDialog by remember { mutableStateOf(false) }
         var boopSending by remember { mutableStateOf(false) }
@@ -258,52 +258,97 @@ data class UserProfileScreen(
             sheetState = sheetState,
             onDismissRequest = { bottomSheetIsVisible = false }
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .nestedScroll(actionMenuNestedScrollConnection)
-                    .verticalScroll(rememberScrollState()),
-            ) {
-                AppSheetActionGroup {
-                    SheetItems(
-                        currentUser = currentUser,
-                        userProfileScreenModel = userProfileScreenModel,
-                        hideSheet = { sheetState.hide() },
-                        onHideCompletion = {
-                            if (!sheetState.isVisible) bottomSheetIsVisible = false
-                        },
-                        openAlertDialog = { openAlertDialog = true },
-                        openEditProfileDialog = { openEditProfileDialog = true },
-                        onManageFriendFavorite = { showFriendFavoriteSheet = true },
-                        openEditNoteDialog = { openEditNoteDialog = true },
-                        boopEnabled = userProfileScreenModel.isBoopAllowed,
-                        openBoopDialog = { openBoopDialog = true },
-                        playerChatboxModerationState = playerChatboxModerationState,
-                        playerVoiceModerationState = playerVoiceModerationState,
-                        playerInteractionState = playerInteractionState,
-                        requestPlayerInteractionOverride = { pendingInteractionOverride = it },
-                        retryPlayerInteractionLoad = {
-                            userProfileScreenModel.refreshPlayerInteractionStatus(interactionLoadFailedMessage)
-                        },
-                        playerBlockState = playerBlockState,
-                        retryPlayerBlockStatus = {
-                            userProfileScreenModel.refreshPlayerBlockStatus(
-                                localeStrings.profileBlockStatusLoadFailed
-                            )
-                        },
-                        confirmPlayerBlockChange = { pendingPlayerBlockChange = it },
-                        openReportDialog = { openReportDialog = true },
-                        openImageInvitePicker = openImageInvitePicker,
-                        openInviteMessageSelection = { action ->
-                            userProfileScreenModel.openInviteMessageSelection(
-                                action = action,
-                                targetUserId = currentUser.id,
-                                targetDisplayName = currentUser.displayName,
-                            )
-                        },
+            SheetItems(
+                currentUser = currentUser,
+                userProfileScreenModel = userProfileScreenModel,
+                hideSheet = { sheetState.hide() },
+                onHideCompletion = {
+                    if (!sheetState.isVisible) bottomSheetIsVisible = false
+                },
+                friendActionEnabled = !friendActionRunning,
+                confirmUnfriend = { openUnfriendDialog = true },
+                runFriendAction = { action ->
+                    if (!friendActionRunning) {
+                        friendActionRunning = true
+                        actionScope.launch {
+                            try {
+                                val dismissJob = launch {
+                                    sheetState.hide()
+                                    if (!sheetState.isVisible) bottomSheetIsVisible = false
+                                }
+                                val succeeded = action()
+                                dismissJob.join()
+                                if (!succeeded) {
+                                    bottomSheetIsVisible = true
+                                    sheetState.show()
+                                }
+                            } finally {
+                                friendActionRunning = false
+                            }
+                        }
+                    }
+                },
+                openAlertDialog = { openAlertDialog = true },
+                openEditProfileDialog = { openEditProfileDialog = true },
+                onManageFriendFavorite = { showFriendFavoriteSheet = true },
+                openEditNoteDialog = { openEditNoteDialog = true },
+                boopEnabled = userProfileScreenModel.isBoopAllowed,
+                openBoopDialog = { openBoopDialog = true },
+                playerChatboxModerationState = playerChatboxModerationState,
+                playerVoiceModerationState = playerVoiceModerationState,
+                playerInteractionState = playerInteractionState,
+                requestPlayerInteractionOverride = { pendingInteractionOverride = it },
+                retryPlayerInteractionLoad = {
+                    userProfileScreenModel.refreshPlayerInteractionStatus(interactionLoadFailedMessage)
+                },
+                playerBlockState = playerBlockState,
+                retryPlayerBlockStatus = {
+                    userProfileScreenModel.refreshPlayerBlockStatus(localeStrings.profileBlockStatusLoadFailed)
+                },
+                confirmPlayerBlockChange = { pendingPlayerBlockChange = it },
+                openReportDialog = { openReportDialog = true },
+                openImageInvitePicker = openImageInvitePicker,
+                openInviteMessageSelection = { action ->
+                    userProfileScreenModel.openInviteMessageSelection(
+                        action = action,
+                        targetUserId = currentUser.id,
+                        targetDisplayName = currentUser.displayName,
                     )
-                }
-            }
+                },
+            )
+        }
+        if (openUnfriendDialog) {
+            AppAlert(
+                onDismissRequest = { if (!friendActionRunning) openUnfriendDialog = false },
+                title = { AppText(localeStrings.profileUnfriendConfirmTitle) },
+                text = { AppText(localeStrings.profileUnfriendConfirmMessage.replace("%name%", currentUser.displayName)) },
+                confirmButton = {
+                    AppButton(
+                        enabled = !friendActionRunning,
+                        role = AppButtonRole.Destructive,
+                        onClick = {
+                            if (!friendActionRunning) {
+                                friendActionRunning = true
+                                actionScope.launch {
+                                    try {
+                                        if (userProfileScreenModel.unfriend(currentUser.id, localeStrings.profileUnfriended)) {
+                                            openUnfriendDialog = false
+                                        }
+                                    } finally {
+                                        friendActionRunning = false
+                                    }
+                                }
+                            }
+                        },
+                    ) {
+                        if (friendActionRunning) AppActivityIndicator(Modifier.size(18.dp))
+                        else AppText(localeStrings.profileUnfriend)
+                    }
+                },
+                dismissButton = {
+                    AppButton(text = localeStrings.cancel, enabled = !friendActionRunning, onClick = { openUnfriendDialog = false })
+                },
+            )
         }
         // Friend FavoriteType group management bottom sheet
         FavoriteGroupBottomSheet(
@@ -506,6 +551,9 @@ private fun ColumnScope.SheetItems(
     userProfileScreenModel: UserProfileScreenModel,
     hideSheet: suspend () -> Unit,
     onHideCompletion: () -> Unit,
+    friendActionEnabled: Boolean,
+    confirmUnfriend: () -> Unit,
+    runFriendAction: (suspend () -> Boolean) -> Unit,
     openAlertDialog: () -> Unit,
     openEditProfileDialog: () -> Unit,
     onManageFriendFavorite: () -> Unit,
@@ -527,173 +575,161 @@ private fun ColumnScope.SheetItems(
     val navigator = LocalNavigator.currentOrThrow
     val localeStrings = strings
     val scope = rememberCoroutineScope()
-    // 只有当是自己的个人资料时才显示
-    if (currentUser.isSelf) {
-
-        SheetButtonItem(text = localeStrings.profileEditProfile, onClick = {
-            scope.launch { hideSheet() }.invokeOnCompletion {
-                onHideCompletion()
-                openEditProfileDialog()
+    var page by remember(currentUser.id) { mutableStateOf(ProfileActionPage.Overview) }
+    var closing by remember { mutableStateOf(false) }
+    val scrollState = rememberScrollState()
+    val nestedScrollConnection = rememberConsumeRemainingUpwardScrollConnection()
+    val performAction: (() -> Unit) -> Unit = { action ->
+        if (!closing) {
+            closing = true
+            scope.launch {
+                try {
+                    // 目标弹窗或页面立即响应点击，抽屉同时退场。
+                    action()
+                    hideSheet()
+                    onHideCompletion()
+                } finally {
+                    closing = false
+                }
             }
-        })
-
-        SheetButtonItem(text = localeStrings.profileViewGallery, onClick = {
-            scope.launch { hideSheet() }.invokeOnCompletion {
-                onHideCompletion()
-                navigator.push(GalleryScreen)
-            }
-        })
-
-        SheetButtonItem(text = localeStrings.recentWorldsTitle, onClick = {
-            scope.launch { hideSheet() }.invokeOnCompletion {
-                onHideCompletion()
-                navigator.push(RecentWorldsScreen)
-            }
-        })
-
+        }
     }
+    LaunchedEffect(page) { scrollState.scrollTo(0) }
+    LocalAppOverlayBackHandler.current?.invoke(page != ProfileActionPage.Overview) { page = ProfileActionPage.Overview }
 
-    // 管理好友收藏分组，仅当不是自己且是好友时显示
-    if (!currentUser.isSelf) {
-        SheetButtonItem(text = localeStrings.selectFavoriteGroup, onClick = {
-            scope.launch { hideSheet() }.invokeOnCompletion {
-                onHideCompletion()
-                onManageFriendFavorite()
-            }
-        })
-        SheetButtonItem(text = localeStrings.userNoteEditTitle, onClick = {
-            scope.launch { hideSheet() }.invokeOnCompletion {
-                onHideCompletion()
-                openEditNoteDialog()
-            }
-        })
-
-        PlayerInteractionSheetItem(
-            targetUserId = currentUser.id,
-            state = playerInteractionState,
-            hideSheet = hideSheet,
-            onHideCompletion = onHideCompletion,
-            requestOverride = requestPlayerInteractionOverride,
-            retryLoad = retryPlayerInteractionLoad,
-        )
-
-        val blockActionText = when {
-            !playerBlockState.isSessionAvailable -> localeStrings.profileBlockStatusUnavailable
-            playerBlockState.isLoading -> localeStrings.profileBlockStatusChecking
-            playerBlockState.loadFailed -> localeStrings.profileBlockStatusRetry
-            playerBlockState.isBlocked == true -> localeStrings.profileUnblock
-            playerBlockState.isBlocked == false -> localeStrings.profileBlock
-            else -> localeStrings.profileBlockStatusChecking
-        }
-        val blockActionEnabled = when {
-            !playerBlockState.isSessionAvailable -> false
-            playerBlockState.isLoading || playerBlockState.isUpdating -> false
-            playerBlockState.loadFailed -> true
-            else -> playerBlockState.isBlocked != null
-        }
-        SheetButtonItem(text = blockActionText, enabled = blockActionEnabled, onClick = {
-            if (playerBlockState.loadFailed) {
-                retryPlayerBlockStatus()
-            } else {
-                val blocked = playerBlockState.isBlocked ?: return@SheetButtonItem
-                scope.launch { hideSheet() }.invokeOnCompletion {
-                    onHideCompletion()
-                    confirmPlayerBlockChange(!blocked)
+    Column(Modifier.fillMaxWidth()) {
+        ProfileActionHeader(currentUser, page, onBack = { page = ProfileActionPage.Overview }, onClose = { performAction {} })
+        Column(
+            Modifier.weight(1f, fill = false)
+                .nestedScroll(nestedScrollConnection)
+                .verticalScroll(scrollState)
+                .padding(horizontal = AppSpacing.page)
+                .padding(top = AppSpacing.s, bottom = AppSpacing.l),
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.l),
+        ) {
+            when (page) {
+                ProfileActionPage.Overview -> {
+                    if (currentUser.isFriend && !currentUser.isSelf) {
+                        Row(
+                            Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                            horizontalArrangement = Arrangement.spacedBy(AppSpacing.s),
+                        ) {
+                            ProfileQuickAction(localeStrings.profileBoop, AppIcons.Tap, enabled = boopEnabled && !closing) { performAction(openBoopDialog) }
+                            ProfileQuickAction(localeStrings.profileRequestInvite, AppIcons.Envelope, enabled = !closing) {
+                                performAction { openInviteMessageSelection(InviteMessageAction.RequestInvite) }
+                            }
+                            ProfileQuickAction(localeStrings.profileActionInvite, AppIcons.Share, enabled = !closing) { page = ProfileActionPage.Invite }
+                        }
+                    }
+                    ProfileActionSection(localeStrings.profileActionManage) {
+                        if (currentUser.isSelf) {
+                            ProfileActionRow(localeStrings.profileEditProfile, AppIcons.Edit, { performAction(openEditProfileDialog) })
+                            ProfileActionRow(localeStrings.profileViewGallery, AppIcons.Gallery, { performAction { navigator.push(GalleryScreen) } }, divider = true)
+                            ProfileActionRow(localeStrings.recentWorldsTitle, AppIcons.DateRange, { performAction { navigator.push(RecentWorldsScreen) } }, divider = true)
+                        } else {
+                            ProfileActionRow(localeStrings.selectFavoriteGroup, AppIcons.FavoriteBorder, { performAction(onManageFriendFavorite) })
+                            ProfileActionRow(localeStrings.userNoteEditTitle, AppIcons.Edit, { performAction(openEditNoteDialog) }, divider = true)
+                        }
+                        ProfileActionRow(
+                            text = if (currentUser.isSelf) localeStrings.profileViewFriendNetwork else localeStrings.profileViewMutualFriends,
+                            icon = AppIcons.Group,
+                            divider = true,
+                            onClick = {
+                                performAction {
+                                    if (currentUser.isSelf) navigator.push(FriendNetworkScreen)
+                                    else navigator.push(MutualFriendsScreen(currentUser.id, currentUser.displayName))
+                                }
+                            },
+                        )
+                        if (!currentUser.isSelf && !currentUser.isFriend) {
+                            FriendRequestSheetItem(currentUser, userProfileScreenModel, friendActionEnabled && !closing, runFriendAction)
+                        }
+                    }
+                    ProfileActionSection(localeStrings.profileActionPreferences) {
+                        if (!currentUser.isSelf) {
+                            ProfileActionRow(localeStrings.profileActionInteraction, AppIcons.Settings, { page = ProfileActionPage.Interaction })
+                        }
+                        ProfileActionRow(localeStrings.profileActionMore, AppIcons.More, { page = ProfileActionPage.More }, divider = !currentUser.isSelf)
+                    }
+                }
+                ProfileActionPage.Interaction -> {
+                    ProfileActionSection(localeStrings.profileActionInteraction) {
+                        PlayerInteractionSheetItem(
+                            targetUserId = currentUser.id,
+                            state = playerInteractionState,
+                            performAction = performAction,
+                            requestOverride = requestPlayerInteractionOverride,
+                            retryLoad = retryPlayerInteractionLoad,
+                        )
+                        if (playerChatboxModerationState != PlayerChatboxModerationState.Unavailable) {
+                            ProfileActionDivider()
+                            PlayerChatboxModerationSheetItem(playerChatboxModerationState, userProfileScreenModel)
+                        }
+                        if (playerVoiceModerationState != PlayerVoiceModerationState.Unavailable) {
+                            ProfileActionDivider()
+                            PlayerVoiceModerationSheetItem(playerVoiceModerationState, userProfileScreenModel)
+                        }
+                    }
+                }
+                ProfileActionPage.Invite -> {
+                    ProfileActionSection(localeStrings.profileActionInvite) {
+                        ProfileActionRow(localeStrings.profileInviteToMyInstance, AppIcons.Envelope, {
+                            performAction { openInviteMessageSelection(InviteMessageAction.Invite) }
+                        })
+                        ProfileActionRow(localeStrings.profileImageInvite, AppIcons.AddPhoto, { performAction(openImageInvitePicker) }, divider = true)
+                    }
+                }
+                ProfileActionPage.More -> {
+                    if (!currentUser.isSelf) {
+                        ProfileActionSection(localeStrings.profileActionRelationship) {
+                            val blockActionText = when {
+                                !playerBlockState.isSessionAvailable -> localeStrings.profileBlockStatusUnavailable
+                                playerBlockState.isLoading -> localeStrings.profileBlockStatusChecking
+                                playerBlockState.loadFailed -> localeStrings.profileBlockStatusRetry
+                                playerBlockState.isBlocked == true -> localeStrings.profileUnblock
+                                playerBlockState.isBlocked == false -> localeStrings.profileBlock
+                                else -> localeStrings.profileBlockStatusChecking
+                            }
+                            val blockActionEnabled = playerBlockState.isSessionAvailable &&
+                                !playerBlockState.isLoading && !playerBlockState.isUpdating &&
+                                (playerBlockState.loadFailed || playerBlockState.isBlocked != null)
+                            ProfileActionRow(
+                                text = blockActionText,
+                                icon = AppIcons.Block,
+                                enabled = blockActionEnabled && !closing,
+                                destructive = true,
+                                onClick = {
+                                    if (playerBlockState.loadFailed) retryPlayerBlockStatus()
+                                    else playerBlockState.isBlocked?.let { blocked -> performAction { confirmPlayerBlockChange(!blocked) } }
+                                },
+                            )
+                            if (currentUser.isFriend && currentUser.friendRequestStatus == Completed) {
+                                ProfileActionRow(localeStrings.profileUnfriend, AppIcons.PersonRemove, { performAction(confirmUnfriend) },
+                                    enabled = friendActionEnabled && !closing, destructive = true, divider = true)
+                            }
+                        }
+                        ProfileActionSection(localeStrings.profileActionSafety) {
+                            ProfileActionRow(localeStrings.report, AppIcons.Shield, { performAction(openReportDialog) }, destructive = true)
+                        }
+                    }
+                    ProfileActionSection(localeStrings.profileActionAdvanced) {
+                        ProfileActionRow(localeStrings.profileViewJsonData, AppIcons.Storage, { performAction(openAlertDialog) })
+                    }
                 }
             }
-        })
-
-        if (currentUser.isFriend) {
-            SheetButtonItem(text = localeStrings.profileBoop, enabled = boopEnabled, onClick = {
-                scope.launch { hideSheet() }.invokeOnCompletion {
-                    onHideCompletion()
-                    openBoopDialog()
-                }
-            })
-            SheetButtonItem(text = localeStrings.profileRequestInvite, onClick = {
-                scope.launch { hideSheet() }.invokeOnCompletion {
-                    onHideCompletion()
-                    openInviteMessageSelection(InviteMessageAction.RequestInvite)
-                }
-            })
-            SheetButtonItem(text = localeStrings.profileInviteToMyInstance, onClick = {
-                scope.launch { hideSheet() }.invokeOnCompletion {
-                    onHideCompletion()
-                    openInviteMessageSelection(InviteMessageAction.Invite)
-                }
-            })
-            SheetButtonItem(text = localeStrings.profileImageInvite, onClick = {
-                scope.launch { hideSheet() }.invokeOnCompletion {
-                    onHideCompletion()
-                    openImageInvitePicker()
-                }
-            })
         }
-
-        PlayerChatboxModerationSheetItem(
-            state = playerChatboxModerationState,
-            screenModel = userProfileScreenModel,
-        )
-        PlayerVoiceModerationSheetItem(
-            state = playerVoiceModerationState,
-            screenModel = userProfileScreenModel,
-        )
     }
-
-    SheetButtonItem(
-        text = if (currentUser.isSelf) localeStrings.profileViewFriendNetwork else localeStrings.profileViewMutualFriends,
-        onClick = {
-            scope.launch { hideSheet() }.invokeOnCompletion {
-                onHideCompletion()
-                if (currentUser.isSelf) {
-                    navigator.push(FriendNetworkScreen)
-                } else {
-                    navigator.push(MutualFriendsScreen(currentUser.id, currentUser.displayName))
-                }
-            }
-        }
-    )
-
-    FriendRequestSheetItem(
-        currentUser,
-        userProfileScreenModel,
-        hideSheet,
-        onHideCompletion,
-    )
-    SheetButtonItem(localeStrings.profileViewJsonData, onClick = {
-        scope.launch { hideSheet() }.invokeOnCompletion {
-            onHideCompletion()
-            openAlertDialog()
-        }
-    })
-    if (!currentUser.isSelf) {
-        SheetButtonItem(
-            text = localeStrings.report,
-            onClick = {
-                scope.launch { hideSheet() }.invokeOnCompletion {
-                    onHideCompletion()
-                    openReportDialog()
-                }
-            },
-            content = { label ->
-                AppText(label, color = AppTheme.colors.destructive)
-            },
-        )
-    }
-
 }
 
 @Composable
 private fun ColumnScope.PlayerInteractionSheetItem(
     targetUserId: String,
     state: PlayerInteractionState,
-    hideSheet: suspend () -> Unit,
-    onHideCompletion: () -> Unit,
+    performAction: (() -> Unit) -> Unit,
     requestOverride: (PlayerInteractionOverride) -> Unit,
     retryLoad: () -> Unit,
 ) {
     val localeStrings = strings
-    val scope = rememberCoroutineScope()
     val stateTarget = when (state) {
         PlayerInteractionState.Unavailable -> null
         is PlayerInteractionState.Checking -> state.targetUserId
@@ -702,20 +738,19 @@ private fun ColumnScope.PlayerInteractionSheetItem(
         is PlayerInteractionState.Failed -> state.targetUserId
     }
     if (stateTarget != null && stateTarget != targetUserId) {
-        SheetButtonItem(text = localeStrings.profileInteractionChecking, enabled = false, onClick = {})
+        ProfileModerationRow(text = localeStrings.profileInteractionClose, status = localeStrings.profileInteractionChecking, loading = true)
         return
     }
 
     when (state) {
-        PlayerInteractionState.Unavailable -> SheetButtonItem(
-            text = localeStrings.profileInteractionUnavailable,
-            enabled = false,
-            onClick = {},
+        PlayerInteractionState.Unavailable -> ProfileModerationRow(
+            text = localeStrings.profileInteractionClose,
+            status = localeStrings.profileInteractionUnavailable,
         )
-        is PlayerInteractionState.Checking -> SheetButtonItem(
-            text = localeStrings.profileInteractionChecking,
-            enabled = false,
-            onClick = {},
+        is PlayerInteractionState.Checking -> ProfileModerationRow(
+            text = localeStrings.profileInteractionClose,
+            status = localeStrings.profileInteractionChecking,
+            loading = true,
         )
         is PlayerInteractionState.Ready -> {
             val requestedOverride =
@@ -724,40 +759,34 @@ private fun ColumnScope.PlayerInteractionSheetItem(
                 } else {
                     PlayerInteractionOverride.InteractOff
                 }
-            SheetButtonItem(
-                text = if (requestedOverride == PlayerInteractionOverride.InteractOff) {
-                    localeStrings.profileInteractionClose
-                } else {
-                    localeStrings.profileInteractionRestore
-                },
+            ProfileModerationRow(
+                text = localeStrings.profileInteractionClose,
+                checked = state.snapshot.effectiveOverride == PlayerInteractionOverride.InteractOff,
+                enabled = true,
                 onClick = {
-                    scope.launch { hideSheet() }.invokeOnCompletion {
-                        onHideCompletion()
-                        requestOverride(requestedOverride)
-                    }
+                    performAction { requestOverride(requestedOverride) }
                 },
             )
         }
-        is PlayerInteractionState.Updating -> SheetButtonItem(
-            text = if (state.requestedOverride == PlayerInteractionOverride.InteractOff) {
+        is PlayerInteractionState.Updating -> ProfileModerationRow(
+            text = localeStrings.profileInteractionClose,
+            status = if (state.requestedOverride == PlayerInteractionOverride.InteractOff) {
                 localeStrings.profileInteractionClosing
             } else {
                 localeStrings.profileInteractionRestoring
             },
-            enabled = false,
-            onClick = {},
+            loading = true,
         )
-        is PlayerInteractionState.Failed -> SheetButtonItem(
-            text = localeStrings.profileInteractionRetry,
+        is PlayerInteractionState.Failed -> ProfileModerationRow(
+            text = localeStrings.profileInteractionClose,
+            status = localeStrings.profileInteractionRetry,
+            enabled = true,
             onClick = {
                 val retryOverride = state.retryOverride
                 if (retryOverride == null) {
                     retryLoad()
                 } else {
-                    scope.launch { hideSheet() }.invokeOnCompletion {
-                        onHideCompletion()
-                        requestOverride(retryOverride)
-                    }
+                    performAction { requestOverride(retryOverride) }
                 }
             },
         )
@@ -837,9 +866,12 @@ private fun ColumnScope.PlayerChatboxModerationSheetItem(
     val enabled = state is PlayerChatboxModerationState.Ready ||
         state is PlayerChatboxModerationState.Failed
 
-    SheetButtonItem(
-        text = text,
+    ProfileModerationRow(
+        text = localeStrings.profileChatboxModerationMute,
+        checked = (state as? PlayerChatboxModerationState.Ready)?.isMuted,
+        status = text.takeUnless { state is PlayerChatboxModerationState.Ready },
         enabled = enabled,
+        loading = state is PlayerChatboxModerationState.Checking || state is PlayerChatboxModerationState.Updating,
         onClick = {
             when (state) {
                 is PlayerChatboxModerationState.Failed ->
@@ -880,9 +912,12 @@ private fun ColumnScope.PlayerVoiceModerationSheetItem(
     val enabled = state is PlayerVoiceModerationState.Ready ||
         state is PlayerVoiceModerationState.Failed
 
-    SheetButtonItem(
-        text = text,
+    ProfileModerationRow(
+        text = localeStrings.profileVoiceModerationMute,
+        checked = (state as? PlayerVoiceModerationState.Ready)?.isMuted,
+        status = text.takeUnless { state is PlayerVoiceModerationState.Ready },
         enabled = enabled,
+        loading = state is PlayerVoiceModerationState.Checking || state is PlayerVoiceModerationState.Updating,
         onClick = {
             when (state) {
                 is PlayerVoiceModerationState.Failed -> screenModel.retryPlayerVoiceModeration()
@@ -959,8 +994,8 @@ private fun PlayerBlockConfirmationDialog(
 private fun ColumnScope.FriendRequestSheetItem(
     currentUser: UserProfileVo,
     userProfileScreenModel: UserProfileScreenModel,
-    hideSheet: suspend () -> Unit,
-    onHideCompletion: () -> Unit,
+    enabled: Boolean,
+    runAction: (suspend () -> Boolean) -> Unit,
 ) {
     val localeStrings = strings
     val action: Pair<String, suspend () -> Boolean>? = when {
@@ -990,48 +1025,18 @@ private fun ColumnScope.FriendRequestSheetItem(
                 else -> null
             }
         }
-        // 状态为Completed,则删除好友
-        // TODO: 加一个弹窗提示是否删除好友
-        currentUser.isFriend && currentUser.friendRequestStatus == Completed ->
-            localeStrings.profileUnfriend to {
-                userProfileScreenModel.unfriend(currentUser.id, localeStrings.profileUnfriended)
-            }
-
         else -> null
     }
 
     if (action == null) return
 
-    val scope = rememberCoroutineScope()
-    var enabled by remember { mutableStateOf(true) }
-    SheetButtonItem(action.first, onClick = {
-        scope.launch { hideSheet() }.invokeOnCompletion {
-            scope.launch {
-                enabled = false
-                when (action.second()) {
-                    true -> hideSheet()
-                    false -> enabled = true
-                }
-            }.invokeOnCompletion {
-                onHideCompletion()
-            }
-        }
-    })
-}
-
-@Composable
-private fun ColumnScope.SheetButtonItem(
-    text: String? = null,
-    enabled: Boolean = true,
-    onClick: () -> Unit,
-    content: @Composable RowScope.(String) -> Unit = { AppText(text = it) },
-) {
-    AppSheetAction(
+    ProfileActionRow(
+        text = action.first,
+        icon = AppIcons.Person,
         enabled = enabled,
-        onClick = onClick,
-    ) {
-        content(text.orEmpty())
-    }
+        divider = true,
+        onClick = { runAction(action.second) },
+    )
 }
 
 @Composable

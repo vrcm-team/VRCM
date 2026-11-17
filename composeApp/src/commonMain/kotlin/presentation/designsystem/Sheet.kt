@@ -1,7 +1,9 @@
 package io.github.vrcmteam.vrcm.presentation.designsystem
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.RowScope
@@ -40,6 +42,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -95,6 +98,7 @@ class AppSheetState(
     internal val offset = Animatable(0f)
     internal var anchors: Map<AppSheetValue, Float> by mutableStateOf(emptyMap())
     internal var laidOut: Boolean by mutableStateOf(false)
+    internal var motion: AppMotion = AppMotion.Default
 
     suspend fun show() = animateTo(if (hasPartiallyExpandedState) AppSheetValue.PartiallyExpanded else AppSheetValue.Expanded)
 
@@ -113,7 +117,17 @@ class AppSheetState(
             currentValue = value
             return
         }
-        offset.animateTo(target, spring(dampingRatio = 0.92f, stiffness = 340f), initialVelocity = velocity)
+        if (motion.reduced) {
+            offset.snapTo(target)
+        } else {
+            // 退场使用短时长动效，避免等待弹簧在屏幕外收敛；展开仍保留弹簧手感。
+            val animationSpec = if (value == AppSheetValue.Hidden) {
+                tween<Float>(durationMillis = motion.fastMs, easing = FastOutLinearInEasing)
+            } else {
+                spring<Float>(dampingRatio = 0.92f, stiffness = 340f)
+            }
+            offset.animateTo(target, animationSpec, initialVelocity = velocity)
+        }
         currentValue = value
     }
 
@@ -184,6 +198,8 @@ fun AppSheet(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val currentOnDismiss by rememberUpdatedState(onDismissRequest)
+    val motion = AppTheme.motion
+    SideEffect { sheetState.motion = motion }
     AppOverlay {
         val scope = rememberCoroutineScope()
         val density = LocalDensity.current
