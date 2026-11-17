@@ -766,6 +766,16 @@ sealed class LocaleStrings {
     open val userNoteSaved: String = "Note saved"
 
     // Local profile actions
+    open val profileActionManage: String = "Profile management"
+    open val profileActionPreferences: String = "Preferences & more"
+    open val profileActionInteraction: String = "Interaction settings"
+    open val profileActionInvite: String = "Send invite"
+    open val profileActionMore: String = "More actions"
+    open val profileActionRelationship: String = "Relationship"
+    open val profileActionSafety: String = "Safety"
+    open val profileActionAdvanced: String = "Advanced"
+    open val profileUnfriendConfirmTitle: String = "Remove friend?"
+    open val profileUnfriendConfirmMessage: String = "Remove %name% from your friends? Becoming friends again will require a new friend request."
     open val userMutualGroups: String = "Mutual Groups"
     open val inventoryCreditsTitle: String = "VRChat Credits"
     open val inventoryCreditsUnavailable: String = "Credits are unavailable for this account"
