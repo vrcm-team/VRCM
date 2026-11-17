@@ -38,6 +38,14 @@ fun VerifyCardInput(
     val verifyCode = uiState.verifyCode
     val cardState = uiState.cardState
     val focusManager = LocalFocusManager.current
+    val canSubmit = cardState.normalizeVerifyCode(verifyCode) != null && !uiState.btnIsLoading
+    val submit: () -> Unit = {
+        if (canSubmit) {
+            focusManager.clearFocus()
+            onClick()
+        }
+    }
+    val keyboardActions = KeyboardActions(onDone = { submit() })
     if (cardState == AuthCardPage.TFACode) {
         // 恢复码是字母数字混合，用普通输入框；提交前再整理成接口要求的格式
         AppTextField(
@@ -53,19 +61,19 @@ fun VerifyCardInput(
                 keyboardType = KeyboardType.Ascii,
                 imeAction = ImeAction.Done,
             ),
-            keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+            keyboardActions = keyboardActions,
         )
     } else {
         CodeTextField(
             modifier = Modifier
                 .fillMaxWidth(),
             value = verifyCode,
-            onValueChange = {
-                if (it.length == 6) {
-                    focusManager.clearFocus()
-                }
-                onVerifyCodeChange(it)
-            },
+            onValueChange = onVerifyCodeChange,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Number,
+                imeAction = ImeAction.Done,
+            ),
+            keyboardActions = keyboardActions,
             length = 6,
             boxWidth = 48.dp,
             boxHeight = 48.dp,
@@ -87,9 +95,9 @@ fun VerifyCardInput(
                 .padding(horizontal = 64.dp)
                 .height(48.dp),
             text = strings.authVerifyButton,
-            enabled = cardState.normalizeVerifyCode(verifyCode) != null,
+            enabled = canSubmit,
             isLoading = uiState.btnIsLoading,
-            onClick = onClick
+            onClick = submit
         )
         // 开启验证器 2FA 的账号可以在验证器验证码与一次性恢复码之间切换；邮箱验证码没有替代方式
         if (cardState == AuthCardPage.TTFACode || cardState == AuthCardPage.TFACode) {
