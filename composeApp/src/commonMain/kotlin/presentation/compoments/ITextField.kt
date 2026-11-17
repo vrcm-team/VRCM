@@ -39,7 +39,8 @@ fun ITextField(
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     keyboardActions: KeyboardActions = KeyboardActions.Default,
     onValueChange: (String) -> Unit,
-    supportingText: @Composable (() -> Unit)? = null
+    supportingText: @Composable (() -> Unit)? = null,
+    textFieldModifier: Modifier = Modifier,
 ) =  ITextField(
     modifier = modifier,
     leadingIcon = {
@@ -54,10 +55,12 @@ fun ITextField(
     keyboardOptions = keyboardOptions,
     keyboardActions = keyboardActions,
     onValueChange = onValueChange,
-    supportingText = supportingText
+    supportingText = supportingText,
+    textFieldModifier = textFieldModifier,
 )
 
 
+/** [modifier] 作用于容器，[textFieldModifier] 作用于文本输入节点，用于焦点与键盘事件。 */
 @Composable
 fun ITextField(
     modifier: Modifier = Modifier,
@@ -67,7 +70,8 @@ fun ITextField(
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     keyboardActions: KeyboardActions = KeyboardActions.Default,
     onValueChange: (String) -> Unit,
-    supportingText: @Composable (() -> Unit)? = null
+    supportingText: @Composable (() -> Unit)? = null,
+    textFieldModifier: Modifier = Modifier,
 ) {
     Row(
         modifier = Modifier
@@ -91,6 +95,7 @@ fun ITextField(
         BasicTextField(
             modifier = Modifier
                 .weight(1f)
+                .then(textFieldModifier)
                 .padding(end = 6.dp, top = 12.dp, bottom = 12.dp),
             value = textValue,
             decorationBox = { innerTextField ->
@@ -148,6 +153,7 @@ fun IPasswordField(
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     keyboardActions: KeyboardActions = KeyboardActions.Default,
     onFocusChanged: (FocusState) -> Unit = {},
+    textFieldModifier: Modifier = Modifier,
     onValueChange: (String) -> Unit
 ) {
     val visualPassword = if (isFocus) {
@@ -176,6 +182,7 @@ fun IPasswordField(
         BasicTextField(
             modifier = Modifier
                 .weight(1f)
+                .then(textFieldModifier)
                 .onFocusChanged(onFocusChanged)
                 .padding(end = 12.dp, top = 12.dp, bottom = 12.dp),
             value = textValue,

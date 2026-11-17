@@ -6,8 +6,15 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
@@ -38,6 +45,23 @@ fun LoginCardInput(
     onClick: () -> Unit
 ) {
     val focusManager = LocalFocusManager.current
+    val usernameFocusRequester = remember { FocusRequester() }
+    val passwordFocusRequester = remember { FocusRequester() }
+    val canSubmit = uiState.username.isNotBlank() && uiState.password.isNotBlank() && !uiState.btnIsLoading
+    val submit: () -> Unit = {
+        if (canSubmit) {
+            focusManager.clearFocus()
+            onClick()
+        }
+    }
+    val submitOnEnter = Modifier.onPreviewKeyEvent { event ->
+        if (event.key == Key.Enter || event.key == Key.NumPadEnter) {
+            if (event.type == KeyEventType.KeyDown) submit()
+            true
+        } else {
+            false
+        }
+    }
     var isFocus by remember { mutableStateOf(false) }
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -45,6 +69,10 @@ fun LoginCardInput(
     ) {
         ITextField(
             modifier = Modifier.padding(horizontal = 32.dp),
+            textFieldModifier = Modifier
+                .focusRequester(usernameFocusRequester)
+                .focusProperties { next = passwordFocusRequester }
+                .then(submitOnEnter),
             painter = rememberVectorPainter(AppIcons.AccountCircle),
             hintText = strings.authLoginUsername,
             textValue = uiState.username,
@@ -52,11 +80,15 @@ fun LoginCardInput(
                 keyboardType = KeyboardType.Text,
                 imeAction = ImeAction.Next
             ),
-            keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
+            keyboardActions = KeyboardActions(onNext = { passwordFocusRequester.requestFocus() }),
             onValueChange = onUsernameChange
         )
         IPasswordField(
             modifier = Modifier.padding(horizontal = 32.dp),
+            textFieldModifier = Modifier
+                .focusRequester(passwordFocusRequester)
+                .focusProperties { previous = usernameFocusRequester }
+                .then(submitOnEnter),
             imageVector = AppIcons.Lock,
             hintText = strings.authLoginPassword,
             textValue = uiState.password,
@@ -65,7 +97,7 @@ fun LoginCardInput(
                 keyboardType = KeyboardType.Password,
                 imeAction = ImeAction.Done
             ),
-            keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+            keyboardActions = KeyboardActions(onDone = { submit() }),
             onFocusChanged = { focusState -> isFocus = focusState.isFocused },
             onValueChange = onPasswordChange
         )
@@ -82,9 +114,9 @@ fun LoginCardInput(
                 .padding(horizontal = 64.dp)
                 .height(48.dp),
             text = strings.authLoginButton,
-            enabled = uiState.password.isNotBlank() && uiState.username.isNotBlank(),
+            enabled = canSubmit,
             isLoading = uiState.btnIsLoading,
-            onClick = onClick
+            onClick = submit
         )
         AuthTermsNotice(modifier = Modifier.padding(horizontal = 32.dp))
     }
