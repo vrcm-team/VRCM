@@ -420,6 +420,8 @@ sealed class LocaleStrings {
     open val favoriteRemoveSuccess: String = "Remove Favorite Success"
     open val favoriteRemoveFailed: String = "Remove Favorite Failed"
     open val favoriteMoveFailed: String = "Move Favorite Failed"
+    open val favoriteUpdating = "Updating favorite…"
+    open val favoriteLocalGroup = "Local favorites"
     open val favoriteMoveSuccess: String = "Move Favorite Success"
     open val favoriteMoveToAnotherGroup: String = "Move Favorite"
     open val selectFavoriteGroup: String = "Select Favorite Group"

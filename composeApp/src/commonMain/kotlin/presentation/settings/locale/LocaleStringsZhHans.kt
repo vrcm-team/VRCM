@@ -400,6 +400,8 @@ internal object LocaleStringsZhHans : LocaleStrings() {
     override val favoriteRemoveSuccess = "已移除收藏"
     override val favoriteRemoveFailed = "移除收藏失败"
     override val favoriteMoveFailed = "移动收藏失败"
+    override val favoriteUpdating = "正在更新收藏…"
+    override val favoriteLocalGroup = "本地收藏"
     override val favoriteMoveSuccess = "已移动收藏"
     override val favoriteMoveToAnotherGroup = "移动到其他收藏组"
     override val selectFavoriteGroup = "选择收藏组"

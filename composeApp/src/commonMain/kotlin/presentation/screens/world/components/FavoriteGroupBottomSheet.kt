@@ -3,13 +3,17 @@ package io.github.vrcmteam.vrcm.presentation.screens.world.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
@@ -18,12 +22,12 @@ import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteGroupData
 import io.github.vrcmteam.vrcm.presentation.compoments.ABottomSheet
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.designsystem.*
-import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.service.AuthService
+import io.github.vrcmteam.vrcm.service.FavoriteEditRequest
+import io.github.vrcmteam.vrcm.service.FavoriteEditService
 import io.github.vrcmteam.vrcm.service.FavoriteService
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
@@ -53,33 +57,40 @@ fun FavoriteGroupBottomSheet(
 ) {
     val favoriteService: FavoriteService = koinInject()
     val authService: AuthService = koinInject()
+    val editor: FavoriteEditService = koinInject()
     val scope = rememberCoroutineScope()
     val strings = strings
-    var isChanging by remember(favoriteId, favoriteType, favoriteRecordId) { mutableStateOf(false) }
-    val latestIsChanging = rememberUpdatedState(isChanging)
+    val session by SharedFlowCentre.currentSession.collectAsState()
+    val ownerId = session?.token?.userId
+    var changingRequest by remember(ownerId, favoriteId, favoriteType, favoriteRecordId) {
+        mutableStateOf<FavoriteEditRequest?>(null)
+    }
+    var failedRequest by remember(ownerId, favoriteId, favoriteType, favoriteRecordId) {
+        mutableStateOf<FavoriteEditRequest?>(null)
+    }
+    var errorMessage by remember(ownerId, favoriteId, favoriteType, favoriteRecordId) { mutableStateOf<String?>(null) }
+    var loadFailed by remember(ownerId, favoriteType) { mutableStateOf(false) }
+    var loadAttempt by remember(ownerId, favoriteType) { mutableStateOf(0) }
+    val isChanging = changingRequest != null
     val sheetState = rememberAppSheetState(
         skipPartiallyExpanded = true,
         confirmValueChange = { targetValue ->
-            targetValue != AppSheetValue.Hidden || !latestIsChanging.value
+            targetValue != AppSheetValue.Hidden || changingRequest == null
         },
     )
 
-    // 加载收藏数据
-    LaunchedEffect(isVisible, favoriteId, favoriteType, favoriteRecordId) {
-        if (!isVisible) return@LaunchedEffect
-        val result = authService.reTryAuth {
-            favoriteService.loadFavoriteByGroup(favoriteType)
-        }
-        result.exceptionOrNull()?.let { error ->
-            if (error is CancellationException) throw error
-            SharedFlowCentre.toastText.emit(
-                ToastText.Error("${strings.favoritesGroupLoadFailed}: ${error.message.orEmpty()}"),
-            )
-        }
-    }
-
-    // 获取收藏数据
     val favoritesByGroup by favoriteService.favoritesByGroup(favoriteType).collectAsState()
+    LaunchedEffect(isVisible, ownerId, favoriteType, loadAttempt) {
+        if (!isVisible) return@LaunchedEffect
+        errorMessage = null
+        failedRequest = null
+        loadFailed = false
+        if (favoritesByGroup.isNotEmpty()) return@LaunchedEffect
+        val result = withContext(Dispatchers.IO) {
+            authService.reTryAuth { favoriteService.loadFavoriteByGroup(favoriteType) }
+        }
+        loadFailed = result.isFailure
+    }
 
     // 查找当前项目在哪个收藏组中
     val existingFavorite = remember(favoritesByGroup, favoriteId, favoriteRecordId) {
@@ -89,35 +100,42 @@ fun FavoriteGroupBottomSheet(
 
     // 已收藏的组名和ID
     val currentGroupName = existingGroup?.name
-    // 添加或移动到新收藏组
-    val onClickGroupItem = onClick@{ groupName: String ->
-        if (isChanging) return@onClick
-        isChanging = true
+    val submit: (FavoriteEditRequest) -> Unit = submit@{ request ->
+        val token = session?.token ?: return@submit
+        if (changingRequest != null) return@submit
+        changingRequest = request
+        failedRequest = null
+        errorMessage = null
         scope.launch {
-            val result = try {
-                withContext(Dispatchers.IO) {
-                    // 如果已在某个组中，先移除
-                    authService.reTryAuth {
-                        doChangeFavoriteGroup(
-                            favoriteService,
-                            groupName,
-                            currentGroupName,
-                            strings,
-                            favoriteId,
-                            favoriteType,
-                            existingFavorite = existingFavorite,
-                            allowGroupChange = allowGroupChange,
-                        )
-                    }.map { groupName }
+            try {
+                val result = withContext(Dispatchers.IO) { editor.edit(token, request) }
+                if (SharedFlowCentre.currentSession.value?.token?.userId != token.userId) return@launch
+                val isMove = request.originalRecordId != null && request.targetGroupName != null
+                val message = when {
+                    request.targetGroupName == null -> if (result.isSuccess) strings.favoriteRemoveSuccess else strings.favoriteRemoveFailed
+                    isMove -> if (result.isSuccess) strings.favoriteMoveSuccess else strings.favoriteMoveFailed
+                    else -> if (result.isSuccess) strings.favoriteAddSuccess else strings.favoriteAddFailed
+                }
+                onConfirm(result.map { request.targetGroupName ?: currentGroupName.orEmpty() })
+                if (result.isFailure) {
+                    failedRequest = request
+                    errorMessage = message
+                } else {
+                    SharedFlowCentre.toastText.emit(ToastText.Success(message))
+                    sheetState.hide()
+                    onDismiss()
                 }
             } finally {
-                isChanging = false
+                changingRequest = null
             }
-            onConfirm(result)
-            sheetState.hide()
-            onDismiss()
         }
     }
+    fun request(groupName: String?) = FavoriteEditRequest(
+        type = favoriteType,
+        favoriteId = favoriteId,
+        originalRecordId = existingFavorite?.second?.id,
+        targetGroupName = groupName,
+    )
 
     ABottomSheet(
         isVisible = isVisible,
@@ -126,7 +144,7 @@ fun FavoriteGroupBottomSheet(
     ) {
         Column(
             modifier = Modifier.fillMaxWidth()
-                .align(Alignment.CenterHorizontally)
+                .verticalScroll(rememberScrollState())
                 .padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -158,17 +176,27 @@ fun FavoriteGroupBottomSheet(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(200.dp),
+                                .padding(vertical = 24.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            AppActivityIndicator()
+                            if (loadFailed) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    AppText(strings.favoritesGroupLoadFailed, color = AppTheme.colors.destructive)
+                                    AppButton(strings.retry, onClick = { loadAttempt++ })
+                                }
+                            } else {
+                                AppActivityIndicator()
+                            }
                         }
                     } else {
-                        val maxFavoritesPerGroup = remember { favoriteService.getMaxFavoritesPerGroup(favoriteType) }
+                        val maxFavoritesPerGroup = favoriteService.getMaxFavoritesPerGroup(favoriteType)
                         val entries = favoritesByGroup.entries
                         entries.forEachIndexed { index, (group, favorites) ->
                             val isCurrentGroup = group.name == currentGroupName
-                            val backgroundColor = if (isCurrentGroup)
+                            val isLocal = group.ownerId == "local"
+                            val isFull = !isLocal && favorites.size >= maxFavoritesPerGroup
+                            val isPendingTarget = isChanging && changingRequest?.targetGroupName == group.name
+                            val backgroundColor = if (isPendingTarget || (isCurrentGroup && !isChanging))
                                 AppTheme.colors.tintSoft
                             else
                                 AppTheme.colors.secondaryGroupedBackground
@@ -177,9 +205,10 @@ fun FavoriteGroupBottomSheet(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .background(backgroundColor)
+                                    .semantics { selected = isCurrentGroup }
                                     .clickable(
-                                        enabled = allowGroupChange && !isChanging && !isCurrentGroup,
-                                        onClick = { onClickGroupItem(group.name) },
+                                        enabled = allowGroupChange && !isChanging && !isCurrentGroup && !isFull,
+                                        onClick = { submit(request(group.name)) },
                                     ),
                             ) {
                                 Row(
@@ -189,22 +218,33 @@ fun FavoriteGroupBottomSheet(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    AppIcon(
-                                        imageVector = AppIcons.Check,
-                                        contentDescription = "已收藏",
-                                        tint = if (isCurrentGroup) AppTheme.colors.tint else Color.Transparent,
-                                    )
+                                    // Stable status slot keeps the row aligned while saving.
+                                    Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) {
+                                        if (isPendingTarget) {
+                                            AppActivityIndicator(Modifier.size(20.dp))
+                                        } else if (isCurrentGroup) {
+                                            AppIcon(AppIcons.Check, contentDescription = null, tint = AppTheme.colors.tint)
+                                        }
+                                    }
+                                    Column(Modifier.weight(1f)) {
+                                        AppText(
+                                            text = if (isLocal) strings.favoriteLocalGroup else group.displayName,
+                                            style = AppTheme.type.headline.copy(
+                                                fontWeight = if (isCurrentGroup) FontWeight.Bold else FontWeight.Normal
+                                            ),
+                                            color = if (isFull && !isCurrentGroup) AppTheme.colors.secondaryLabel else AppTheme.colors.label,
+                                        )
+                                        if (isPendingTarget) {
+                                            AppText(
+                                                text = strings.favoriteUpdating,
+                                                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                                                style = AppTheme.type.caption1,
+                                                color = AppTheme.colors.tint,
+                                            )
+                                        }
+                                    }
                                     AppText(
-                                        modifier = Modifier.weight(1f),
-                                        text = group.displayName,
-                                        style = AppTheme.type.headline.copy(
-                                            fontWeight = if (isCurrentGroup) FontWeight.Bold else FontWeight.Normal
-                                        ),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    AppText(
-                                        text = "${favorites.size}/${maxFavoritesPerGroup}",
+                                        text = if (isLocal) favorites.size.toString() else "${favorites.size}/$maxFavoritesPerGroup",
                                         style = AppTheme.type.caption1,
                                         color = AppTheme.colors.secondaryLabel
                                     )
@@ -218,15 +258,25 @@ fun FavoriteGroupBottomSheet(
                 }
 
             }
+            if (isChanging && changingRequest?.targetGroupName == null) {
+                AppText(strings.favoriteUpdating, color = AppTheme.colors.secondaryLabel)
+            }
+            errorMessage?.let { message ->
+                AppText(message, color = AppTheme.colors.destructive)
+                failedRequest?.let { retry -> AppButton(strings.retry, onClick = { submit(retry) }) }
+            }
             // 底部按钮
             if (currentGroupName != null) {
                 AppButton(
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !isChanging,
-                    onClick = { onClickGroupItem(currentGroupName) },
+                    onClick = { submit(request(null)) },
                     style = AppButtonStyle.Tinted,
                     role = AppButtonRole.Destructive,
                 ) {
+                    if (isChanging && changingRequest?.targetGroupName == null) {
+                        AppActivityIndicator(Modifier.size(20.dp))
+                    }
                     AppText(strings.remove)
                 }
             }
@@ -249,77 +299,4 @@ internal fun findFavoriteForManagement(
     } else {
         entries.firstOrNull { (_, favorite) -> favorite.favoriteId == favoriteId }
     }
-}
-
-private suspend fun doChangeFavoriteGroup(
-    favoriteService: FavoriteService,
-    groupName: String?,
-    currentGroupName: String?,
-    strings: LocaleStrings,
-    favoriteId: String,
-    favoriteType: FavoriteType,
-    existingFavorite: Pair<FavoriteGroupData, FavoriteData>?,
-    allowGroupChange: Boolean,
-): Result<Unit> = try {
-    val favorite = existingFavorite?.second
-
-    // 移除旧组
-    suspend fun removeFavorite() {
-        if (favorite != null) {
-            try {
-                favoriteService.removeFavorite(favorite)
-                if (groupName == currentGroupName) {
-                    val successMessage = strings.favoriteRemoveSuccess
-                    SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
-                }
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Throwable) {
-                val errorMessage = "${strings.favoriteRemoveFailed}: ${error.message}"
-                SharedFlowCentre.toastText.emit(ToastText.Error(errorMessage))
-                throw error
-            }
-        }
-    }
-
-    suspend fun addFavorite() {
-        // 添加到新组
-        if (allowGroupChange && groupName != currentGroupName && groupName != null) {
-            val isMove = favorite != null
-            try {
-                favoriteService.addFavorite(
-                    favoriteId = favoriteId,
-                    favoriteType = favoriteType,
-                    groupName = groupName,
-                )
-                val successMessage = if (isMove) strings.favoriteMoveSuccess else strings.favoriteAddSuccess
-                SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Throwable) {
-                val errorMessage =
-                    "${if (isMove) strings.favoriteMoveFailed else strings.favoriteAddFailed}: ${error.message}"
-                SharedFlowCentre.toastText.emit(ToastText.Error(errorMessage))
-                throw error
-            }
-        }
-    }
-
-    // 如果本地的分组移动时应该尝试添加，添加成功以后再删除本地的，如果是远端的分组应该先删除再添加
-    val oldIsLocal = favorite?.id?.let(favoriteService::parseLocalFavoriteId)?.first == true
-
-    if (oldIsLocal) {
-        addFavorite()
-        removeFavorite()
-    } else {
-        removeFavorite()
-        addFavorite()
-    }
-
-    favoriteService.loadFavoriteByGroup(favoriteType).getOrThrow()
-    Result.success(Unit)
-} catch (error: CancellationException) {
-    throw error
-} catch (error: Throwable) {
-    Result.failure(error)
 }

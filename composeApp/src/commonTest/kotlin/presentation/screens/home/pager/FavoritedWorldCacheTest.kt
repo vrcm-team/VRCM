@@ -56,7 +56,7 @@ class FavoritedWorldCacheTest {
     @Test
     fun sharedCacheKeepsGroupNamesAndSuccessfulEmptyGroups() {
         val groups: Map<FavoriteGroupData, List<FavoriteData>> = linkedMapOf(
-            group("worlds1", "First group") to emptyList(),
+            group("worlds1", "First group") to listOf(FavoriteData("wrld_one", "fvrt_one", listOf("worlds1"), "world")),
             group("worlds2", "Second group") to emptyList(),
         )
         val worlds = listOf(

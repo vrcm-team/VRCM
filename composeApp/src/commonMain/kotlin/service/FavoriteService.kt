@@ -63,6 +63,13 @@ internal class FavoriteGroupCache {
         return removed
     }
 
+    fun applyEdit(type: FavoriteType, removed: FavoriteData?, added: FavoriteData?) {
+        replace(type, flow(type).value.mapValues { (group, favorites) ->
+            val remaining = favorites.filterNot { it.id == removed?.id || it.id == added?.id }
+            if (added != null && group.name in added.tags) remaining + added else remaining
+        })
+    }
+
     fun updateGroup(
         type: FavoriteType,
         ownerId: String,
@@ -349,6 +356,18 @@ class FavoriteService(
         synchronizeFavoritesOwnerLocked(sessionToken)
         requestGenerations[favoriteType] = (requestGenerations[favoriteType] ?: 0L) + 1L
         favoritesByGroupCache.removeFavorite(favoriteType, favorite)
+    }
+
+    internal suspend fun commitFavoriteEdit(
+        sessionToken: AccountSessionToken,
+        favoriteType: FavoriteType,
+        removed: FavoriteData?,
+        added: FavoriteData?,
+    ) = cacheMutex.withLock {
+        if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@withLock
+        synchronizeFavoritesOwnerLocked(sessionToken)
+        requestGenerations[favoriteType] = (requestGenerations[favoriteType] ?: 0L) + 1L
+        favoritesByGroupCache.applyEdit(favoriteType, removed, added)
     }
 
     internal suspend fun prepareFavoriteGroupClear(

@@ -404,6 +404,8 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val favoriteRemoveSuccess = "お気に入りから削除しました"
     override val favoriteRemoveFailed = "お気に入り削除に失敗しました"
     override val favoriteMoveFailed = "お気に入り移動に失敗しました"
+    override val favoriteUpdating = "お気に入りを更新中…"
+    override val favoriteLocalGroup = "ローカルのお気に入り"
     override val favoriteMoveSuccess = "お気に入りを移動しました"
     override val favoriteMoveToAnotherGroup = "別のグループに移動"
     override val selectFavoriteGroup = "お気に入りグループを選択"
