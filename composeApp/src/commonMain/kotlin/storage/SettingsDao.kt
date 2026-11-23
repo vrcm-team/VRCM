@@ -19,6 +19,7 @@ class SettingsDao(
                 languageTag = settingsSettings.getStringOrNull(DaoKeys.Settings.LANGUAGE_TAG_KEY),
                 friendPresenceNotificationsEnabled = friendPresenceNotificationsEnabled,
                 friendOfflineNotificationsEnabled = friendOfflineNotificationsEnabled,
+                notificationCompatibilityModeEnabled = notificationCompatibilityModeEnabled,
                 boopNotificationsEnabled = boopNotificationsEnabled,
                 friendRequestNotificationsEnabled = friendRequestNotificationsEnabled,
                 groupAnnouncementNotificationsEnabled = groupAnnouncementNotificationsEnabled,
@@ -42,6 +43,7 @@ class SettingsDao(
             }
             friendPresenceNotificationsEnabled = value.friendPresenceNotificationsEnabled
             friendOfflineNotificationsEnabled = value.friendOfflineNotificationsEnabled
+            notificationCompatibilityModeEnabled = value.notificationCompatibilityModeEnabled
             boopNotificationsEnabled = value.boopNotificationsEnabled
             friendRequestNotificationsEnabled = value.friendRequestNotificationsEnabled
             groupAnnouncementNotificationsEnabled = value.groupAnnouncementNotificationsEnabled
@@ -69,6 +71,10 @@ class SettingsDao(
     var friendOfflineNotificationsEnabled: Boolean
         get() = settingsSettings.getBoolean(DaoKeys.Settings.FRIEND_OFFLINE_NOTIFICATIONS_ENABLED_KEY, false)
         set(value) = settingsSettings.putBoolean(DaoKeys.Settings.FRIEND_OFFLINE_NOTIFICATIONS_ENABLED_KEY, value)
+
+    var notificationCompatibilityModeEnabled: Boolean
+        get() = settingsSettings.getBoolean(DaoKeys.Settings.NOTIFICATION_COMPATIBILITY_MODE_ENABLED_KEY, false)
+        set(value) = settingsSettings.putBoolean(DaoKeys.Settings.NOTIFICATION_COMPATIBILITY_MODE_ENABLED_KEY, value)
 
     var boopNotificationsEnabled: Boolean
         get() = settingsSettings.getBoolean(DaoKeys.Settings.BOOP_NOTIFICATIONS_ENABLED_KEY, false)

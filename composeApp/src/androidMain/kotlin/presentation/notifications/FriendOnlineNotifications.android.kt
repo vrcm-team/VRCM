@@ -28,6 +28,7 @@ import io.github.vrcmteam.vrcm.EXTRA_NOTIFICATION_DESTINATION
 import io.github.vrcmteam.vrcm.EXTRA_NOTIFICATION_TARGET_ID
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.service.NotificationLaunchDestination
+import io.github.vrcmteam.vrcm.storage.SettingsDao
 import java.util.Date
 import java.util.concurrent.ConcurrentHashMap
 
@@ -130,6 +131,7 @@ class FriendNotificationFactory(private val context: Context) {
 class AndroidFriendOnlineNotifier(
     private val context: Context,
     private val imageLoader: ImageLoader,
+    private val settingsDao: SettingsDao,
 ) : FriendOnlineNotifier {
     private val factory = FriendNotificationFactory(context)
     private val notificationManager = context.getSystemService(NotificationManager::class.java)
@@ -185,6 +187,10 @@ class AndroidFriendOnlineNotifier(
                 showAvatarTimestamp = showAvatarTimestamp,
             ),
         )
+        if (settingsDao.notificationCompatibilityModeEnabled) {
+            latestAvatarRequests.remove(id, requestToken)
+            return
+        }
         val imageUrl = iconUrl?.trim()?.takeIf(String::isNotEmpty) ?: run {
             latestAvatarRequests.remove(id, requestToken)
             return
@@ -200,9 +206,8 @@ class AndroidFriendOnlineNotifier(
                     latestAvatarRequests.remove(id, requestToken)
                 },
                 onSuccess = { image ->
-                    if (latestAvatarRequests[id] !== requestToken) return@target
-                    latestAvatarRequests.remove(id, requestToken)
-                    if (!canNotify()) return@target
+                    if (!latestAvatarRequests.remove(id, requestToken)) return@target
+                    if (settingsDao.notificationCompatibilityModeEnabled || !canNotify()) return@target
                     notificationManager.notify(
                         id,
                         factory.social(

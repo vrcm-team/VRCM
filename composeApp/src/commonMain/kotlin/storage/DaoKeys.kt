@@ -68,6 +68,7 @@ object DaoKeys{
 
         const val FRIEND_PRESENCE_NOTIFICATIONS_ENABLED_KEY = "${PREFIX}.friendPresenceNotificationsEnabled"
         const val FRIEND_OFFLINE_NOTIFICATIONS_ENABLED_KEY = "${PREFIX}.friendOfflineNotificationsEnabled"
+        const val NOTIFICATION_COMPATIBILITY_MODE_ENABLED_KEY = "${PREFIX}.notificationCompatibilityModeEnabled"
         const val BOOP_NOTIFICATIONS_ENABLED_KEY = "${PREFIX}.boopNotificationsEnabled"
         const val FRIEND_REQUEST_NOTIFICATIONS_ENABLED_KEY = "${PREFIX}.friendRequestNotificationsEnabled"
         const val GROUP_ANNOUNCEMENT_NOTIFICATIONS_ENABLED_KEY = "${PREFIX}.groupAnnouncementNotificationsEnabled"

@@ -203,6 +203,9 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val playerModerationRemoveConfirmTitle = "このプレイヤー設定を消去しますか？"
     override val playerModerationRemoveConfirmMessage =
         "%player% の「%type%」設定を消去します。この操作は元に戻せません。"
+    override val notificationCompatibilityMode = "通知の互換モード"
+    override val notificationCompatibilityModeDescription =
+        "システム通知のアバターを非表示にし、一部の端末で通知時刻が表示されるようにします。"
     override val notificationSectionFriendPresence = "フレンドのオンライン状態"
     override val notificationOnlineDescription = "フレンドがゲームに入ったときに通知します"
     override val notificationFriendOffline = "オフライン通知"

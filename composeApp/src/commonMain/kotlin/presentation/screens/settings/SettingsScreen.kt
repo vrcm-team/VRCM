@@ -326,6 +326,16 @@ private fun NotificationSections(platform: AppPlatform) {
     val navigator = LocalNavigator.currentOrThrow
     var currentSettings by LocalSettingsState.current
 
+    SettingsGroup {
+        SettingsSwitchRow(
+            title = strings.notificationCompatibilityMode,
+            description = strings.notificationCompatibilityModeDescription,
+            checked = currentSettings.notificationCompatibilityModeEnabled,
+        ) {
+            currentSettings = currentSettings.copy(notificationCompatibilityModeEnabled = it)
+        }
+    }
+
     SettingsGroup(title = strings.notificationSectionFriendPresence) {
         NotificationPermissionSwitchRow(
             platform = platform,
