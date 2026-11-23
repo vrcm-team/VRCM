@@ -1,6 +1,7 @@
 package io.github.vrcmteam.vrcm.storage
 
 import androidx.room.Room
+import androidx.room.RoomDatabase
 import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import androidx.sqlite.execSQL
@@ -8,12 +9,83 @@ import io.github.vrcmteam.vrcm.service.FriendActivityEventType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import java.io.RandomAccessFile
 import java.nio.file.Files
 import kotlin.io.path.absolutePathString
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
+import kotlin.test.assertNull
 
 class VrcmDatabaseMigrationTest {
+    @Test
+    fun damagedCacheIsRebuiltWhileActivitySurvivesRecoveryAndMigration() = runTest {
+        val directory = Files.createTempDirectory("vrcm-recovery-test-")
+        val original = directory.resolve("vrcm test.db")
+        val databasePath = original.absolutePathString()
+        val event = FriendActivityEventEntity(
+            id = 7L,
+            ownerUserId = "usr_owner",
+            friendUserId = "usr_friend",
+            displayName = "Friend",
+            profileImageUrl = "",
+            type = FriendActivityEventType.Online.name,
+            occurredAtMillis = 123L,
+            previousValue = "offline",
+            currentValue = "online",
+            worldId = "wrld_test",
+            worldName = "Test World",
+            accessType = "Public",
+        )
+        val driver = BundledSQLiteDriver()
+        val favorite = CachedBlobEntity("favorite_list", "usr_owner", "", "{}", 1L)
+
+        try {
+            createVersion4Database(databasePath, event)
+            val (pageSize, rootPage) = driver.open(databasePath).use { db ->
+                db.execSQL("INSERT INTO cached_blobs VALUES ('favorite_list', 'usr_owner', '', '{}', 1)")
+                db.queryLong("PRAGMA page_size") to db.queryLong(
+                    "SELECT rootpage FROM sqlite_schema WHERE name = 'index_cached_blobs_scope_groupKey_updatedAtMillis'"
+                )
+            }
+            RandomAccessFile(original.toFile(), "rw").use { file ->
+                file.seek((rootPage - 1) * pageSize)
+                assertEquals(0x0a, file.readUnsignedByte()) // SQLite index leaf page.
+                file.skipBytes(2)
+                file.writeShort(0) // The leaf header now claims it has no index entries.
+            }
+            driver.open(databasePath).use { db ->
+                db.prepare("PRAGMA integrity_check('cached_blobs')").use {
+                    check(it.step())
+                    assertNotEquals("ok", it.getText(0))
+                }
+            }
+            val originalBytes = Files.readAllBytes(original)
+
+            val database = Room.databaseBuilder<VrcmDatabase>(name = databasePath)
+                .setDriver(RecoveringDesktopSQLiteDriver())
+                .setJournalMode(RoomDatabase.JournalMode.TRUNCATE)
+                .setQueryCoroutineContext(Dispatchers.IO)
+                .build()
+            try {
+                assertEquals(listOf(event), database.friendActivityDao().observeAllEvents("usr_owner", limit = 10, offset = 0).first())
+                assertNull(database.cachedBlobDao().payload(favorite.scope, favorite.cacheKey))
+                database.cachedBlobDao().save(favorite, limit = 8)
+            } finally {
+                database.close()
+            }
+
+            RecoveringDesktopSQLiteDriver().open(databasePath).use { db ->
+                assertEquals(6L, db.queryLong("PRAGMA user_version"))
+                assertEquals(1L, db.queryLong("SELECT COUNT(*) FROM cached_blobs"))
+            }
+            assertContentEquals(originalBytes, Files.readAllBytes(original))
+        } finally {
+            directory.toFile().deleteRecursively()
+        }
+    }
+
     @Test
     fun migrationFrom4To5PreservesEventsAndReplacesTimelineIndexes() = runTest {
         val directory = Files.createTempDirectory("vrcm-migration-")

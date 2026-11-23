@@ -13,4 +13,7 @@ internal actual fun platformVrcmDatabaseBuilder(
     appPlatform: AppPlatform,
 ): RoomDatabase.Builder<VrcmDatabase> = Room.databaseBuilder<VrcmDatabase>(
     name = (desktopSettingsDirectory() / VRCM_DATABASE_NAME).toString(),
-).setDriver(BundledSQLiteDriver())
+)
+    .setDriver(RecoveringDesktopSQLiteDriver())
+    // Bundled SQLite 3.50.1 is affected by the WAL reset race. Use a rollback journal for this file.
+    .setJournalMode(RoomDatabase.JournalMode.TRUNCATE)
