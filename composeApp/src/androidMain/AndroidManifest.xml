@@ -59,6 +59,7 @@
                 <data android:host="www.vrchat.com" />
                 <data android:pathPrefix="/home/user/" />
                 <data android:pathPrefix="/home/world/" />
+                <data android:path="/home/launch" />
                 <data android:pathPrefix="/home/group/" />
                 <data android:pathPrefix="/home/avatar/" />
             </intent-filter>

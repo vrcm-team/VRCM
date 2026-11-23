@@ -42,13 +42,19 @@ internal fun parseOfficialId(value: String): OfficialLinkTarget? {
     return type.targetFor(id)
 }
 
-/** Parses an exact public VRChat profile URL and rejects foreign hosts or mismatched IDs. */
+/** Parses public VRChat profile and world launch URLs, checking the host and content ID. */
 internal fun parseOfficialLink(value: String): OfficialLinkTarget? {
     val url = runCatching { Url(value.trim()) }.getOrNull() ?: return null
     if (url.protocol != URLProtocol.HTTPS) return null
     if (url.host != "vrchat.com" && url.host != "www.vrchat.com") return null
 
-    val segments = url.encodedPath.split('/').filter(String::isNotEmpty)
+    val path = url.encodedPath
+    if (path == "/home/launch") {
+        val worldId = url.parameters.getAll("worldId")?.singleOrNull() ?: return null
+        return OfficialLinkType.World.targetFor(worldId)
+    }
+
+    val segments = path.split('/').filter(String::isNotEmpty)
     if (segments.size != 3 || segments[0] != "home") return null
     val type = OfficialLinkType.entries.firstOrNull { it.pathSegment == segments[1] }
         ?: return null
