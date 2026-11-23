@@ -38,22 +38,26 @@ object AuthScreen : AppRoute {
     }
 }
 
-/** 独立登录入口不恢复上一个账号，确保添加账号和二次验证能延续同一次登录操作。 */
+/** 账号管理入口。没有指定已保存的账号时打开添加账号表单。 */
 @Serializable
 data class AccountLoginScreen(val userId: String? = null) : AppRoute {
     @Composable
     override fun Content() {
-        AuthContent(accountLogin = true, accountUserId = userId)
+        AuthContent(accountLogin = this)
     }
 }
 
 @Composable
-private fun AuthContent(accountLogin: Boolean = false, accountUserId: String? = null) {
+private fun AuthContent(accountLogin: AccountLoginScreen? = null) {
     val currentNavigator = currentNavigator
     val authScreenModel: AuthScreenModel = koinViewModel()
     var showAccountMenu by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        if (accountLogin) authScreenModel.beginAccountLogin(accountUserId) else authScreenModel.tryAuth()
+        when {
+            accountLogin == null -> authScreenModel.tryAuth()
+            accountLogin.userId != null -> authScreenModel.beginAccountLogin(accountLogin.userId)
+            else -> authScreenModel.beginAccountAddition { currentNavigator.lastItem === accountLogin }
+        }
     }
     val authUIState = authScreenModel.uiState
     BoxWithConstraints(
@@ -111,7 +115,13 @@ private fun AuthContent(accountLogin: Boolean = false, accountUserId: String? = 
 
                     AuthCardPage.Authed -> {
                         LaunchedEffect(Unit) {
-                            currentNavigator replace AuthAnimeScreen(true)
+                            if (accountLogin != null && accountLogin.userId == null) {
+                                if (currentNavigator.lastItem === accountLogin) {
+                                    currentNavigator replaceAll AuthAnimeScreen(true)
+                                }
+                            } else {
+                                currentNavigator replace AuthAnimeScreen(true)
+                            }
                         }
                         Box(modifier = Modifier.fillMaxSize())
                     }

@@ -56,7 +56,7 @@ internal fun ColumnScope.AccountSecurityContent() {
                 leading = { AppIcon(AppIcons.Add, contentDescription = null, tint = AppTheme.colors.tint) },
                 titleColor = AppTheme.colors.tint,
                 chevron = true,
-                onClick = { navigator replaceAll AccountLoginScreen() },
+                onClick = { navigator push AccountLoginScreen() },
             )
         }
         AppSectionFooter(if (accounts.isEmpty()) strings.settingsNoAccounts else strings.settingsAccountsHint)
