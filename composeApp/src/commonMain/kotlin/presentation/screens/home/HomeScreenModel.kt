@@ -146,6 +146,7 @@ internal enum class HomeDestination {
 
 internal enum class HomeTab {
     Location,
+    Groups,
     Activity,
 }
 

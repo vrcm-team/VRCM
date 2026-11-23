@@ -56,7 +56,6 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.drawer.drawerStatusShar
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendListPagerModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPager
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.GroupInstancePager
-import io.github.vrcmteam.vrcm.presentation.screens.home.pager.HomeLocationSource
 import io.github.vrcmteam.vrcm.presentation.screens.inventory.InventoryScreen
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.*
 import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationCenterContent
@@ -153,12 +152,6 @@ object HomeScreen : AppListRoute {
         }
         HandleBackNavigation(model.drawerVisible || drawerState.isOpen, closeDrawer)
 
-        var locationSourceIndex by rememberSaveable {
-            mutableIntStateOf(HomeLocationSource.Friends.ordinal)
-        }
-        val locationSource = HomeLocationSource.entries.getOrElse(locationSourceIndex) {
-            HomeLocationSource.Friends
-        }
         // 顶栏 / 底栏随列表滚动收起；换页面、换标签或点标签回到顶部时放出来，否则没有栏可点
         val barsState = remember { HomeBarsScrollState() }
         val barsConnection = rememberHomeBarsNestedScrollConnection(barsState)
@@ -167,7 +160,6 @@ object HomeScreen : AppListRoute {
             selectedDestination,
             model.selectedHomeTabIndex,
             model.selectedFavoritesTabIndex,
-            locationSourceIndex,
         ) {
             barsConnection.show()
         }
@@ -180,18 +172,12 @@ object HomeScreen : AppListRoute {
             initialPage = model.selectedHomeTabIndex,
             pageCount = { HomeTab.entries.size },
         )
-        var activityFilterIndex by rememberSaveable {
-            mutableIntStateOf(FriendActivityTimelineFilter.All.ordinal)
-        }
-        val activityFilter = FriendActivityTimelineFilter.entries.getOrElse(activityFilterIndex) {
-            FriendActivityTimelineFilter.All
-        }
         val favoritesPagerState = rememberPagerState(
             initialPage = model.selectedFavoritesTabIndex,
             pageCount = { FavoritesTab.entries.size },
         )
 
-        // 收藏、动态是通栏列表（iOS 信息那种），用系统背景色；位置、通知是卡片，用分组灰底
+        // 收藏、动态是通栏列表，用系统背景色；位置、群组、通知是卡片，用分组灰底
         val showsPlainList = selectedDestination == HomeDestination.Favorites ||
             (selectedDestination == HomeDestination.Home && model.selectedHomeTabIndex == HomeTab.Activity.ordinal)
         val pageColor by animateColorAsState(
@@ -248,10 +234,6 @@ object HomeScreen : AppListRoute {
                                     when (selectedDestination) {
                                         HomeDestination.Home -> HomeTabRow(
                                             pagerState = homePagerState,
-                                            locationSource = locationSource,
-                                            onLocationSourceSelected = { locationSourceIndex = it.ordinal },
-                                            activityFilter = activityFilter,
-                                            onActivityFilterSelected = { activityFilterIndex = it.ordinal },
                                             modifier = Modifier.widthIn(max = HomeTabRowMaxWidth),
                                         )
                                         HomeDestination.Favorites -> FavoritesHubTabRow(
@@ -306,8 +288,6 @@ object HomeScreen : AppListRoute {
                                         HomeDestination.Home -> HomeDestinationContent(
                                             model = model,
                                             pagerState = homePagerState,
-                                            locationSource = locationSource,
-                                            activityFilter = activityFilter,
                                             hasBottomNavigation = !useRail && showMainNavigation,
                                         )
                                         HomeDestination.Favorites -> FavoritesHubContent(
@@ -340,8 +320,6 @@ object HomeScreen : AppListRoute {
 private fun HomeDestinationContent(
     model: HomeScreenModel,
     pagerState: PagerState,
-    locationSource: HomeLocationSource,
-    activityFilter: FriendActivityTimelineFilter,
     hasBottomNavigation: Boolean,
 ) {
     val stateHolder = rememberSaveableStateHolder()
@@ -363,27 +341,22 @@ private fun HomeDestinationContent(
             key = { HomeTab.entries[it].name },
         ) { page ->
             val tab = HomeTab.entries[page]
-            // 位置页两种来源各存各的列表状态，换回来时还在原来的位置
-            val pageKey = when (tab) {
-                HomeTab.Location -> "${'$'}{tab.name}:${'$'}{locationSource.name}"
-                HomeTab.Activity -> tab.name
-            }
-            stateHolder.SaveableStateProvider(pageKey) {
+            val isActive = { pagerState.settledPage == tab.ordinal }
+            stateHolder.SaveableStateProvider(tab.name) {
                 when (tab) {
-                    HomeTab.Location -> Box(Modifier.fillMaxSize()) {
+                    HomeTab.Location, HomeTab.Groups -> Box(Modifier.fillMaxSize()) {
                         CompositionLocalProvider(LocalSharedSuffixKey provides FriendLocationPager.title) {
-                            val isActive = { pagerState.settledPage == HomeTab.Location.ordinal }
-                            when (locationSource) {
-                                HomeLocationSource.Friends -> FriendLocationPager.Content(isActive = isActive)
-                                HomeLocationSource.Groups -> GroupInstancePager(isActive = isActive)
+                            if (tab == HomeTab.Location) {
+                                FriendLocationPager.Content(isActive = isActive)
+                            } else {
+                                GroupInstancePager(isActive = isActive)
                             }
                         }
                     }
                     HomeTab.Activity -> if (activityActivated) {
                         FriendActivityTimelineDestination(
                             hasBottomNavigation = hasBottomNavigation,
-                            isActive = { pagerState.settledPage == HomeTab.Activity.ordinal },
-                            selectedFilter = activityFilter,
+                            isActive = isActive,
                         )
                     } else {
                         ActivityTimelinePreview()
@@ -397,118 +370,44 @@ private fun HomeDestinationContent(
 @Composable
 private fun HomeTabRow(
     pagerState: PagerState,
-    locationSource: HomeLocationSource,
-    onLocationSourceSelected: (HomeLocationSource) -> Unit,
-    activityFilter: FriendActivityTimelineFilter,
-    onActivityFilterSelected: (FriendActivityTimelineFilter) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
-    var menuTab by remember { mutableStateOf<HomeTab?>(null) }
     AppTabRow(selectedTabIndex = pagerState.currentPage, modifier = modifier) {
         HomeTab.entries.forEachIndexed { index, tab ->
             AppTab(
                 selected = index == pagerState.currentPage,
-                onClick = {
-                    // 已经选中的标签再点一次，拉出下拉框换这一页显示的内容
-                    if (index == pagerState.settledPage && !pagerState.isScrollInProgress) {
-                        menuTab = tab
-                    } else {
-                        scope.launch { pagerState.animateScrollToTab(index) }
-                    }
-                },
+                onClick = { scope.launch { pagerState.animateScrollToTab(index) } },
                 text = {
-                    Box {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(2.dp),
-                        ) {
-                            AppText(
-                                text = when (tab) {
-                                    HomeTab.Location -> strings.homeTabLocation
-                                    HomeTab.Activity -> strings.homeTabActivity
-                                },
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            AppIcon(
-                                imageVector = if (menuTab == tab) {
-                                    AppIcons.ExpandLess
-                                } else {
-                                    AppIcons.ExpandMore
-                                },
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
-                        val dismiss = { menuTab = null }
-                        when (tab) {
-                            HomeTab.Location -> HomeTabOptionsMenu(
-                                expanded = menuTab == tab,
-                                onDismissRequest = dismiss,
-                                options = HomeLocationSource.entries,
-                                selected = locationSource,
-                                label = { it.label() },
-                                onSelected = onLocationSourceSelected,
-                            )
-                            HomeTab.Activity -> HomeTabOptionsMenu(
-                                expanded = menuTab == tab,
-                                onDismissRequest = dismiss,
-                                options = FriendActivityTimelineFilter.entries,
-                                selected = activityFilter,
-                                label = { it.label() },
-                                onSelected = onActivityFilterSelected,
-                            )
-                        }
-                    }
+                    AppText(
+                        text = when (tab) {
+                            HomeTab.Location -> strings.homeTabLocation
+                            HomeTab.Groups -> strings.groups
+                            HomeTab.Activity -> strings.homeTabActivity
+                        },
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 },
             )
         }
     }
-}
-
-/** 标签上的下拉框：这一页显示哪一种内容，选中项打对勾。 */
-@Composable
-private fun <T> HomeTabOptionsMenu(
-    expanded: Boolean,
-    onDismissRequest: () -> Unit,
-    options: List<T>,
-    selected: T,
-    label: @Composable (T) -> String,
-    onSelected: (T) -> Unit,
-) {
-    AppMenu(
-        expanded = expanded,
-        onDismissRequest = onDismissRequest,
-        modifier = Modifier.widthIn(min = 200.dp),
-    ) {
-        options.forEach { option ->
-            AppMenuItem(
-                text = { AppText(label(option)) },
-                onClick = {
-                    onDismissRequest()
-                    onSelected(option)
-                },
-                selected = option == selected,
-            )
-        }
-    }
-}
-
-@Composable
-private fun HomeLocationSource.label(): String = when (this) {
-    HomeLocationSource.Friends -> strings.homeLocationSourceFriends
-    HomeLocationSource.Groups -> strings.groupInstances
 }
 
 @Composable
 private fun FriendActivityTimelineDestination(
     hasBottomNavigation: Boolean,
     isActive: () -> Boolean,
-    selectedFilter: FriendActivityTimelineFilter,
 ) {
     val model: FriendActivityTimelineModel = koinViewModel()
     val state by model.state.collectAsState()
+    var selectedFilterNames by rememberSaveable {
+        mutableStateOf(ArrayList(AllActivityFilters.map { it.name }))
+    }
+    val selectedFilters = remember(selectedFilterNames) {
+        FriendActivityTimelineFilter.entries.filterTo(mutableSetOf()) { it.name in selectedFilterNames }
+    }
+    var filterDialogVisible by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val navigator = currentNavigator
     val currentIsActive by rememberUpdatedState(isActive)
@@ -520,15 +419,13 @@ private fun FriendActivityTimelineDestination(
             }
         }
     }
-    LaunchedEffect(model, selectedFilter) {
-        model.selectFilter(selectedFilter)
+    LaunchedEffect(model, selectedFilters) {
+        model.selectFilters(selectedFilters)
         listState.scrollToItem(0)
     }
 
     FriendActivityTimelineContent(
         state = state,
-        filter = selectedFilter,
-        onFilterSelected = model::selectFilter,
         onLoadMore = model::loadMore,
         onRetry = model::retry,
         onRetryLoadMore = model::retryLoadMore,
@@ -549,9 +446,31 @@ private fun FriendActivityTimelineDestination(
         },
         listState = listState,
         controlsInList = true,
-        showFilterControls = false,
+        observedHintAction = {
+            AppIconButton(
+                onClick = { filterDialogVisible = true },
+                size = AppSize.touchTarget,
+                contentColor = if (selectedFilters == AllActivityFilters) {
+                    AppTheme.colors.secondaryLabel
+                } else {
+                    AppTheme.colors.tint
+                },
+            ) {
+                AppIcon(AppIcons.Filter, contentDescription = strings.friendActivityFilterTitle)
+            }
+        },
         bottomNavigationPadding = if (hasBottomNavigation) 80.dp else 0.dp,
     )
+    if (filterDialogVisible) {
+        FriendActivityFilterDialog(
+            selectedFilters = selectedFilters,
+            onDismiss = { filterDialogVisible = false },
+            onConfirm = { filters ->
+                selectedFilterNames = ArrayList(filters.map { it.name })
+                filterDialogVisible = false
+            },
+        )
+    }
 }
 
 @Composable
