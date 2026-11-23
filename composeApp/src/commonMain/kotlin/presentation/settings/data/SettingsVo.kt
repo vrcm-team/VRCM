@@ -10,6 +10,7 @@ data class SettingsVo(
     val themeColor: ThemeColor,
     val friendPresenceNotificationsEnabled: Boolean = false,
     val friendOfflineNotificationsEnabled: Boolean = false,
+    val notificationCompatibilityModeEnabled: Boolean = false,
     val boopNotificationsEnabled: Boolean = false,
     val friendRequestNotificationsEnabled: Boolean = false,
     val groupAnnouncementNotificationsEnabled: Boolean = false,

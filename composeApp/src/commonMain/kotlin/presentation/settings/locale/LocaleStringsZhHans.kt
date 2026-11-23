@@ -202,6 +202,8 @@ internal object LocaleStringsZhHans : LocaleStrings() {
     override val playerModerationRemoveSetting = "清除此玩家设置"
     override val playerModerationRemoveConfirmTitle = "清除此玩家设置？"
     override val playerModerationRemoveConfirmMessage = "将清除 %player% 的“%type%”设置。此操作无法撤销。"
+    override val notificationCompatibilityMode = "通知兼容模式"
+    override val notificationCompatibilityModeDescription = "隐藏系统通知中的头像，帮助部分设备正常显示通知时间。"
     override val notificationSectionFriendPresence = "好友上下线"
     override val notificationOnlineDescription = "好友进入游戏时提醒"
     override val notificationFriendOffline = "下线提醒"

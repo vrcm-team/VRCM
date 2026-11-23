@@ -214,6 +214,9 @@ sealed class LocaleStrings {
     open val playerModerationRemoveConfirmTitle: String = "Clear this player setting?"
     open val playerModerationRemoveConfirmMessage: String =
         "Clear \"%type%\" for %player%? This cannot be undone."
+    open val notificationCompatibilityMode: String = "Notification compatibility mode"
+    open val notificationCompatibilityModeDescription: String =
+        "Hides avatars in system notifications to help some devices show the notification time."
     open val notificationSectionFriendPresence: String = "Friend presence"
     open val notificationOnlineDescription: String = "Alerts when a friend enters the game"
     open val notificationFriendOffline: String = "Offline alerts"
