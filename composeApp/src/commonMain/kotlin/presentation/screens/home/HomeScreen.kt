@@ -180,12 +180,6 @@ object HomeScreen : AppListRoute {
             initialPage = model.selectedHomeTabIndex,
             pageCount = { HomeTab.entries.size },
         )
-        var activityFilterIndex by rememberSaveable {
-            mutableIntStateOf(FriendActivityTimelineFilter.All.ordinal)
-        }
-        val activityFilter = FriendActivityTimelineFilter.entries.getOrElse(activityFilterIndex) {
-            FriendActivityTimelineFilter.All
-        }
         val favoritesPagerState = rememberPagerState(
             initialPage = model.selectedFavoritesTabIndex,
             pageCount = { FavoritesTab.entries.size },
@@ -250,8 +244,6 @@ object HomeScreen : AppListRoute {
                                             pagerState = homePagerState,
                                             locationSource = locationSource,
                                             onLocationSourceSelected = { locationSourceIndex = it.ordinal },
-                                            activityFilter = activityFilter,
-                                            onActivityFilterSelected = { activityFilterIndex = it.ordinal },
                                             modifier = Modifier.widthIn(max = HomeTabRowMaxWidth),
                                         )
                                         HomeDestination.Favorites -> FavoritesHubTabRow(
@@ -307,7 +299,6 @@ object HomeScreen : AppListRoute {
                                             model = model,
                                             pagerState = homePagerState,
                                             locationSource = locationSource,
-                                            activityFilter = activityFilter,
                                             hasBottomNavigation = !useRail && showMainNavigation,
                                         )
                                         HomeDestination.Favorites -> FavoritesHubContent(
@@ -341,7 +332,6 @@ private fun HomeDestinationContent(
     model: HomeScreenModel,
     pagerState: PagerState,
     locationSource: HomeLocationSource,
-    activityFilter: FriendActivityTimelineFilter,
     hasBottomNavigation: Boolean,
 ) {
     val stateHolder = rememberSaveableStateHolder()
@@ -383,7 +373,6 @@ private fun HomeDestinationContent(
                         FriendActivityTimelineDestination(
                             hasBottomNavigation = hasBottomNavigation,
                             isActive = { pagerState.settledPage == HomeTab.Activity.ordinal },
-                            selectedFilter = activityFilter,
                         )
                     } else {
                         ActivityTimelinePreview()
@@ -399,67 +388,55 @@ private fun HomeTabRow(
     pagerState: PagerState,
     locationSource: HomeLocationSource,
     onLocationSourceSelected: (HomeLocationSource) -> Unit,
-    activityFilter: FriendActivityTimelineFilter,
-    onActivityFilterSelected: (FriendActivityTimelineFilter) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
-    var menuTab by remember { mutableStateOf<HomeTab?>(null) }
+    var locationMenuExpanded by remember { mutableStateOf(false) }
     AppTabRow(selectedTabIndex = pagerState.currentPage, modifier = modifier) {
         HomeTab.entries.forEachIndexed { index, tab ->
             AppTab(
                 selected = index == pagerState.currentPage,
                 onClick = {
-                    // 已经选中的标签再点一次，拉出下拉框换这一页显示的内容
-                    if (index == pagerState.settledPage && !pagerState.isScrollInProgress) {
-                        menuTab = tab
-                    } else {
+                    if (index != pagerState.settledPage || pagerState.isScrollInProgress) {
                         scope.launch { pagerState.animateScrollToTab(index) }
+                    } else if (tab == HomeTab.Location) {
+                        locationMenuExpanded = true
                     }
                 },
                 text = {
-                    Box {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(2.dp),
-                        ) {
-                            AppText(
-                                text = when (tab) {
-                                    HomeTab.Location -> strings.homeTabLocation
-                                    HomeTab.Activity -> strings.homeTabActivity
-                                },
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            AppIcon(
-                                imageVector = if (menuTab == tab) {
-                                    AppIcons.ExpandLess
-                                } else {
-                                    AppIcons.ExpandMore
-                                },
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
-                        val dismiss = { menuTab = null }
-                        when (tab) {
-                            HomeTab.Location -> HomeTabOptionsMenu(
-                                expanded = menuTab == tab,
-                                onDismissRequest = dismiss,
-                                options = HomeLocationSource.entries,
+                    when (tab) {
+                        HomeTab.Location -> Box {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                            ) {
+                                AppText(
+                                    text = strings.homeTabLocation,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                AppIcon(
+                                    imageVector = if (locationMenuExpanded) {
+                                        AppIcons.ExpandLess
+                                    } else {
+                                        AppIcons.ExpandMore
+                                    },
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                            HomeLocationOptionsMenu(
+                                expanded = locationMenuExpanded,
+                                onDismissRequest = { locationMenuExpanded = false },
                                 selected = locationSource,
-                                label = { it.label() },
                                 onSelected = onLocationSourceSelected,
                             )
-                            HomeTab.Activity -> HomeTabOptionsMenu(
-                                expanded = menuTab == tab,
-                                onDismissRequest = dismiss,
-                                options = FriendActivityTimelineFilter.entries,
-                                selected = activityFilter,
-                                label = { it.label() },
-                                onSelected = onActivityFilterSelected,
-                            )
                         }
+                        HomeTab.Activity -> AppText(
+                            text = strings.homeTabActivity,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
                 },
             )
@@ -467,24 +444,21 @@ private fun HomeTabRow(
     }
 }
 
-/** 标签上的下拉框：这一页显示哪一种内容，选中项打对勾。 */
 @Composable
-private fun <T> HomeTabOptionsMenu(
+private fun HomeLocationOptionsMenu(
     expanded: Boolean,
     onDismissRequest: () -> Unit,
-    options: List<T>,
-    selected: T,
-    label: @Composable (T) -> String,
-    onSelected: (T) -> Unit,
+    selected: HomeLocationSource,
+    onSelected: (HomeLocationSource) -> Unit,
 ) {
     AppMenu(
         expanded = expanded,
         onDismissRequest = onDismissRequest,
         modifier = Modifier.widthIn(min = 200.dp),
     ) {
-        options.forEach { option ->
+        HomeLocationSource.entries.forEach { option ->
             AppMenuItem(
-                text = { AppText(label(option)) },
+                text = { AppText(option.label()) },
                 onClick = {
                     onDismissRequest()
                     onSelected(option)
@@ -505,10 +479,16 @@ private fun HomeLocationSource.label(): String = when (this) {
 private fun FriendActivityTimelineDestination(
     hasBottomNavigation: Boolean,
     isActive: () -> Boolean,
-    selectedFilter: FriendActivityTimelineFilter,
 ) {
     val model: FriendActivityTimelineModel = koinViewModel()
     val state by model.state.collectAsState()
+    var selectedFilterNames by rememberSaveable {
+        mutableStateOf(ArrayList(AllActivityFilters.map { it.name }))
+    }
+    val selectedFilters = remember(selectedFilterNames) {
+        FriendActivityTimelineFilter.entries.filterTo(mutableSetOf()) { it.name in selectedFilterNames }
+    }
+    var filterDialogVisible by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val navigator = currentNavigator
     val currentIsActive by rememberUpdatedState(isActive)
@@ -520,15 +500,13 @@ private fun FriendActivityTimelineDestination(
             }
         }
     }
-    LaunchedEffect(model, selectedFilter) {
-        model.selectFilter(selectedFilter)
+    LaunchedEffect(model, selectedFilters) {
+        model.selectFilters(selectedFilters)
         listState.scrollToItem(0)
     }
 
     FriendActivityTimelineContent(
         state = state,
-        filter = selectedFilter,
-        onFilterSelected = model::selectFilter,
         onLoadMore = model::loadMore,
         onRetry = model::retry,
         onRetryLoadMore = model::retryLoadMore,
@@ -549,9 +527,31 @@ private fun FriendActivityTimelineDestination(
         },
         listState = listState,
         controlsInList = true,
-        showFilterControls = false,
+        observedHintAction = {
+            AppIconButton(
+                onClick = { filterDialogVisible = true },
+                size = AppSize.touchTarget,
+                contentColor = if (selectedFilters == AllActivityFilters) {
+                    AppTheme.colors.secondaryLabel
+                } else {
+                    AppTheme.colors.tint
+                },
+            ) {
+                AppIcon(AppIcons.Filter, contentDescription = strings.friendActivityFilterTitle)
+            }
+        },
         bottomNavigationPadding = if (hasBottomNavigation) 80.dp else 0.dp,
     )
+    if (filterDialogVisible) {
+        FriendActivityFilterDialog(
+            selectedFilters = selectedFilters,
+            onDismiss = { filterDialogVisible = false },
+            onConfirm = { filters ->
+                selectedFilterNames = ArrayList(filters.map { it.name })
+                filterDialogVisible = false
+            },
+        )
+    }
 }
 
 @Composable

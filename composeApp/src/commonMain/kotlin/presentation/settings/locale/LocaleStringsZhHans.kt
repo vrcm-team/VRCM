@@ -806,6 +806,7 @@ internal object LocaleStringsZhHans : LocaleStrings() {
     override val friendActivityTimelineEmpty = "暂无观察到的好友动态"
     override val friendActivityTimelineError = "无法加载好友动态"
     override val friendActivityLoadMoreError = "无法加载更多好友动态"
+    override val friendActivityFilterTitle = "筛选动态"
     override val friendActivityFilterAll = "全部"
     override val friendActivityFilterPresence = "上下线"
     override val friendActivityFilterLocation = "位置"

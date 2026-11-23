@@ -846,6 +846,7 @@ sealed class LocaleStrings {
     open val friendActivityTimelineEmpty: String = "No observed activity yet"
     open val friendActivityTimelineError: String = "Friend activity could not be loaded"
     open val friendActivityLoadMoreError: String = "More activity could not be loaded"
+    open val friendActivityFilterTitle: String = "Filter activity"
     open val friendActivityFilterAll: String = "All"
     open val friendActivityFilterPresence: String = "Online & offline"
     open val friendActivityFilterLocation: String = "Location"

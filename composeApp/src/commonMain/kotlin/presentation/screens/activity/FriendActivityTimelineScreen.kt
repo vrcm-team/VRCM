@@ -76,7 +76,7 @@ object FriendActivityTimelineScreen : AppDetailRoute {
         val navigator = LocalNavigator.currentOrThrow
         val model: FriendActivityTimelineModel = koinViewModel()
         val state by model.state.collectAsState()
-        val filter by model.filter.collectAsState()
+        val filters by model.filters.collectAsState()
 
         AppScaffold(
             containerColor = AppTheme.colors.systemBackground,
@@ -97,8 +97,7 @@ object FriendActivityTimelineScreen : AppDetailRoute {
         ) { padding ->
             FriendActivityTimelineContent(
                 state = state,
-                filter = filter,
-                onFilterSelected = model::selectFilter,
+                filterControls = { ActivityTimelineFilters(filters, model::selectFilters) },
                 onRetry = model::retry,
                 onLoadMore = model::loadMore,
                 onRetryLoadMore = model::retryLoadMore,
@@ -127,8 +126,6 @@ object FriendActivityTimelineScreen : AppDetailRoute {
 @Composable
 fun FriendActivityTimelineContent(
     state: FriendActivityTimelineState,
-    filter: FriendActivityTimelineFilter,
-    onFilterSelected: (FriendActivityTimelineFilter) -> Unit,
     onRetry: () -> Unit,
     onLoadMore: () -> Unit,
     onRetryLoadMore: () -> Unit,
@@ -138,7 +135,8 @@ fun FriendActivityTimelineContent(
     listState: LazyListState = rememberLazyListState(),
     headerContent: (@Composable () -> Unit)? = null,
     controlsInList: Boolean = headerContent != null,
-    showFilterControls: Boolean = true,
+    filterControls: (@Composable () -> Unit)? = null,
+    observedHintAction: (@Composable () -> Unit)? = null,
     bottomNavigationPadding: Dp = 0.dp,
 ) {
     val contentState = state as? FriendActivityTimelineState.Content
@@ -159,16 +157,15 @@ fun FriendActivityTimelineContent(
         onLoadMore()
     }
 
+    val controls: @Composable () -> Unit = {
+        filterControls?.invoke()
+        ActivityTimelineObservedHint(action = observedHintAction)
+    }
     if (!controlsInList) {
         Column(modifier = modifier.fillMaxSize()) {
-            if (showFilterControls) {
-                ActivityTimelineFilters(filter, onFilterSelected)
-            }
-            ActivityTimelineObservedHint()
+            controls()
             ActivityTimelineList(
                 state = state,
-                filter = filter,
-                onFilterSelected = onFilterSelected,
                 onRetry = onRetry,
                 onRetryLoadMore = onRetryLoadMore,
                 onUserClick = onUserClick,
@@ -176,16 +173,12 @@ fun FriendActivityTimelineContent(
                 listState = listState,
                 modifier = Modifier.weight(1f),
                 headerContent = headerContent,
-                includeControls = false,
-                showFilterControls = showFilterControls,
                 bottomNavigationPadding = bottomNavigationPadding,
             )
         }
     } else {
         ActivityTimelineList(
             state = state,
-            filter = filter,
-            onFilterSelected = onFilterSelected,
             onRetry = onRetry,
             onRetryLoadMore = onRetryLoadMore,
             onUserClick = onUserClick,
@@ -193,8 +186,7 @@ fun FriendActivityTimelineContent(
             listState = listState,
             modifier = modifier,
             headerContent = headerContent,
-            includeControls = true,
-            showFilterControls = showFilterControls,
+            controls = controls,
             bottomNavigationPadding = bottomNavigationPadding,
         )
     }
@@ -203,8 +195,6 @@ fun FriendActivityTimelineContent(
 @Composable
 private fun ActivityTimelineList(
     state: FriendActivityTimelineState,
-    filter: FriendActivityTimelineFilter,
-    onFilterSelected: (FriendActivityTimelineFilter) -> Unit,
     onRetry: () -> Unit,
     onRetryLoadMore: () -> Unit,
     onUserClick: (FriendActivityEvent) -> Unit,
@@ -212,10 +202,10 @@ private fun ActivityTimelineList(
     listState: LazyListState,
     modifier: Modifier,
     headerContent: (@Composable () -> Unit)? = null,
-    includeControls: Boolean,
-    showFilterControls: Boolean,
+    controls: (@Composable () -> Unit)? = null,
     bottomNavigationPadding: Dp,
 ) {
+    val includeControls = controls != null
     // 列表铺到屏幕底（Edge-to-Edge）：系统导航条的高度加进 contentPadding，最后一项仍能滚到它上方
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -230,14 +220,9 @@ private fun ActivityTimelineList(
                 headerContent()
             }
         }
-        if (includeControls && showFilterControls) {
-            item(key = "activity-filters") {
-                ActivityTimelineFilters(filter, onFilterSelected)
-            }
-        }
-        if (includeControls) {
+        if (controls != null) {
             item(key = "activity-observed-hint") {
-                ActivityTimelineObservedHint()
+                controls()
             }
         }
 
@@ -330,18 +315,26 @@ private fun ActivityTimelineList(
 
 @Composable
 private fun ActivityTimelineFilters(
-    filter: FriendActivityTimelineFilter,
-    onFilterSelected: (FriendActivityTimelineFilter) -> Unit,
+    filters: Set<FriendActivityTimelineFilter>,
+    onFiltersSelected: (Set<FriendActivityTimelineFilter>) -> Unit,
 ) {
     LazyRow(
         modifier = Modifier.fillMaxWidth(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        items(FriendActivityTimelineFilter.entries, key = { it.name }) { option ->
+        item(key = "all") {
             AppFilterChip(
-                selected = option == filter,
-                onClick = { onFilterSelected(option) },
+                selected = filters == AllActivityFilters,
+                onClick = { onFiltersSelected(AllActivityFilters) },
+                label = { AppText(strings.friendActivityFilterAll) },
+            )
+        }
+        items(FriendActivityTimelineFilter.entries, key = { it.name }) { option ->
+            val optionFilters = setOf(option)
+            AppFilterChip(
+                selected = filters == optionFilters,
+                onClick = { onFiltersSelected(optionFilters) },
                 label = { AppText(option.label()) },
             )
         }
@@ -349,13 +342,20 @@ private fun ActivityTimelineFilters(
 }
 
 @Composable
-private fun ActivityTimelineObservedHint() {
-    AppText(
-        text = strings.friendActivityObservedHint,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-        style = AppTheme.type.caption1,
-        color = AppTheme.colors.secondaryLabel,
-    )
+private fun ActivityTimelineObservedHint(action: (@Composable () -> Unit)?) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(AppSpacing.s),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AppText(
+            text = strings.friendActivityObservedHint,
+            modifier = Modifier.weight(1f).padding(vertical = 4.dp),
+            style = AppTheme.type.caption1,
+            color = AppTheme.colors.secondaryLabel,
+        )
+        action?.invoke()
+    }
 }
 
 @Composable
@@ -419,7 +419,6 @@ private val TimelineAvatarSize = 44.dp
 
 @Composable
 internal fun FriendActivityTimelineFilter.label(): String = when (this) {
-    FriendActivityTimelineFilter.All -> strings.friendActivityFilterAll
     FriendActivityTimelineFilter.Presence -> strings.friendActivityFilterPresence
     FriendActivityTimelineFilter.Location -> strings.friendActivityFilterLocation
     FriendActivityTimelineFilter.Profile -> strings.friendActivityFilterProfile

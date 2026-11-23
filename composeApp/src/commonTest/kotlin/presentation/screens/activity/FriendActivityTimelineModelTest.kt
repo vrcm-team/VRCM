@@ -194,12 +194,56 @@ class FriendActivityTimelineModelTest : MainDispatcherTest() {
         val model = FriendActivityTimelineModel(source, pageSize = 2)
         advanceUntilIdle()
 
-        model.selectFilter(FriendActivityTimelineFilter.Location)
+        val filters = setOf(FriendActivityTimelineFilter.Location)
+        model.selectFilters(filters)
         advanceUntilIdle()
 
         val filtered = assertIs<FriendActivityTimelineState.Content>(model.state.value)
         assertEquals(listOf(8L), filtered.events.map(FriendActivityEvent::id))
-        assertEquals(FriendActivityTimelineFilter.Location, model.filter.value)
+        assertEquals(filters, model.filters.value)
+    }
+
+    @Test
+    fun combinedFiltersApplyAcrossPagesAndClearingThemHidesAllEvents() = runTest {
+        val source = FakeTimelineSource(
+            listOf(
+                event(7, FriendActivityEventType.AvatarChanged),
+                event(6, FriendActivityEventType.LocationChanged),
+                event(5, FriendActivityEventType.Online),
+                event(4, FriendActivityEventType.StatusChanged),
+                event(3, FriendActivityEventType.Offline),
+                event(2, FriendActivityEventType.LocationChanged),
+                event(1, FriendActivityEventType.AvatarChanged),
+            )
+        )
+        val model = FriendActivityTimelineModel(source, pageSize = 2)
+        advanceUntilIdle()
+
+        model.selectFilters(setOf(FriendActivityTimelineFilter.Location, FriendActivityTimelineFilter.Presence))
+        advanceUntilIdle()
+
+        val filtered = assertIs<FriendActivityTimelineState.Content>(model.state.value)
+        assertEquals(listOf(6L, 5L), filtered.events.map(FriendActivityEvent::id))
+        assertTrue(filtered.hasMore)
+
+        model.loadMore()
+        advanceUntilIdle()
+
+        val loaded = assertIs<FriendActivityTimelineState.Content>(model.state.value)
+        assertEquals(listOf(6L, 5L, 3L, 2L), loaded.events.map(FriendActivityEvent::id))
+        assertFalse(loaded.hasMore)
+
+        model.selectFilters(emptySet())
+        advanceUntilIdle()
+
+        val hidden = assertIs<FriendActivityTimelineState.Content>(model.state.value)
+        assertTrue(hidden.events.isEmpty())
+        assertFalse(hidden.hasMore)
+
+        model.selectFilters(AllActivityFilters)
+        advanceUntilIdle()
+        val restored = assertIs<FriendActivityTimelineState.Content>(model.state.value)
+        assertEquals(listOf(7L, 6L), restored.events.map(FriendActivityEvent::id))
     }
 
     @Test
@@ -300,9 +344,15 @@ class FriendActivityTimelineModelTest : MainDispatcherTest() {
         ): Flow<List<FriendActivityEvent>> {
             requestedTokens += token
             requestedCursors += cursor
-            return appendResponses.removeFirst().onEach { page ->
-                val accountDatabase = accountDatabases.getValue(token)
+            val accountDatabase = accountDatabases.getValue(token)
+            return appendResponses.removeFirstOrNull()?.onEach { page ->
                 accountDatabase.value = (accountDatabase.value + page).normalizeActivityEvents()
+            } ?: accountDatabase.map { events ->
+                events.filter { event ->
+                    (types.isEmpty() || event.type in types) &&
+                        (event.occurredAtMillis < cursor.occurredAtMillis ||
+                            (event.occurredAtMillis == cursor.occurredAtMillis && event.id < cursor.id))
+                }.take(limit)
             }
         }
 

@@ -128,6 +128,17 @@ object AppIcons {
         symbol("line.3.horizontal") { stroke(Medium) { line(4.5f, 7f, 19.5f, 7f); line(4.5f, 12f, 19.5f, 12f); line(4.5f, 17f, 19.5f, 17f) } }
     }
 
+    /** line.3.horizontal.decrease */
+    val Filter: ImageVector by lazy {
+        symbol("line.3.horizontal.decrease") {
+            stroke(Medium) {
+                line(4f, 7f, 20f, 7f)
+                line(7f, 12f, 17f, 12f)
+                line(10f, 17f, 14f, 17f)
+            }
+        }
+    }
+
     /** ellipsis：更多操作。 */
     val More: ImageVector by lazy {
         symbol("ellipsis") { fill { circle(5.5f, 12f, 1.7f); circle(12f, 12f, 1.7f); circle(18.5f, 12f, 1.7f) } }

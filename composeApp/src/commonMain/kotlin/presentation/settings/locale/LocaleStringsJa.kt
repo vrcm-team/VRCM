@@ -819,6 +819,7 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val friendActivityTimelineEmpty = "観測されたアクティビティはまだありません"
     override val friendActivityTimelineError = "フレンドの動向を読み込めませんでした"
     override val friendActivityLoadMoreError = "続きのアクティビティを読み込めませんでした"
+    override val friendActivityFilterTitle = "アクティビティの絞り込み"
     override val friendActivityFilterAll = "すべて"
     override val friendActivityFilterPresence = "オンライン・オフライン"
     override val friendActivityFilterLocation = "場所"
