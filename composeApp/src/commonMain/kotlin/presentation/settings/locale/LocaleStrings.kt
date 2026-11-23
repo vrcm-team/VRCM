@@ -958,7 +958,6 @@ sealed class LocaleStrings {
     open val mainNavigationNotifications: String = "Inbox"
     open val mainNavigationFriends: String = "Friends"
     open val homeTabLocation: String = "Locations"
-    open val homeLocationSourceFriends: String = "Friend Locations"
     open val homeTabActivity: String = "Activity"
     open val drawerMyProfile: String = "My profile"
     open val drawerSettings: String = "Settings"

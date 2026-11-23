@@ -41,7 +41,7 @@ import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
- * 位置页的「群组房间」来源：自己加入的群组现在开着的房间，按群组分段显示。
+ * 首页群组标签，按群组分段显示自己加入的群组目前开启的房间。
  * 卡片沿用好友位置的 [LocationCard]：点图片进入世界，点信息区展开房间操作。
  */
 @OptIn(ExperimentalSharedTransitionApi::class)

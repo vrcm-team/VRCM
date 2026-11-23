@@ -56,7 +56,6 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.drawer.drawerStatusShar
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendListPagerModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPager
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.GroupInstancePager
-import io.github.vrcmteam.vrcm.presentation.screens.home.pager.HomeLocationSource
 import io.github.vrcmteam.vrcm.presentation.screens.inventory.InventoryScreen
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.*
 import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationCenterContent
@@ -153,12 +152,6 @@ object HomeScreen : AppListRoute {
         }
         HandleBackNavigation(model.drawerVisible || drawerState.isOpen, closeDrawer)
 
-        var locationSourceIndex by rememberSaveable {
-            mutableIntStateOf(HomeLocationSource.Friends.ordinal)
-        }
-        val locationSource = HomeLocationSource.entries.getOrElse(locationSourceIndex) {
-            HomeLocationSource.Friends
-        }
         // 顶栏 / 底栏随列表滚动收起；换页面、换标签或点标签回到顶部时放出来，否则没有栏可点
         val barsState = remember { HomeBarsScrollState() }
         val barsConnection = rememberHomeBarsNestedScrollConnection(barsState)
@@ -167,7 +160,6 @@ object HomeScreen : AppListRoute {
             selectedDestination,
             model.selectedHomeTabIndex,
             model.selectedFavoritesTabIndex,
-            locationSourceIndex,
         ) {
             barsConnection.show()
         }
@@ -185,7 +177,7 @@ object HomeScreen : AppListRoute {
             pageCount = { FavoritesTab.entries.size },
         )
 
-        // 收藏、动态是通栏列表（iOS 信息那种），用系统背景色；位置、通知是卡片，用分组灰底
+        // 收藏、动态是通栏列表，用系统背景色；位置、群组、通知是卡片，用分组灰底
         val showsPlainList = selectedDestination == HomeDestination.Favorites ||
             (selectedDestination == HomeDestination.Home && model.selectedHomeTabIndex == HomeTab.Activity.ordinal)
         val pageColor by animateColorAsState(
@@ -242,8 +234,6 @@ object HomeScreen : AppListRoute {
                                     when (selectedDestination) {
                                         HomeDestination.Home -> HomeTabRow(
                                             pagerState = homePagerState,
-                                            locationSource = locationSource,
-                                            onLocationSourceSelected = { locationSourceIndex = it.ordinal },
                                             modifier = Modifier.widthIn(max = HomeTabRowMaxWidth),
                                         )
                                         HomeDestination.Favorites -> FavoritesHubTabRow(
@@ -298,7 +288,6 @@ object HomeScreen : AppListRoute {
                                         HomeDestination.Home -> HomeDestinationContent(
                                             model = model,
                                             pagerState = homePagerState,
-                                            locationSource = locationSource,
                                             hasBottomNavigation = !useRail && showMainNavigation,
                                         )
                                         HomeDestination.Favorites -> FavoritesHubContent(
@@ -331,7 +320,6 @@ object HomeScreen : AppListRoute {
 private fun HomeDestinationContent(
     model: HomeScreenModel,
     pagerState: PagerState,
-    locationSource: HomeLocationSource,
     hasBottomNavigation: Boolean,
 ) {
     val stateHolder = rememberSaveableStateHolder()
@@ -353,26 +341,22 @@ private fun HomeDestinationContent(
             key = { HomeTab.entries[it].name },
         ) { page ->
             val tab = HomeTab.entries[page]
-            // 位置页两种来源各存各的列表状态，换回来时还在原来的位置
-            val pageKey = when (tab) {
-                HomeTab.Location -> "${'$'}{tab.name}:${'$'}{locationSource.name}"
-                HomeTab.Activity -> tab.name
-            }
-            stateHolder.SaveableStateProvider(pageKey) {
+            val isActive = { pagerState.settledPage == tab.ordinal }
+            stateHolder.SaveableStateProvider(tab.name) {
                 when (tab) {
-                    HomeTab.Location -> Box(Modifier.fillMaxSize()) {
+                    HomeTab.Location, HomeTab.Groups -> Box(Modifier.fillMaxSize()) {
                         CompositionLocalProvider(LocalSharedSuffixKey provides FriendLocationPager.title) {
-                            val isActive = { pagerState.settledPage == HomeTab.Location.ordinal }
-                            when (locationSource) {
-                                HomeLocationSource.Friends -> FriendLocationPager.Content(isActive = isActive)
-                                HomeLocationSource.Groups -> GroupInstancePager(isActive = isActive)
+                            if (tab == HomeTab.Location) {
+                                FriendLocationPager.Content(isActive = isActive)
+                            } else {
+                                GroupInstancePager(isActive = isActive)
                             }
                         }
                     }
                     HomeTab.Activity -> if (activityActivated) {
                         FriendActivityTimelineDestination(
                             hasBottomNavigation = hasBottomNavigation,
-                            isActive = { pagerState.settledPage == HomeTab.Activity.ordinal },
+                            isActive = isActive,
                         )
                     } else {
                         ActivityTimelinePreview()
@@ -386,93 +370,28 @@ private fun HomeDestinationContent(
 @Composable
 private fun HomeTabRow(
     pagerState: PagerState,
-    locationSource: HomeLocationSource,
-    onLocationSourceSelected: (HomeLocationSource) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
-    var locationMenuExpanded by remember { mutableStateOf(false) }
     AppTabRow(selectedTabIndex = pagerState.currentPage, modifier = modifier) {
         HomeTab.entries.forEachIndexed { index, tab ->
             AppTab(
                 selected = index == pagerState.currentPage,
-                onClick = {
-                    if (index != pagerState.settledPage || pagerState.isScrollInProgress) {
-                        scope.launch { pagerState.animateScrollToTab(index) }
-                    } else if (tab == HomeTab.Location) {
-                        locationMenuExpanded = true
-                    }
-                },
+                onClick = { scope.launch { pagerState.animateScrollToTab(index) } },
                 text = {
-                    when (tab) {
-                        HomeTab.Location -> Box {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                            ) {
-                                AppText(
-                                    text = strings.homeTabLocation,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                AppIcon(
-                                    imageVector = if (locationMenuExpanded) {
-                                        AppIcons.ExpandLess
-                                    } else {
-                                        AppIcons.ExpandMore
-                                    },
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            }
-                            HomeLocationOptionsMenu(
-                                expanded = locationMenuExpanded,
-                                onDismissRequest = { locationMenuExpanded = false },
-                                selected = locationSource,
-                                onSelected = onLocationSourceSelected,
-                            )
-                        }
-                        HomeTab.Activity -> AppText(
-                            text = strings.homeTabActivity,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                    AppText(
+                        text = when (tab) {
+                            HomeTab.Location -> strings.homeTabLocation
+                            HomeTab.Groups -> strings.groups
+                            HomeTab.Activity -> strings.homeTabActivity
+                        },
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 },
             )
         }
     }
-}
-
-@Composable
-private fun HomeLocationOptionsMenu(
-    expanded: Boolean,
-    onDismissRequest: () -> Unit,
-    selected: HomeLocationSource,
-    onSelected: (HomeLocationSource) -> Unit,
-) {
-    AppMenu(
-        expanded = expanded,
-        onDismissRequest = onDismissRequest,
-        modifier = Modifier.widthIn(min = 200.dp),
-    ) {
-        HomeLocationSource.entries.forEach { option ->
-            AppMenuItem(
-                text = { AppText(option.label()) },
-                onClick = {
-                    onDismissRequest()
-                    onSelected(option)
-                },
-                selected = option == selected,
-            )
-        }
-    }
-}
-
-@Composable
-private fun HomeLocationSource.label(): String = when (this) {
-    HomeLocationSource.Friends -> strings.homeLocationSourceFriends
-    HomeLocationSource.Groups -> strings.groupInstances
 }
 
 @Composable

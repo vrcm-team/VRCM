@@ -931,7 +931,6 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val mainNavigationNotifications = "通知"
     override val mainNavigationFriends = "フレンド"
     override val homeTabLocation = "場所"
-    override val homeLocationSourceFriends = "フレンドの場所"
     override val homeTabActivity = "アクティビティ"
     override val drawerMyProfile = "マイプロフィール"
     override val drawerSettings = "設定"

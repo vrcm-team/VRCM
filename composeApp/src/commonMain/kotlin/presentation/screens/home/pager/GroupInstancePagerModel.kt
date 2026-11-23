@@ -19,12 +19,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-/** 位置页显示哪一种房间：好友所在的房间，或自己加入的群组开着的房间。 */
-enum class HomeLocationSource {
-    Friends,
-    Groups,
-}
-
 /** 一个群组房间：[instants] 是卡片要的实例信息，[groupName] 用来分组显示。 */
 data class GroupInstanceVo(
     val location: String,
