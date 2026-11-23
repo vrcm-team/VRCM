@@ -3,10 +3,13 @@ package io.github.vrcmteam.vrcm.service
 import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.di.supports.PersistentCookiesStorage
+import io.github.vrcmteam.vrcm.network.api.attributes.AUTH_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.attributes.AUTH_COOKIE
 import io.github.vrcmteam.vrcm.network.api.attributes.AuthState
 import io.github.vrcmteam.vrcm.network.api.attributes.AuthType
 import io.github.vrcmteam.vrcm.network.api.attributes.TWO_FACTOR_AUTH_COOKIE
+import io.github.vrcmteam.vrcm.network.api.attributes.USER_API_PREFIX
+import io.github.vrcmteam.vrcm.network.api.attributes.VRC_API_URL
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.network.api.auth.data.Presence
@@ -22,6 +25,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
 import io.github.vrcmteam.vrcm.service.data.AccountDto
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
 import io.github.vrcmteam.vrcm.storage.AccountDao
+import io.ktor.client.plugins.cookies.AcceptAllCookiesStorage
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.atomicfu.locks.SynchronizedObject
@@ -29,6 +33,10 @@ import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -109,17 +117,14 @@ class AuthService(
     fun accountDtoOrNull(): AccountDto? = accountDao.currentAccountDtoOrNull()
 
     /** 停止旧会话但保留各账号凭据；已保存账号优先用 Cookie 快捷登录。 */
-    suspend fun beginAccountLogin(userId: String? = null): AuthState? = authMutex.withLock {
-        val account = userId?.let { id ->
-            requireNotNull(accountDao.accountDtoList().firstOrNull { it.userId == id }) {
-                "Saved account is unavailable"
-            }
+    suspend fun beginAccountLogin(userId: String): AuthState? = authMutex.withLock {
+        val account = requireNotNull(accountDao.accountDtoList().firstOrNull { it.userId == userId }) {
+            "Saved account is unavailable"
         }
         invalidateCurrentSessionLocked()
         cookiesStorage.removeCookie(AUTH_COOKIE)
         cookiesStorage.removeCookie(TWO_FACTOR_AUTH_COOKIE)
-        currentAccountDto = account ?: AccountDto()
-        if (account == null) return@withLock null
+        currentAccountDto = account
 
         if (!account.authCookie.isNullOrBlank()) {
             applyAuthCookie(account.username)
@@ -135,6 +140,49 @@ class AuthService(
         }
         val password = account.password?.takeIf(String::isNotEmpty) ?: return@withLock null
         loginLocked(account.username, password, expectedUserId = account.userId)
+    }
+
+    internal fun startAccountAddition(canCommit: () -> Boolean): AccountAddition =
+        AccountAddition(canCommit)
+
+    /** Holds the credentials and challenges for one addition until the route accepts the result. */
+    internal inner class AccountAddition(private val canCommit: () -> Boolean) : AutoCloseable {
+        private val cookies = AcceptAllCookiesStorage()
+        private val api = authApi.withCookies(cookies)
+        private val authUrl = Url("$VRC_API_URL$AUTH_API_PREFIX/$USER_API_PREFIX")
+
+        suspend fun login(username: String, password: String): AuthState {
+            accountDao.accountDtoByUserName(username)?.let { account ->
+                account.authCookie?.let { cookies.addCookie(authUrl, Cookie(AUTH_COOKIE, it, path = "/")) }
+                account.twoFactorAuthCookie?.let {
+                    cookies.addCookie(authUrl, Cookie(TWO_FACTOR_AUTH_COOKIE, it, path = "/"))
+                }
+            }
+            return api.login(username, password).also {
+                if (it == AuthState.Authed) complete(password)
+            }
+        }
+
+        suspend fun verify(password: String, code: String, page: AuthCardPage): Result<Unit> =
+            api.verify(code, page.toAuthType()).onSuccess { complete(password) }
+
+        private suspend fun complete(password: String) {
+            val user = enrichCurrentUser(api.currentUser())
+            val receivedCookies = cookies.get(authUrl).associate { it.name to it.value }
+            val authCookie = checkNotNull(receivedCookies[AUTH_COOKIE]) { "Missing auth cookie" }
+            authMutex.withLock {
+                publishAuthenticated(user, password, authCookie, receivedCookies[TWO_FACTOR_AUTH_COOKIE]) { account ->
+                    currentCoroutineContext().ensureActive()
+                    if (!canCommit()) throw CancellationException("Add account route was closed")
+                    cookiesStorage.removeCookie(AUTH_COOKIE)
+                    cookiesStorage.removeCookie(TWO_FACTOR_AUTH_COOKIE)
+                    cookiesStorage.addCookie(AUTH_COOKIE, account.authCookie)
+                    cookiesStorage.addCookie(TWO_FACTOR_AUTH_COOKIE, account.twoFactorAuthCookie)
+                }
+            }
+        }
+
+        override fun close() = api.close()
     }
 
     suspend fun restoreAuth(): AuthState? = authMutex.withLock {
@@ -465,13 +513,7 @@ class AuthService(
         verifyCode: String,
         authCardPage: AuthCardPage,
     ): Result<Unit> = authMutex.withLock {
-        val authType = when (authCardPage) {
-            AuthCardPage.EmailCode -> AuthType.Email
-            AuthCardPage.TFACode -> AuthType.TFA
-            AuthCardPage.TTFACode -> AuthType.TTFA
-            else -> error("not supported")
-        }
-        return authApi.verify(verifyCode, authType)
+        return authApi.verify(verifyCode, authCardPage.toAuthType())
             .let { if (it.isSuccess) emitAuthed(password) else it }
     }
 
@@ -485,27 +527,43 @@ class AuthService(
             require(expectedUserId == null || userData.id == expectedUserId) {
                 "Authenticated account does not match the selected account"
             }
-            val accountDto = AccountDto(
-                userId = userData.id,
-                username = userData.username,
-                password = password,
-                iconUrl = userData.iconUrl,
-                authCookie = cookiesStorage.cookieValue(AUTH_COOKIE),
-                twoFactorAuthCookie = cookiesStorage.cookieValue(TWO_FACTOR_AUTH_COOKIE),
+            publishAuthenticated(
+                userData,
+                password,
+                cookiesStorage.cookieValue(AUTH_COOKIE),
+                cookiesStorage.cookieValue(TWO_FACTOR_AUTH_COOKIE),
             )
-            homeWorldMutationGate.withLock {
-                synchronized(currentUserLock) {
-                    publishCurrentUserLocked(
-                        userData.copy(
-                            presence = selectCurrentPresence(userData.presence, socketPresence),
-                        )
-                    )
-                }
-            }
-            currentAccountDto = accountDto
-            accountDao.saveAccountInfo(accountDto)
-            SharedFlowCentre.emitAuthenticated(accountDto)
         }
+    }
+
+    private suspend fun publishAuthenticated(
+        user: CurrentUserData,
+        password: String?,
+        authCookie: String?,
+        twoFactorAuthCookie: String?,
+        beforePublish: suspend (AccountDto) -> Unit = {},
+    ) {
+        val account = AccountDto(
+            userId = user.id,
+            username = user.username,
+            password = password,
+            iconUrl = user.iconUrl,
+            authCookie = authCookie,
+            twoFactorAuthCookie = twoFactorAuthCookie,
+        )
+        homeWorldMutationGate.withLock {
+            beforePublish(account)
+            synchronized(currentUserLock) {
+                if (currentUser?.id != user.id) {
+                    socketPresence = null
+                    socketPresenceRevision++
+                }
+                publishCurrentUserLocked(user.copy(presence = selectCurrentPresence(user.presence, socketPresence)))
+            }
+        }
+        currentAccountDto = account
+        accountDao.saveAccountInfo(account)
+        withContext(NonCancellable) { SharedFlowCentre.emitAuthenticated(account) }
     }
 
     suspend fun login(username: String, password: String): AuthState = authMutex.withLock {
@@ -776,6 +834,13 @@ class AuthService(
         return user.mergePublicProfile(profile)
     }
 
+}
+
+private fun AuthCardPage.toAuthType(): AuthType = when (this) {
+    AuthCardPage.EmailCode -> AuthType.Email
+    AuthCardPage.TFACode -> AuthType.TFA
+    AuthCardPage.TTFACode -> AuthType.TTFA
+    else -> error("not supported")
 }
 
 /** Merges fields moved from the user endpoint to the public profile endpoint. */

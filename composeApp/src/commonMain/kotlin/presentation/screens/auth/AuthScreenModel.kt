@@ -32,6 +32,8 @@ class AuthScreenModel(
     })
 
     private var _currentVerifyJob: Job? = null
+    private var canAddAccount: (() -> Boolean)? = null
+    private var accountAddition: AuthService.AccountAddition? = null
 
     fun accountDtoList():List<AccountDto> = authService.accountDtoList()
 
@@ -115,7 +117,12 @@ class AuthScreenModel(
         }
     }
 
-    fun beginAccountLogin(userId: String?) {
+    internal fun beginAccountAddition(canCommit: () -> Boolean) {
+        canAddAccount = canCommit
+        _uiState.value = AuthUIState(cardState = AuthCardPage.Login)
+    }
+
+    fun beginAccountLogin(userId: String) {
         val account = authService.accountDtoList().firstOrNull { it.userId == userId }
         _uiState.value = AuthUIState(
             userId = account?.userId.orEmpty(),
@@ -136,6 +143,12 @@ class AuthScreenModel(
     }
 
     fun returnToLogin() {
+        if (canAddAccount != null) {
+            accountAddition?.close()
+            accountAddition = null
+            onCardStateChange(AuthCardPage.Login)
+            return
+        }
         viewModelScope.launch {
             authService.logout()
             onCardStateChange(AuthCardPage.Login)
@@ -164,8 +177,16 @@ class AuthScreenModel(
             onErrorMessageChange("Username or Password is empty")
         } else {
             onLoadingChange(true)
-            viewModelScope.launch(context = Dispatchers.Default) {
-                doLogin(username, password)
+            val canCommit = canAddAccount
+            if (canCommit == null) {
+                viewModelScope.launch(Dispatchers.Default) { doLogin(username, password) }
+            } else {
+                viewModelScope.launch {
+                    accountAddition?.close()
+                    val addition = authService.startAccountAddition(canCommit)
+                    accountAddition = addition
+                    doLogin(username, password, addition)
+                }
             }
         }
     }
@@ -177,20 +198,27 @@ class AuthScreenModel(
         val password = _uiState.value.password.trim()
         if (_uiState.value.btnIsLoading) return
         onLoadingChange(true)
-        _currentVerifyJob = viewModelScope.launch(context = Dispatchers.Default) {
-            async(context = Dispatchers.IO) {
-                authService.verify(password, verifyCode, cardState)
-            }.await()
-                .onSuccess {
-                    onCardStateChange(AuthCardPage.Authed)
-                }.onAuthFailure()
+        val addition = accountAddition
+        _currentVerifyJob = viewModelScope.launch {
+            val result = authRequestCatching {
+                if (addition == null) {
+                    withContext(Dispatchers.IO) { authService.verify(password, verifyCode, cardState).getOrThrow() }
+                } else {
+                    addition.verify(password, verifyCode, cardState).getOrThrow()
+                }
+            }
+            result.onSuccess { onCardStateChange(AuthCardPage.Authed) }.onAuthFailure()
         }
     }
 
-    private suspend fun doLogin(username: String, password: String) {
-        val runCatching = runCatching { authService.login(username, password) }.onAuthFailure()
-        if (runCatching.isFailure) return
-        val authState = runCatching.getOrNull()!!
+    private suspend fun doLogin(
+        username: String,
+        password: String,
+        addition: AuthService.AccountAddition? = null,
+    ) {
+        val authState = authRequestCatching {
+            addition?.login(username, password) ?: authService.login(username, password)
+        }.onAuthFailure().getOrNull() ?: return
 
         if (authState is AuthState.Unauthorized) {
             onErrorMessageChange(authState.message)
@@ -209,6 +237,13 @@ class AuthScreenModel(
 
         }
         onCardStateChange(authCardPage)
+    }
+
+    private inline fun <T> authRequestCatching(request: () -> T): Result<T> =
+        runCatching(request).onFailure { if (it is CancellationException) throw it }
+
+    override fun onCleared() {
+        accountAddition?.close()
     }
 
     private inline fun <T> Result<T>.onAuthFailure() =

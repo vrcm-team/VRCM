@@ -13,6 +13,8 @@ import io.github.vrcmteam.vrcm.network.extensions.urlEncode
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.ktor.client.*
 import io.ktor.client.call.*
+import io.ktor.client.plugins.cookies.CookiesStorage
+import io.ktor.client.plugins.cookies.HttpCookies
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -22,6 +24,13 @@ import kotlinx.serialization.Serializable
 class AuthApi(
     private val client: HttpClient,
 ) {
+
+    /** Uses the existing engine and client configuration with a separate Cookie store. */
+    internal fun withCookies(storage: CookiesStorage): AuthApi = AuthApi(client.config {
+        install(HttpCookies) { this.storage = storage }
+    })
+
+    internal fun close() = client.close()
 
     /** Loads the origin of a pending login before the user explicitly approves it. */
     suspend fun deviceAuthInfo(userCode: String): DeviceAuthInfoData =

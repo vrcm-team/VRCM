@@ -6,6 +6,7 @@ import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.di.supports.PersistentCookiesStorage
 import io.github.vrcmteam.vrcm.network.api.attributes.AUTH_COOKIE
 import io.github.vrcmteam.vrcm.network.api.attributes.AuthState
+import io.github.vrcmteam.vrcm.network.api.attributes.TWO_FACTOR_AUTH_COOKIE
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
@@ -14,6 +15,7 @@ import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
+import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarSelector
 import io.github.vrcmteam.vrcm.service.data.AccountDto
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
@@ -1295,20 +1297,91 @@ class AuthServiceTest : MainDispatcherTest() {
     }
 
     @Test
-    fun addingAccountClearsLiveSessionWithoutRevokingSavedCredentials() = runTest {
-        val account = cachedAccount()
-        val fixture = fixture { error("Adding an account must wait for entered credentials") }
+    fun leavingAddAccountDuringVerificationKeepsTheOriginalSessionAndCookies() = runTest {
+        val previous = cachedAccount()
+        val added = previous.copy(userId = "usr_other", username = "other-user")
+        val verificationStarted = CompletableDeferred<Unit>()
+        val continueVerification = CompletableDeferred<Unit>()
+        val fixture = fixture { request ->
+            val requestCookies = request.headers[HttpHeaders.Cookie].orEmpty()
+            when {
+                request.headers[HttpHeaders.Authorization] != null -> {
+                    assertFalse(requestCookies.contains("auth=cached-auth"))
+                    assertFalse(requestCookies.contains("twoFactorAuth=cached-2fa"))
+                    jsonResponse("""{"requiresTwoFactorAuth":["totp"]}""", "auth=pending-auth; Path=/")
+                }
+                request.method == HttpMethod.Post -> {
+                    assertTrue(requestCookies.contains("auth=pending-auth"))
+                    verificationStarted.complete(Unit)
+                    continueVerification.await()
+                    jsonResponse("""{"verified":true}""", "auth=added-auth; Path=/", "twoFactorAuth=added-2fa; Path=/")
+                }
+                requestCookies.contains("auth=added-auth") -> jsonResponse(currentUserJson(added))
+                else -> {
+                    assertTrue(requestCookies.contains("auth=cached-auth"))
+                    jsonResponse(currentUserJson(previous))
+                }
+            }
+        }
+        var routeIsCurrent = true
+        val addition = fixture.service.startAccountAddition { routeIsCurrent }
         try {
-            SharedFlowCentre.emitAuthenticated(account)
-            fixture.cookies.addCookie(AUTH_COOKIE, account.authCookie)
+            assertIs<AuthState.Authed>(fixture.service.restoreAuth())
+            val originalSession = SharedFlowCentre.currentSession.value
+            assertIs<AuthState.NeedTTFA>(addition.login(added.username, "new-password"))
+            assertEquals(originalSession, SharedFlowCentre.currentSession.value)
+            assertEquals(previous.userId, fixture.service.currentUser(isRefresh = true).id)
 
-            assertNull(fixture.service.beginAccountLogin())
+            val verification = async {
+                addition.verify("new-password", "123456", AuthCardPage.TTFACode)
+            }
+            verificationStarted.await()
+            routeIsCurrent = false
+            continueVerification.complete(Unit)
+            assertFailsWith<CancellationException> { verification.await() }
 
-            assertNull(SharedFlowCentre.currentSession.value)
-            assertNull(fixture.cookies.cookieValue(AUTH_COOKIE))
-            assertEquals("", fixture.service.accountDto().username)
-            assertEquals(account.authCookie, fixture.accountDao.accountDtoByUserName(account.username)?.authCookie)
+            assertEquals(originalSession, SharedFlowCentre.currentSession.value)
+            assertEquals(previous.userId, fixture.service.currentUserState.value?.id)
+            assertEquals(previous.userId, fixture.accountDao.currentAccountDtoOrNull()?.userId)
+            assertNull(fixture.accountDao.accountDtoByUserName(added.username))
+            addition.close()
+            assertEquals(previous.userId, fixture.service.currentUser(isRefresh = true).id)
+            assertEquals(previous.twoFactorAuthCookie, fixture.cookies.cookieValue(TWO_FACTOR_AUTH_COOKIE))
         } finally {
+            continueVerification.complete(Unit)
+            addition.close()
+            fixture.service.closeAndJoin()
+            fixture.client.close()
+        }
+    }
+
+    @Test
+    fun successfulAdditionPromotesOnlyTheNewAccountsCredentials() = runTest {
+        val previous = cachedAccount()
+        val added = previous.copy(userId = "usr_other", username = "other-user")
+        val fixture = fixture { request ->
+            val requestCookies = request.headers[HttpHeaders.Cookie].orEmpty()
+            if (request.headers[HttpHeaders.Authorization] != null) {
+                assertFalse(requestCookies.contains("auth=cached-auth"))
+                jsonResponse(currentUserJson(added), "auth=added-auth; Path=/")
+            } else if (requestCookies.contains("auth=added-auth")) {
+                jsonResponse(currentUserJson(added))
+            } else {
+                jsonResponse(currentUserJson(previous))
+            }
+        }
+        val addition = fixture.service.startAccountAddition { true }
+        try {
+            assertIs<AuthState.Authed>(fixture.service.restoreAuth())
+            assertIs<AuthState.Authed>(addition.login(added.username, "new-password"))
+
+            assertEquals(added.userId, SharedFlowCentre.currentSession.value?.account?.userId)
+            assertEquals(added.userId, fixture.accountDao.currentAccountDtoOrNull()?.userId)
+            assertEquals("added-auth", fixture.cookies.cookieValue(AUTH_COOKIE))
+            assertNull(fixture.cookies.cookieValue(TWO_FACTOR_AUTH_COOKIE))
+            assertEquals(previous.authCookie, fixture.accountDao.accountDtoByUserName(previous.username)?.authCookie)
+        } finally {
+            addition.close()
             fixture.service.closeAndJoin()
             fixture.client.close()
         }
@@ -1439,10 +1512,13 @@ class AuthServiceTest : MainDispatcherTest() {
         twoFactorAuthCookie = "cached-2fa",
     )
 
-    private fun MockRequestHandleScope.jsonResponse(body: String) = respond(
+    private fun MockRequestHandleScope.jsonResponse(body: String, vararg cookies: String) = respond(
         content = body,
         status = HttpStatusCode.OK,
-        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+        headers = headersOf(
+            HttpHeaders.ContentType to listOf("application/json"),
+            HttpHeaders.SetCookie to cookies.toList(),
+        ),
     )
 
     private fun currentUserJson(
