@@ -10,7 +10,6 @@ internal data class FriendActivityObservation(
     val bio: String,
     val lastActivityAtMillis: Long?,
     val travelingToLocation: String = "",
-    val avatarImageUrl: String = "",
 )
 
 internal enum class FriendSocketPresenceType { Online, Offline }
@@ -321,10 +320,6 @@ internal class FriendActivityTracker(
         if (previous.displayName.isNotBlank() && displayName.isNotBlank() && previous.displayName != displayName) {
             add(baseEvent.copy(type = FriendActivityEventType.DisplayNameChanged,
                 previousValue = previous.displayName, currentValue = displayName))
-        }
-        if (previous.avatarImageUrl.isNotBlank() && avatarImageUrl.isNotBlank() && previous.avatarImageUrl != avatarImageUrl) {
-            add(baseEvent.copy(type = FriendActivityEventType.AvatarChanged,
-                previousValue = previous.avatarImageUrl, currentValue = avatarImageUrl))
         }
     }
 

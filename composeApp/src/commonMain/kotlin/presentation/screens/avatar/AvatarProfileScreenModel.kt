@@ -84,15 +84,22 @@ internal class NetworkAvatarSelector(
         }
     }
 
-    override suspend fun select(avatarId: String): Result<Unit> =
-        authService.reTryAuthCatching { avatarsApi.selectAvatar(avatarId) }
-            .onSuccess { selection ->
-                authService.applyCurrentAvatarUpdate(selection.currentAvatar)
-            }
-            .onFailure { error ->
-                logger.error(avatarSelectionFailureLog(avatarId, error))
-            }
-            .map { }
+    override suspend fun select(avatarId: String): Result<Unit> {
+        val token = SharedFlowCentre.currentSession.value?.token
+            ?: return Result.failure(IllegalStateException("No active session for avatar selection"))
+        val response = authService.runSessionBoundCatchingWithToken(token) { requestToken ->
+            val selection = avatarsApi.selectAvatar(avatarId)
+            authService.applyCurrentAvatarUpdate(
+                requestToken,
+                selection.currentAvatar,
+                selection.currentAvatarImageUrl,
+                selection.currentAvatarThumbnailImageUrl,
+            )
+        } ?: return Result.failure(IllegalStateException("Account changed during avatar selection"))
+        return response.result.onFailure { error ->
+            logger.error(avatarSelectionFailureLog(avatarId, error))
+        }
+    }
 }
 
 internal data class AvatarFallbackUserContext(

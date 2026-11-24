@@ -55,24 +55,32 @@ class FriendActivityRoomStoreTest {
                 displayName = "Original",
                 location = "offline",
                 status = "offline",
-                avatarImageUrl = "https://example.com/avatar-before.png",
             )
-            val changed = baseline.copy(
-                displayName = "Renamed",
-                avatarImageUrl = "https://example.com/avatar-after.png",
+            val changed = baseline.copy(displayName = "Renamed")
+            val avatar = FriendActivityEventDraft(
+                userId = session.account.userId,
+                displayName = "Owner",
+                profileImageUrl = "",
+                type = FriendActivityEventType.AvatarChanged,
+                occurredAtMillis = 2_500L,
+                previousValue = "https://example.com/avatar-before.png",
+                currentValue = "https://example.com/avatar-after.png",
             )
             trackFriendActivity(
                 session = session,
                 snapshots = flow {
-                    listOf(baseline, changed, changed.copy(profileImageUrl = "new-profile-icon"))
-                        .forEachIndexed { index, friend ->
-                            emit(FriendActivityInputSnapshot(
-                                token = session.token,
-                                friends = listOf(friend),
-                                selfLocation = null,
-                                observedAtMillis = (index + 1) * 1_000L,
-                            ))
-                        }
+                    emit(FriendActivityInputSnapshot(session.token, listOf(baseline), null, 1_000L))
+                    emit(FriendActivityInputSnapshot(session.token, listOf(changed), null, 2_000L))
+                    emit(FriendActivityInputSnapshot(
+                        token = session.token,
+                        friends = emptyList(),
+                        selfLocation = null,
+                        observedAtMillis = avatar.occurredAtMillis,
+                        avatarEvent = avatar,
+                    ))
+                    emit(FriendActivityInputSnapshot(
+                        session.token, listOf(changed.copy(profileImageUrl = "new-profile-icon")), null, 3_000L,
+                    ))
                 },
                 store = store,
             )
@@ -83,9 +91,10 @@ class FriendActivityRoomStoreTest {
             assertEquals("Renamed", profile.single().currentValue)
             val avatars = store.observeAllEvents("usr_owner", FriendActivityTimelineFilter.Avatar.eventTypes, 20).first()
             assertEquals(listOf(FriendActivityEventType.AvatarChanged.name), avatars.map { it.type })
-            assertEquals(baseline.avatarImageUrl, avatars.single().previousValue)
-            assertEquals(changed.avatarImageUrl, avatars.single().currentValue)
-            assertEquals(2, store.observeEvents("usr_owner", baseline.userId).first().size)
+            assertEquals(avatar.previousValue, avatars.single().previousValue)
+            assertEquals(avatar.currentValue, avatars.single().currentValue)
+            assertEquals(session.account.userId, avatars.single().friendUserId)
+            assertEquals(1, store.observeEvents("usr_owner", baseline.userId).first().size)
         }
     }
 

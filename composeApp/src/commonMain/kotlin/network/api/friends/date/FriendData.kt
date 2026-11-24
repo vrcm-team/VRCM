@@ -35,6 +35,8 @@ data class FriendData(
     override val tags: List<String> = emptyList(),
     override val userIcon: String = "",
     override val pronouns: String? = null,
+    val bannerType: String? = null,
+    val bannerUrl: String? = null,
 ) : IUser {
     /**
      * Friend-list responses can omit the legacy `userIcon` field while still

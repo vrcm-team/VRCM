@@ -35,7 +35,9 @@ data class UserContent(
     override val statusDescription: String,
     override val tags: List<String>,
     override val userIcon: String = "",
-    override val pronouns: String? = null
+    override val pronouns: String? = null,
+    val bannerType: String? = null,
+    val bannerUrl: String? = null,
 ): IUser {
     override val iconUrl: String
         get() = profileIconUrl.ifBlank { userIcon.ifBlank { profileImageUrl } }

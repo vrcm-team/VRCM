@@ -15,6 +15,8 @@ import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
+import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendUpdateContent
+import io.github.vrcmteam.vrcm.network.websocket.data.content.SocketUserUpdate
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarSelector
 import io.github.vrcmteam.vrcm.service.data.AccountDto
@@ -47,6 +49,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -839,7 +843,7 @@ class AuthServiceTest : MainDispatcherTest() {
             ),
         )
 
-        fixture.service.applyCurrentAvatarUpdate("avtr_newer")
+        fixture.service.applyCurrentAvatarUpdate(session.token, "avtr_newer", null, null)
         assertEquals(
             FallbackAvatarUpdateResult.Stale,
             fixture.service.applyFallbackAvatarUpdate(
@@ -1156,6 +1160,42 @@ class AuthServiceTest : MainDispatcherTest() {
             fixture.service.currentUserState.value?.currentAvatar,
         )
         fixture.client.close()
+    }
+
+    @Test
+    fun partialOwnAvatarUpdatesRecordEachSwapWithoutCountingTheSelectionEcho() = runTest {
+        val fixture = fixture {
+            jsonResponse(currentUserJson(cachedAccount(), currentAvatar = "avtr_current"))
+        }
+        try {
+            assertIs<AuthState.Authed>(fixture.service.restoreAuth())
+            val token = assertNotNull(SharedFlowCentre.currentSession.value).token
+
+            fixture.service.applySocketUserUpdate(
+                token.copy(generation = token.generation + 1),
+                SocketUserUpdate(id = token.userId, currentAvatar = "avtr_stale"),
+            )
+            assertEquals("avtr_current", fixture.service.currentUserState.value?.currentAvatar)
+
+            val selectedImage = "https://api.vrchat.cloud/api/1/file/file_selected/1/file"
+            fixture.service.applyCurrentAvatarUpdate(token, "avtr_selected", selectedImage, null)
+            val echo = Json.decodeFromString<FriendUpdateContent>(
+                """{"user":{"id":"${token.userId}","currentAvatar":"avtr_selected"}}""",
+            )
+            fixture.service.applySocketUserUpdate(token, echo.user)
+            val gameSwap = Json.decodeFromString<FriendUpdateContent>(
+                """{"user":{"id":"${token.userId}","currentAvatar":"avtr_ingame"}}""",
+            )
+            fixture.service.applySocketUserUpdate(token, gameSwap.user)
+
+            val changes = fixture.service.ownAvatarActivity.take(2).toList()
+            assertEquals(listOf(selectedImage, null), changes.map { it.event.currentValue })
+            assertEquals(selectedImage, changes.last().event.previousValue)
+            assertEquals("avtr_ingame", fixture.service.currentUserState.value?.currentAvatar)
+        } finally {
+            fixture.service.closeAndJoin()
+            fixture.client.close()
+        }
     }
 
     @Test

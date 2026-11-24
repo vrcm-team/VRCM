@@ -6,18 +6,15 @@ import kotlin.test.assertTrue
 
 class FriendActivityTrackerTest {
     @Test
-    fun profileChangesUseAvatarIdentityAndDoNotTreatMissingImagesAsAvatarChanges() {
+    fun profileChangesRecordDisplayNameButIgnoreProfileIconChanges() {
         val tracker = FriendActivityTracker()
-        val friend = FriendActivityObservation("usr_friend", "Original", "icon", "offline", "offline", "", "", null,
-            avatarImageUrl = "avatar-a")
+        val friend = FriendActivityObservation("usr_friend", "Original", "icon", "offline", "offline", "", "", null)
         assertTrue(tracker.observe(listOf(friend), null, 1_000L).events.isEmpty())
-        val changed = friend.copy(displayName = "Renamed", profileImageUrl = "new-icon", avatarImageUrl = "avatar-b")
-        val events = tracker.observe(listOf(changed), null, 2_000L).events
-        assertEquals(setOf(FriendActivityEventType.DisplayNameChanged, FriendActivityEventType.AvatarChanged), events.map { it.type }.toSet())
-        assertEquals("avatar-a", events.single { it.type == FriendActivityEventType.AvatarChanged }.previousValue)
-        assertTrue(tracker.observe(listOf(changed.copy(profileImageUrl = "another-icon")), null, 3_000L).events.isEmpty())
-        assertTrue(tracker.observe(listOf(changed.copy(avatarImageUrl = "")), null, 4_000L).events.isEmpty())
-        assertTrue(tracker.observe(listOf(changed), null, 5_000L).events.isEmpty())
+        val renamed = friend.copy(displayName = "Renamed", profileImageUrl = "new-icon")
+        val event = tracker.observe(listOf(renamed), null, 2_000L).events.single()
+        assertEquals(FriendActivityEventType.DisplayNameChanged, event.type)
+        assertTrue(tracker.observe(listOf(renamed.copy(profileImageUrl = "another-icon")), null, 3_000L)
+            .events.isEmpty())
     }
 
     @Test
