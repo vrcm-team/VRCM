@@ -13,7 +13,8 @@ data class FileResponse(
     val ownerId: String,
     val mimeType: String,
     val extension: String,
-    val versions: List<FileVersionResponse>
+    val versions: List<FileVersionResponse>,
+    val tags: List<String> = emptyList(),
 )
 
 /**

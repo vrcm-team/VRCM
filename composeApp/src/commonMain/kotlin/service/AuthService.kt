@@ -19,7 +19,7 @@ import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 import io.github.vrcmteam.vrcm.network.api.users.data.CurrentUpdateUserData
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
-import io.github.vrcmteam.vrcm.network.websocket.data.content.UserContent
+import io.github.vrcmteam.vrcm.network.websocket.data.content.SocketUserUpdate
 import io.github.vrcmteam.vrcm.network.websocket.WebSocketSessionRecovery
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
 import io.github.vrcmteam.vrcm.service.data.AccountDto
@@ -42,6 +42,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.channels.Channel
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -92,6 +96,9 @@ class AuthService(
     private var socketPresenceRevision = 0L
     private val _currentUserState = MutableStateFlow<CurrentUserData?>(null)
     val currentUserState: StateFlow<CurrentUserData?> = _currentUserState.asStateFlow()
+
+    private val avatarChanges = Channel<AccountAvatarActivity>(Channel.UNLIMITED)
+    internal val ownAvatarActivity = avatarChanges.receiveAsFlow()
 
     private var currentAccountDto: AccountDto? = null
 
@@ -262,10 +269,17 @@ class AuthService(
         }
     }
 
-    internal fun applyCurrentAvatarUpdate(avatarId: String) {
+    internal fun applyCurrentAvatarUpdate(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+        imageUrl: String?,
+        thumbnailUrl: String?,
+    ) {
         synchronized(currentUserLock) {
-            val existing = currentUser ?: return@synchronized
-            publishCurrentUserLocked(existing.copy(currentAvatar = avatarId))
+            if (!SharedFlowCentre.isCurrentSession(sessionToken) || avatarId.isBlank()) return@synchronized
+            val existing = currentUser?.takeIf { it.id == sessionToken.userId } ?: return@synchronized
+            val updated = existing.withAvatar(avatarId, imageUrl, thumbnailUrl)
+            publishAvatarUpdateLocked(sessionToken, existing, updated)
         }
     }
 
@@ -475,37 +489,49 @@ class AuthService(
         }
     }
 
-    fun applySocketUserUpdate(user: UserContent) {
+    internal fun applySocketUserUpdate(sessionToken: AccountSessionToken, user: SocketUserUpdate) {
         synchronized(currentUserLock) {
-            val existing = currentUser ?: return@synchronized
-            if (existing.id != user.id) return@synchronized
-            publishCurrentUserLocked(
-                existing.copy(
-                    allowAvatarCopying = user.allowAvatarCopying,
-                    bio = user.bio ?: existing.bio,
-                    bioLinks = user.bioLinks.ifEmpty { existing.bioLinks },
-                    currentAvatarImageUrl = user.currentAvatarImageUrl
-                        .ifBlank { existing.currentAvatarImageUrl },
-                    currentAvatarTags = user.currentAvatarTags.ifEmpty { existing.currentAvatarTags },
-                    currentAvatarThumbnailImageUrl = user.currentAvatarThumbnailImageUrl
-                        ?: existing.currentAvatarThumbnailImageUrl,
-                    displayName = user.displayName.ifBlank { existing.displayName },
-                    lastActivity = user.lastActivity.ifBlank { existing.lastActivity },
-                    lastLogin = user.lastLogin.ifBlank { existing.lastLogin },
-                    lastPlatform = user.lastPlatform.ifBlank { existing.lastPlatform },
-                    profilePicOverride = user.profilePicOverride
-                        .ifBlank { existing.profilePicOverride },
-                    profileIconUrl = user.profileIconUrl
-                        .ifBlank { existing.profileIconUrl },
-                    state = user.state,
-                    status = user.status,
-                    statusDescription = user.statusDescription,
-                    tags = user.tags,
-                    userIcon = user.userIcon.ifBlank { existing.userIcon },
-                    pronouns = user.pronouns ?: existing.pronouns,
-                )
+            if (!SharedFlowCentre.isCurrentSession(sessionToken) || user.id != sessionToken.userId) {
+                return@synchronized
+            }
+            val existing = currentUser?.takeIf { it.id == user.id } ?: return@synchronized
+            val updated = existing.withAvatar(
+                avatarId = user.currentAvatar?.takeIf(String::isNotBlank) ?: existing.currentAvatar,
+                imageUrl = user.currentAvatarImageUrl,
+                thumbnailUrl = user.currentAvatarThumbnailImageUrl,
+            ).copy(
+                allowAvatarCopying = user.allowAvatarCopying ?: existing.allowAvatarCopying,
+                bio = user.bio ?: existing.bio,
+                bioLinks = user.bioLinks ?: existing.bioLinks,
+                currentAvatarTags = user.currentAvatarTags ?: existing.currentAvatarTags,
+                displayName = user.displayName ?: existing.displayName,
+                lastActivity = user.lastActivity ?: existing.lastActivity,
+                lastLogin = user.lastLogin ?: existing.lastLogin,
+                lastPlatform = user.lastPlatform ?: existing.lastPlatform,
+                profilePicOverride = user.profilePicOverride ?: existing.profilePicOverride,
+                profileIconUrl = user.profileIconUrl ?: existing.profileIconUrl,
+                state = user.state ?: existing.state,
+                status = user.status ?: existing.status,
+                statusDescription = user.statusDescription ?: existing.statusDescription,
+                tags = user.tags ?: existing.tags,
+                userIcon = user.userIcon ?: existing.userIcon,
+                pronouns = user.pronouns ?: existing.pronouns,
+                bannerType = user.bannerType ?: existing.bannerType,
+                bannerUrl = user.bannerUrl ?: existing.bannerUrl,
             )
+            publishAvatarUpdateLocked(sessionToken, existing, updated)
         }
+    }
+
+    @OptIn(ExperimentalTime::class)
+    private fun publishAvatarUpdateLocked(
+        sessionToken: AccountSessionToken,
+        previous: CurrentUserData,
+        updated: CurrentUserData,
+    ) {
+        publishCurrentUserLocked(updated)
+        updated.avatarActivitySince(previous, sessionToken, Clock.System.now().toEpochMilliseconds())
+            ?.let { avatarChanges.trySend(it) }
     }
 
     suspend fun verify(
@@ -835,6 +861,16 @@ class AuthService(
     }
 
 }
+
+private fun CurrentUserData.withAvatar(
+    avatarId: String,
+    imageUrl: String?,
+    thumbnailUrl: String?,
+): CurrentUserData = copy(
+    currentAvatar = avatarId,
+    currentAvatarImageUrl = imageUrl ?: currentAvatarImageUrl.takeIf { avatarId == currentAvatar }.orEmpty(),
+    currentAvatarThumbnailImageUrl = thumbnailUrl ?: currentAvatarThumbnailImageUrl.takeIf { avatarId == currentAvatar },
+)
 
 private fun AuthCardPage.toAuthType(): AuthType = when (this) {
     AuthCardPage.EmailCode -> AuthType.Email

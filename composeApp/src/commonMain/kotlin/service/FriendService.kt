@@ -35,6 +35,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -132,6 +134,9 @@ class FriendService(
 
     val friendMap: Map<String, FriendData>
         get() = friendState.value
+
+    private val avatarChanges = Channel<AccountAvatarActivity>(Channel.UNLIMITED)
+    internal val friendAvatarActivity = avatarChanges.receiveAsFlow()
 
     private val _friendUpdateFlow = MutableSharedFlow<AccountFriendUpdateEvent>()
     val friendUpdateFlow: SharedFlow<AccountFriendUpdateEvent> = _friendUpdateFlow.asSharedFlow()
@@ -250,15 +255,16 @@ class FriendService(
             }
             "user-update" -> {
                 val content = json.decodeFromString<FriendUpdateContent>(socketEvent.content)
-                authService.applySocketUserUpdate(content.user)
+                authService.applySocketUserUpdate(sessionToken, content.user)
             }
             FriendEvents.FriendOnline.typeName -> {
                 val content = json.decodeFromString<FriendOnlineContent>(socketEvent.content)
-                val update = updateFriendPresence(
+                val update = updateFriend(
                     sessionToken = sessionToken,
                     userId = content.userId,
                     isActive = false,
                     update = content::mergeWith,
+                    avatarObservedAtMillis = receivedAtMillis,
                 )
                 val friend = update?.current
                     ?: run {
@@ -276,8 +282,13 @@ class FriendService(
 
             FriendEvents.FriendActive.typeName -> {
                 val content = json.decodeFromString<FriendActiveContent>(socketEvent.content)
-                val friend = content.toFriendData()
-                if (!putFriend(sessionToken, friend, isActive = true)) return
+                val friend = updateFriend(
+                    sessionToken = sessionToken,
+                    userId = content.userId,
+                    isActive = true,
+                    update = content::toFriendData,
+                    avatarObservedAtMillis = receivedAtMillis,
+                )?.current ?: return
                 emitFriendUpdate(sessionToken, FriendUpdateEvent.Active(friend))
             }
 
@@ -315,31 +326,19 @@ class FriendService(
                     userId = content.userId,
                     isActive = false,
                     update = content::mergeWith,
-                )
-                    ?: return refreshAfterIncompleteEvent(sessionToken)
+                    avatarObservedAtMillis = receivedAtMillis,
+                )?.current ?: return refreshAfterIncompleteEvent(sessionToken)
                 emitFriendUpdate(sessionToken, FriendUpdateEvent.LocationChanged(friend))
             }
 
             FriendEvents.FriendUpdate.typeName -> {
                 val content = json.decodeFromString<FriendUpdateContent>(socketEvent.content)
-                val friend = updateFriend(sessionToken, content.user.id) { existing ->
-                    existing?.copy(
-                        bio = content.user.bio,
-                        bioLinks = content.user.bioLinks,
-                        currentAvatarImageUrl = content.user.currentAvatarImageUrl,
-                        currentAvatarTags = content.user.currentAvatarTags,
-                        currentAvatarThumbnailImageUrl = content.user.currentAvatarThumbnailImageUrl,
-                        displayName = content.user.displayName,
-                        profilePicOverride = content.user.profilePicOverride,
-                        profileIconUrl = content.user.profileIconUrl
-                            .ifBlank { existing?.profileIconUrl.orEmpty() },
-                        status = content.user.status,
-                        statusDescription = content.user.statusDescription,
-                        tags = content.user.tags,
-                        userIcon = content.user.userIcon,
-                        pronouns = content.user.pronouns,
-                    )
-                } ?: return refreshAfterIncompleteEvent(sessionToken)
+                val friend = updateFriend(
+                    sessionToken = sessionToken,
+                    userId = content.user.id,
+                    update = { existing -> existing?.let(content.user::mergeWith) },
+                    avatarObservedAtMillis = receivedAtMillis,
+                )?.current ?: return refreshAfterIncompleteEvent(sessionToken)
                 emitFriendUpdate(sessionToken, FriendUpdateEvent.Updated(friend))
             }
 
@@ -448,25 +447,14 @@ class FriendService(
         userId: String,
         isActive: Boolean? = null,
         update: (FriendData?) -> FriendData?,
-    ): FriendData? = synchronized(friendMapLock) {
-        if (!isCurrentSessionLocked(sessionToken)) return@synchronized null
-        isActive?.let { friendStore.setActiveFromEvent(userId, it) }
-        val updated = friendStore.updateFromEvent(userId, update) ?: return@synchronized null
-        publishFriendState()
-        updated
-    }
-
-    private fun updateFriendPresence(
-        sessionToken: AccountSessionToken,
-        userId: String,
-        isActive: Boolean? = null,
-        update: (FriendData?) -> FriendData?,
+        avatarObservedAtMillis: Long,
     ): FriendPresenceUpdate? = synchronized(friendMapLock) {
         if (!isCurrentSessionLocked(sessionToken)) return@synchronized null
         val previous = friendStore.friend(userId)
         isActive?.let { friendStore.setActiveFromEvent(userId, it) }
         val current = friendStore.updateFromEvent(userId, update) ?: return@synchronized null
         publishFriendState()
+        publishAvatarChange(sessionToken, previous, current, avatarObservedAtMillis)
         FriendPresenceUpdate(previous, current)
     }
 
@@ -484,15 +472,14 @@ class FriendService(
         FriendPresenceUpdate(previous, current)
     }
 
-    private fun putFriend(
-        sessionToken: AccountSessionToken,
-        friend: FriendData,
-        isActive: Boolean? = null,
-    ): Boolean =
-        mutateFriendStore(sessionToken) {
-            isActive?.let { friendStore.setActiveFromEvent(friend.id, it) }
-            friendStore.putFromEvent(friend)
-        }
+    private fun publishAvatarChange(
+        token: AccountSessionToken,
+        previous: FriendData?,
+        current: FriendData,
+        observedAtMillis: Long,
+    ) {
+        current.avatarActivitySince(previous, token, observedAtMillis)?.let { avatarChanges.trySend(it) }
+    }
 
     private fun removeFriend(sessionToken: AccountSessionToken, userId: String): Boolean =
         mutateFriendStore(sessionToken) {
@@ -523,6 +510,7 @@ class FriendService(
         }
     }
 
+    @OptIn(ExperimentalTime::class)
     private fun commitRefresh(
         sessionToken: AccountSessionToken,
         token: FriendRefreshToken,
@@ -530,8 +518,17 @@ class FriendService(
         replaceUntouched: Boolean,
     ): Boolean = synchronized(friendMapLock) {
         if (!isCurrentSessionLocked(sessionToken)) return@synchronized false
+        val previous = if (_initialRefreshCompleted.value) friendStore.snapshot else emptyMap()
         val committed = friendStore.mergeRefresh(token, friends, replaceUntouched)
         if (committed) {
+            if (previous.isNotEmpty()) {
+                val observedAtMillis = Clock.System.now().toEpochMilliseconds()
+                friends.forEach { friend ->
+                    friendStore.friend(friend.id)?.let { current ->
+                        publishAvatarChange(sessionToken, previous[friend.id], current, observedAtMillis)
+                    }
+                }
+            }
             publishFriendState()
             _friendLastActivitySource.value = FriendActivitySourceSnapshot(
                 token = sessionToken,

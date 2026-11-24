@@ -74,7 +74,7 @@ class FriendPresenceContentTest {
 
         assertEquals("usr_a", content.user.id)
         assertEquals("Alice Updated", content.user.displayName)
-        assertEquals("https://example.invalid/socket-icon.png", content.user.iconUrl)
+        assertEquals("https://example.invalid/socket-icon.png", content.user.mergeWith(cachedFriend()).iconUrl)
     }
 
     private fun cachedFriend() = FriendData(

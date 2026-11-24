@@ -5,6 +5,8 @@ import io.github.vrcmteam.vrcm.core.shared.AuthenticatedAccount
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
+import io.github.vrcmteam.vrcm.network.api.files.FileApi
+import io.github.vrcmteam.vrcm.network.api.files.data.FileTagType
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
 import io.github.vrcmteam.vrcm.storage.FriendActivityEventEntity
 import io.github.vrcmteam.vrcm.storage.FriendActivitySummaryEntity
@@ -35,6 +37,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 import org.koin.core.logger.Logger
@@ -82,6 +85,7 @@ internal data class FriendActivityInputSnapshot(
     val socketPresenceEvent: FriendSocketPresenceEvent? = null,
     val trackingControl: FriendActivityTrackingControl? = null,
     val updateLastActivityOnly: Boolean = false,
+    val avatarEvent: FriendActivityEventDraft? = null,
 )
 
 internal enum class FriendActivityTrackingControl { Stop, Resume }
@@ -173,6 +177,8 @@ internal class FriendActivityTrackingState(
 @OptIn(ExperimentalCoroutinesApi::class, ExperimentalTime::class)
 class FriendActivityService internal constructor(
     private val friendService: FriendService,
+    private val authService: AuthService,
+    private val fileApi: FileApi,
     private val store: RoomFriendActivityStore,
     private val worldsApi: WorldsApi,
     private val logger: Logger,
@@ -195,9 +201,22 @@ class FriendActivityService internal constructor(
             SharedFlowCentre.currentSession.collectLatest { session ->
                 if (session == null) return@collectLatest
                 try {
+                    val avatarFiles = mutableMapOf<String, Boolean>()
                     trackFriendActivity(
                         session = session,
                         snapshots = merge(
+                            authService.ownAvatarActivity.mapNotNull { change ->
+                                change.takeIf { it.token == session.token && trackingState.isEnabled() }
+                                    ?.toInputSnapshot()
+                            },
+                            friendService.friendAvatarActivity.mapNotNull { change ->
+                                if (change.token != session.token || !trackingState.isEnabled()) return@mapNotNull null
+                                if (change.needsIconValidation &&
+                                    (!isAvatarImage(change.event.currentValue, avatarFiles) ||
+                                        !isAvatarImage(change.event.previousValue, avatarFiles))
+                                ) return@mapNotNull null
+                                change.toInputSnapshot()
+                            },
                             friendService.friendActivitySource.filterNotNull().mapNotNull {
                                 it.takeIf { trackingState.isEnabled() }?.toInputSnapshot()
                             },
@@ -261,6 +280,27 @@ class FriendActivityService internal constructor(
                 }
             }
         }
+    }
+
+    private suspend fun isAvatarImage(url: String?, cache: MutableMap<String, Boolean>): Boolean {
+        val fileId = FileApi.findFileId(url.orEmpty())
+        if (fileId.isBlank()) return false
+        cache[fileId]?.let { return it }
+        val result = withTimeoutOrNull(AVATAR_FILE_TIMEOUT_MILLIS) { fileApi.getFileInfo(fileId) }
+        if (result == null) {
+            logger.warn("Timed out checking activity avatar file $fileId")
+            return false
+        }
+        val file = result.getOrElse { error ->
+            if (error is CancellationException) throw error
+            logger.warn("Failed to check activity avatar file $fileId: ${error.message}")
+            return false
+        }
+        val isAvatar = FileTagType.Icon.value !in file.tags &&
+            (FileTagType.AvatarImage.value in file.tags ||
+                (file.name.startsWith("Avatar - ", ignoreCase = true) && file.name.contains(" - Image - ")))
+        cache[fileId] = isAvatar
+        return isAvatar
     }
 
     fun observeSummary(friendUserId: String): Flow<FriendActivitySummary?> =
@@ -415,6 +455,7 @@ class FriendActivityService internal constructor(
     }
 
     private companion object {
+        const val AVATAR_FILE_TIMEOUT_MILLIS = 5_000L
         const val WORLD_NAME_TIMEOUT_MILLIS = 5_000L
         const val MEETING_CHECKPOINT_MILLIS = 15_000L
     }
@@ -435,7 +476,9 @@ internal suspend fun trackFriendActivity(
     try {
         snapshots.collect { snapshot ->
             if (snapshot.token != session.token) return@collect
-            if (!snapshot.updateLastActivityOnly) latestObservations = snapshot.friends
+            if (!snapshot.updateLastActivityOnly && snapshot.avatarEvent == null) {
+                latestObservations = snapshot.friends
+            }
             val batch = when (snapshot.trackingControl) {
                 FriendActivityTrackingControl.Stop -> {
                     trackingEnabled = false
@@ -449,6 +492,8 @@ internal suspend fun trackFriendActivity(
                     FriendActivityBatch()
                 } else if (!trackingEnabled) {
                     FriendActivityBatch()
+                } else if (snapshot.avatarEvent != null) {
+                    FriendActivityBatch(events = listOf(snapshot.avatarEvent))
                 } else snapshot.socketPresenceEvent?.let {
                     tracker.observeSocketPresence(snapshot.friends, it)
                 } ?: tracker.observe(snapshot.friends, snapshot.selfLocation, snapshot.observedAtMillis)
@@ -472,7 +517,7 @@ internal suspend fun trackFriendActivity(
             if (!recorded) {
                 writeToken = store.activateAccount(session.account.userId)
                 tracker = FriendActivityTracker(derivePresenceEvents = false)
-                val baseline = if (trackingEnabled && !snapshot.updateLastActivityOnly) {
+                val baseline = if (trackingEnabled && !snapshot.updateLastActivityOnly && snapshot.avatarEvent == null) {
                     tracker.observe(
                         friends = snapshot.friends,
                         selfLocation = snapshot.selfLocation,
@@ -510,6 +555,14 @@ internal suspend fun trackFriendActivity(
     }
 }
 
+private fun AccountAvatarActivity.toInputSnapshot() = FriendActivityInputSnapshot(
+    token = token,
+    friends = emptyList(),
+    selfLocation = null,
+    observedAtMillis = event.occurredAtMillis,
+    avatarEvent = event,
+)
+
 @OptIn(ExperimentalTime::class)
 private fun FriendActivitySourceSnapshot.toInputSnapshot(
         socketPresenceEvent: FriendSocketPresenceEvent? = null,
@@ -533,7 +586,6 @@ private fun FriendActivitySourceSnapshot.toInputSnapshot(
                 ?.takeIf { includeLastActivity }
                 ?.takeIf { friend.status == UserStatus.Offline },
             travelingToLocation = friend.travelingToLocation,
-            avatarImageUrl = friend.currentAvatarImageUrl,
         )
     },
     selfLocation = selfLocation,

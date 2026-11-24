@@ -5,4 +5,6 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class AvatarSelectionData(
     val currentAvatar: String,
+    val currentAvatarImageUrl: String? = null,
+    val currentAvatarThumbnailImageUrl: String? = null,
 )

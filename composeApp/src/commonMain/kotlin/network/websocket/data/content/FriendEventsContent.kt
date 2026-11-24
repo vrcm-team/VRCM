@@ -19,7 +19,7 @@ internal fun mergeFriendPresence(
     travelingToLocation: String = "",
     platform: String? = null,
 ): FriendData? {
-    val friend = user?.toFriendData(userId, location, travelingToLocation) ?: existing?.copy(
+    val friend = user?.toFriendData(userId, location, travelingToLocation, existing) ?: existing?.copy(
         location = location,
         travelingToLocation = travelingToLocation,
         status = if (existing.status == UserStatus.Offline && location != LocationType.Offline.value) {
@@ -35,18 +35,19 @@ internal fun UserContent.toFriendData(
     userId: String = id,
     location: String,
     travelingToLocation: String = "",
+    existing: FriendData? = null,
 ) = FriendData(
     bio = bio,
     bioLinks = bioLinks,
-    currentAvatarImageUrl = currentAvatarImageUrl,
+    currentAvatarImageUrl = currentAvatarImageUrl.ifBlank { existing?.currentAvatarImageUrl.orEmpty() },
     currentAvatarTags = currentAvatarTags,
-    currentAvatarThumbnailImageUrl = currentAvatarThumbnailImageUrl,
+    currentAvatarThumbnailImageUrl = currentAvatarThumbnailImageUrl ?: existing?.currentAvatarThumbnailImageUrl,
     developerType = developerType,
     displayName = displayName,
     friendKey = friendKey,
     id = userId,
     imageUrl = profileImageUrl,
-    profileIconUrl = profileIconUrl,
+    profileIconUrl = profileIconUrl.ifBlank { existing?.profileIconUrl.orEmpty() },
     isFriend = isFriend,
     lastLogin = lastLogin,
     lastActivity = lastActivity,
@@ -59,4 +60,6 @@ internal fun UserContent.toFriendData(
     tags = tags,
     userIcon = userIcon,
     pronouns = pronouns,
+    bannerType = bannerType ?: existing?.bannerType,
+    bannerUrl = bannerUrl ?: existing?.bannerUrl,
 )
