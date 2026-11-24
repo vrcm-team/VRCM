@@ -25,7 +25,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.AppPlatformType
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
+import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.presentation.adaptive.AppWindowWidthClass
 import io.github.vrcmteam.vrcm.presentation.adaptive.LocalAppWindowWidthClass
@@ -153,7 +155,8 @@ object HomeScreen : AppListRoute {
         HandleBackNavigation(model.drawerVisible || drawerState.isOpen, closeDrawer)
 
         // 顶栏 / 底栏随列表滚动收起；换页面、换标签或点标签回到顶部时放出来，否则没有栏可点
-        val barsState = remember { HomeBarsScrollState() }
+        val collapseBars = getAppPlatform().type != AppPlatformType.Desktop
+        val barsState = remember(collapseBars) { HomeBarsScrollState(collapseEnabled = collapseBars) }
         val barsConnection = rememberHomeBarsNestedScrollConnection(barsState)
         LaunchedEffect(
             barsConnection,

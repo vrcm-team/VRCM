@@ -21,6 +21,7 @@ import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
@@ -32,6 +33,8 @@ import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import kotlin.math.roundToInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 /**
  * 主页顶栏 / 底栏和列表手势接在一起之后的行为：
@@ -39,6 +42,22 @@ import kotlin.test.assertEquals
  */
 @OptIn(ExperimentalTestApi::class)
 class HomeBarsScrollBehaviorTest {
+    @Test
+    fun mouseWheelScrollsDownAndBackToTheTopWithDesktopBarsVisible() = runBarsTest(collapseEnabled = false) { state, listState ->
+        onNodeWithTag(ListTag).performMouseInput {
+            moveTo(center)
+            scroll(1f)
+        }
+        waitForIdle()
+        assertEquals(TopBarHeight, onNodeWithTag(TopBarTag).getBoundsInRoot().bottom)
+        assertTrue(listState.canScrollBackward)
+
+        onNodeWithTag(ListTag).performMouseInput { scroll(-2f) }
+        waitForIdle()
+        assertFalse(listState.canScrollBackward)
+        assertEquals(0f, state.hiddenFraction)
+    }
+
     @Test
     fun scrollingDownCollapsesTheBarsBeforeTheListScrolls() = runBarsTest { state, listState ->
         assertEquals(TopBarHeight, onNodeWithTag(FirstItemTag).getBoundsInRoot().top)
@@ -106,10 +125,11 @@ class HomeBarsScrollBehaviorTest {
     /** [onRefresh] 非空时列表外面包一层下拉刷新，和主页的各个列表一样。 */
     private fun runBarsTest(
         onRefresh: (() -> Unit)? = null,
+        collapseEnabled: Boolean = true,
         block: ComposeUiTest.(HomeBarsScrollState, LazyListState) -> Unit,
     ) =
         runDesktopComposeUiTest(width = 400, height = WindowHeight) {
-            val state = HomeBarsScrollState()
+            val state = HomeBarsScrollState(collapseEnabled)
             val listState = LazyListState()
             setContent {
                 AppTheme(dark = false) {

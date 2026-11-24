@@ -34,7 +34,7 @@ import kotlin.math.roundToInt
  * 收到底时容器只剩状态栏那么高的一条留在屏幕上，给状态栏垫一层模糊底。
  */
 @Stable
-internal class HomeBarsScrollState {
+internal class HomeBarsScrollState(private val collapseEnabled: Boolean = true) {
     /** 顶部容器可收起的高度（px）。 */
     var collapseRange by mutableFloatStateOf(0f)
         private set
@@ -57,6 +57,8 @@ internal class HomeBarsScrollState {
 
     /** 顶部容器高度变了（字号、窗口变化、换到没有标签的页面）：保持收起进度不变。 */
     fun updateCollapseRange(range: Float) {
+        // Compose Desktop stops dispatching wheel input when the list hits its scroll boundary.
+        if (!collapseEnabled) return
         val fraction = hiddenFraction
         collapseRange = range.coerceAtLeast(0f)
         collapsed = collapseRange * fraction
