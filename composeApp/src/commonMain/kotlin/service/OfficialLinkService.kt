@@ -34,6 +34,19 @@ internal sealed interface OfficialLinkContent {
     data class Avatar(val data: AvatarData) : OfficialLinkContent
 }
 
+private val clipboardUrlPattern = Regex(
+    """(?:^|[^A-Za-z0-9_+./-])(https?)\\?://([^\s<>"“”‘’《》〈〉【】「」『』（）。，、；：！？]+)""",
+    RegexOption.IGNORE_CASE,
+)
+
+/** Parses a standalone ID or the first supported VRChat URL in clipboard text. */
+internal fun parseOfficialClipboardTarget(value: String): OfficialLinkTarget? =
+    parseOfficialId(value) ?: clipboardUrlPattern.findAll(value).firstNotNullOfOrNull { match ->
+        val (scheme, address) = match.destructured
+        val trimmedAddress = address.trimEnd('.', ',', '!', ';', ':', '?', ')', ']', '}', '\'')
+        parseOfficialLink("$scheme://$trimmedAddress")
+    }
+
 /** Parses a standalone ID for a VRChat content type that VRCM can open. */
 internal fun parseOfficialId(value: String): OfficialLinkTarget? {
     val id = value.trim()
