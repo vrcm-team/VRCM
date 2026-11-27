@@ -2,7 +2,7 @@ package io.github.vrcmteam.vrcm.presentation.compoments
 
 import io.github.vrcmteam.vrcm.service.OfficialLinkRequest
 import io.github.vrcmteam.vrcm.service.OfficialLinkTarget
-import io.github.vrcmteam.vrcm.service.parseOfficialId
+import io.github.vrcmteam.vrcm.service.parseOfficialClipboardTarget
 import io.github.vrcmteam.vrcm.service.parseOfficialLink
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -75,13 +75,13 @@ internal class OfficialLinkPromptController<T>(
     }
 
     fun markClipboardInspected(value: String) {
-        val target = parseOfficialId(value) ?: parseOfficialLink(value) ?: return
+        val target = parseOfficialClipboardTarget(value) ?: return
         markInspected(target.key())
     }
 
     fun inspectClipboard(value: String) {
         if (!isAuthenticated) return
-        val target = parseOfficialId(value) ?: parseOfficialLink(value) ?: return
+        val target = parseOfficialClipboardTarget(value) ?: return
         val targetKey = target.key()
         if (targetKey == lastInspectedTargetKey) return
 

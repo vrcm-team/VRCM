@@ -70,6 +70,59 @@ class OfficialLinkPromptControllerTest {
     }
 
     @Test
+    fun clipboardAcceptsAnAvatarLinkSurroundedByShareText() = runTest {
+        val controller = OfficialLinkPromptController<String>(
+            scope = this,
+            resolve = { Result.success("resolved") },
+            onResolved = {},
+            onExternalConsumed = {},
+        )
+        controller.updateAuthentication(true)
+        val shares = listOf(
+            "角色分享：https://vrchat.com/home/avatar/avtr_sample-1。",
+            "角色分享：https\\://vrchat.com/home/avatar/avtr_sample-2",
+            "Avatar link (https://www.vrchat.com/home/avatar/avtr_sample-3).",
+        )
+
+        shares.forEachIndexed { index, share ->
+            controller.inspectClipboard(share)
+
+            val confirmation = assertIs<OfficialLinkPromptState.ClipboardConfirmation>(
+                controller.state.value,
+            )
+            assertEquals(OfficialLinkType.Avatar, confirmation.operation.target.type)
+            assertEquals("avtr_sample-${index + 1}", confirmation.operation.target.id)
+        }
+    }
+
+    @Test
+    fun clipboardChoosesTheFirstSupportedLinkInShareText() = runTest {
+        val controller = OfficialLinkPromptController<String>(
+            scope = this,
+            resolve = { Result.success("resolved") },
+            onResolved = {},
+            onExternalConsumed = {},
+        )
+        controller.updateAuthentication(true)
+
+        controller.inspectClipboard(
+            """
+            https://vrchat.com.example/home/avatar/avtr_foreign
+            https://example.com/?next=https://vrchat.com/home/avatar/avtr_nested
+            https://vrchat.com/home/avatar/avtr_invalid/extra
+            World: https://vrchat.com/home/launch?instanceId=12345&worldId=wrld_sample-1
+            Avatar: https://vrchat.com/home/avatar/avtr_sample-1
+            """.trimIndent(),
+        )
+
+        val confirmation = assertIs<OfficialLinkPromptState.ClipboardConfirmation>(
+            controller.state.value,
+        )
+        assertEquals(OfficialLinkType.World, confirmation.operation.target.type)
+        assertEquals("wrld_sample-1", confirmation.operation.target.id)
+    }
+
+    @Test
     fun externalLinkSuppressesClipboardInspectionForTheSameForegroundEvent() {
         val gate = OfficialLinkClipboardInspectionGate()
 
